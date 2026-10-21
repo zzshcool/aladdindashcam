@@ -1,0 +1,65 @@
+package com.aladdin.dashcam.model
+
+enum class ConnectionStatus {
+    DISCONNECTED,
+    CONNECTING,
+    CONNECTED,
+    STREAM_INTERRUPTED
+}
+
+enum class DeviceMode(val raw: Int) {
+    RECORD(0),
+    CAPTURE(1),
+    PLAYBACK(2),
+    MENU(3),
+    UNKNOWN(-1);
+
+    companion object {
+        fun fromRaw(raw: Int): DeviceMode =
+            values().firstOrNull { it.raw == raw } ?: UNKNOWN
+    }
+}
+
+enum class RecordingStatus {
+    UNKNOWN,
+    RECORDING,
+    STOPPED
+}
+
+data class DashCamDeviceStatus(
+    val mode: DeviceMode = DeviceMode.UNKNOWN,
+    val recordingStatus: RecordingStatus = RecordingStatus.UNKNOWN,
+    val audioEnabled: Boolean = false,
+    val rtspFlag: Boolean = false,
+    val batteryLevel: Int = 0, // 0 to 4
+    val isCharging: Boolean = false,
+    val sdCardReady: Boolean = false,
+    val recordResolutionIndex: Int = 0,
+    val remainingRecordingSeconds: Long = 0L,
+    val captureResolutionIndex: Int = 0,
+    val availablePhotos: Long = 0L,
+    val lastUpdatedTimestamp: Long = 0L
+)
+
+data class MediaItem(
+    val id: String,
+    val fileName: String,
+    val sizeBytes: Long,
+    val durationSeconds: Int,
+    val timestampMillis: Long,
+    val isVideo: Boolean,
+    val isEmergency: Boolean,
+    val isDownloaded: Boolean = false,
+    val deviceIndex: Int = 0
+)
+
+data class DownloadTask(
+    val taskId: String,
+    val mediaItem: MediaItem,
+    val progressPercent: Int = 0,
+    val bytesDownloaded: Long = 0L,
+    val totalBytes: Long = 0L,
+    val isCompleted: Boolean = false,
+    val isFailed: Boolean = false,
+    val errorMessage: String? = null
+)

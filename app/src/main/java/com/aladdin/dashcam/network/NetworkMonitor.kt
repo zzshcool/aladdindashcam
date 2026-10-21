@@ -1,0 +1,90 @@
+package com.aladdin.dashcam.network
+
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
+import android.util.Log
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+
+class NetworkMonitor(context: Context) {
+    private val connectivityManager =
+        context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+    private val _wifiNetwork = MutableStateFlow<Network?>(null)
+    val wifiNetwork: StateFlow<Network?> = _wifiNetwork.asStateFlow()
+
+    private val _cellularAvailable = MutableStateFlow(false)
+    val cellularAvailable: StateFlow<Boolean> = _cellularAvailable.asStateFlow()
+
+    private val wifiCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            val caps = connectivityManager.getNetworkCapabilities(network)
+            if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) {
+                Log.i(TAG, "Wi-Fi network available: $network")
+                _wifiNetwork.value = network
+            }
+        }
+
+        override fun onLost(network: Network) {
+            if (_wifiNetwork.value == network) {
+                Log.w(TAG, "Wi-Fi network lost: $network")
+                _wifiNetwork.value = null
+            }
+        }
+    }
+
+    private val cellularCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            Log.i(TAG, "Cellular network available: $network")
+            _cellularAvailable.value = true
+        }
+
+        override fun onLost(network: Network) {
+            Log.w(TAG, "Cellular network lost")
+            _cellularAvailable.value = false
+        }
+    }
+
+    fun startMonitoring() {
+        try {
+            // Monitor Wi-Fi
+            val wifiRequest = NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .build()
+            connectivityManager.registerNetworkCallback(wifiRequest, wifiCallback)
+
+            // Monitor Cellular
+            val cellularRequest = NetworkRequest.Builder()
+                .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
+                .build()
+            connectivityManager.registerNetworkCallback(cellularRequest, cellularCallback)
+
+            // Initial probe
+            connectivityManager.activeNetwork?.let { active ->
+                val caps = connectivityManager.getNetworkCapabilities(active)
+                if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) {
+                    _wifiNetwork.value = active
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to register network callbacks", e)
+        }
+    }
+
+    fun stopMonitoring() {
+        try {
+            connectivityManager.unregisterNetworkCallback(wifiCallback)
+            connectivityManager.unregisterNetworkCallback(cellularCallback)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error unregistering network callbacks", e)
+        }
+    }
+
+    companion object {
+        private const val TAG = "NetworkMonitor"
+    }
+}

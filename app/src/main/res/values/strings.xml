@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">AladdinDashCam</string>
+
+    <!-- Bottom Navigation Tabs (5.3) -->
+    <string name="tab_live">即時</string>
+    <string name="tab_album">相簿</string>
+    <string name="tab_downloads">下載</string>
+    <string name="tab_device">裝置</string>
+
+    <!-- Live Preview (5.4) -->
+    <string name="live_title">即時影像</string>
+    <string name="device_status_connected">已連線</string>
+    <string name="device_status_connecting">連線中…</string>
+    <string name="device_status_disconnected">未連線</string>
+    <string name="device_status_stream_interrupted">畫面已中斷</string>
+
+    <string name="recording_active">正在錄影</string>
+    <string name="recording_stopped">已停止錄影</string>
+    <string name="recording_unknown">錄影狀態未知</string>
+
+    <string name="hud_speed_unit">km/h</string>
+    <string name="hud_gps_searching">搜尋 GPS…</string>
+    <string name="hud_gps_locked">GPS 已定位</string>
+    <string name="hud_gps_disabled">GPS 未啟用</string>
+
+    <string name="btn_start_recording">開始錄影</string>
+    <string name="btn_stop_recording">停止錄影</string>
+    <string name="btn_take_photo">拍照</string>
+    <string name="btn_protect_event">事件鎖檔</string>
+    <string name="btn_navigation_mode">啟動導航 PiP</string>
+    <string name="btn_retry_connect">重試連線</string>
+
+    <!-- Album (5.6) -->
+    <string name="album_source_device">裝置相簿</string>
+    <string name="album_source_local">本機媒體</string>
+    <string name="album_filter_all">全部</string>
+    <string name="album_filter_video">影片</string>
+    <string name="album_filter_photo">照片</string>
+    <string name="album_filter_emergency">緊急鎖檔</string>
+    <string name="album_view_grid">網格檢視</string>
+    <string name="album_view_timeline">時間軸</string>
+    <string name="album_empty">尚無媒體檔案</string>
+    <string name="album_loading">讀取檔案清單中…</string>
+
+    <!-- Downloads (5.3) -->
+    <string name="downloads_title">下載中心</string>
+    <string name="downloads_empty">目前沒有下載任務</string>
+
+    <!-- Device & Settings (5.8) -->
+    <string name="device_title">裝置與設定</string>
+    <string name="setting_resolution">錄影解析度</string>
+    <string name="setting_loop">循環錄影片長</string>
+    <string name="setting_audio">記錄器錄音</string>
+    <string name="setting_exposure">曝光補償</string>
+    <string name="setting_watermark">日期時間浮水印</string>
+    <string name="setting_rtc_sync">校正記錄器時間</string>
+    <string name="setting_diagnostics">通訊與系統診斷</string>
+    <string name="setting_danger_zone">危險操作區</string>
+    <string name="setting_format_sd">格式化記憶卡</string>
+    <string name="setting_factory_reset">恢復原廠設定</string>
+
+    <!-- Diagnostics -->
+    <string name="diag_title">診斷資訊</string>
+    <string name="diag_transport">傳輸通道：GPSOCKET TCP 8081</string>
+    <string name="diag_rtsp">串流端點：rtsp://192.168.25.1:8080/?action=stream</string>
+    <string name="diag_wifi_bound">Wi-Fi 網路專屬綁定狀態</string>
+    <string name="diag_cellular_route">行動數據網際網路狀態</string>
+</resources>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Specification Tokens (Chapter 5) -->
+    <color name="bg_dark">#101418</color>
+    <color name="surface_dark">#1A2026</color>
+    <color name="surface_elevated">#222B35</color>
+    <color name="border_subtle">#2A323D</color>
+
+    <color name="text_primary">#F2F5F7</color>
+    <color name="text_secondary">#B4BEC7</color>
+    <color name="text_disabled">#6B7785</color>
+
+    <color name="accent_teal">#54C5B5</color>
+    <color name="accent_teal_dark">#3AA395</color>
+    <color name="warning_yellow">#F2BE63</color>
+    <color name="error_red">#F07878</color>
+    <color name="record_active_red">#FF4D4D</color>
+    <color name="status_green">#48C774</color>
+
+    <!-- UI Helpers -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="transparent">#00000000</color>
+    <color name="hud_scrim">#80000000</color>
+</resources>
