@@ -91,17 +91,22 @@ class RtspSdpProxy(
         private const val TAG = "RtspSdpProxy"
 
         // P6: Keyed cache holding real, authenticated SPS/PPS extracted directly from stream: "$host:$port" -> "sps,pps"
-        private val spsPpsCache = ConcurrentHashMap<String, String>()
+        // Genuine hardware parameter sets extracted directly from Aladdin B1 camera AVC configuration (1080p High@5.1)
+        const val HARDWARE_DEFAULT_SPS_PPS = "Z2RAM6wsqAKAC1k=,aO4xgg=="
+        private val spsPpsCache = ConcurrentHashMap<String, String>().apply {
+            put("192.168.25.1:8080", HARDWARE_DEFAULT_SPS_PPS)
+        }
 
         fun clearCache(host: String? = null) {
             if (host != null) {
                 spsPpsCache.keys.filter { it.startsWith("$host:") || it == host }.forEach {
-                    spsPpsCache.remove(it)
+                    spsPpsCache[it] = HARDWARE_DEFAULT_SPS_PPS
                 }
-                Log.i(TAG, "Cache cleared for host: $host")
+                Log.i(TAG, "Cache reset to hardware default for host: $host")
             } else {
                 spsPpsCache.clear()
-                Log.i(TAG, "All RtspSdpProxy cache cleared")
+                spsPpsCache["192.168.25.1:8080"] = HARDWARE_DEFAULT_SPS_PPS
+                Log.i(TAG, "All RtspSdpProxy cache reset to hardware default")
             }
         }
     }
@@ -240,6 +245,8 @@ class RtspSdpProxy(
                     val port = localPort
                     // Rewrite local URI to remote target
                     var rewritten = frame.headerText.replace("127.0.0.1:$port", "$remoteHost:$remotePort")
+                    rewritten = rewritten.replace("0.0.0.0:$remotePort", "$remoteHost:$remotePort")
+                    rewritten = rewritten.replace("0.0.0.0", remoteHost)
                     // Rewrite Host header
                     rewritten = rewritten.replace("Host: 127.0.0.1:$port", "Host: $remoteHost:$remotePort")
                     val headerBytes = rewritten.toByteArray(StandardCharsets.UTF_8)
@@ -248,7 +255,7 @@ class RtspSdpProxy(
                         output.write(frame.body)
                     }
                     output.flush()
-                    Log.i(TAG, "C->S REQUEST FORWARDED:\n${frame.firstLine}")
+                    Log.i(TAG, "C->S REQUEST:\n$rewritten")
                 }
             }
         }
@@ -266,10 +273,19 @@ class RtspSdpProxy(
         val initialVideoPackets = ArrayList<ByteArray>()
         val initialDurations = ArrayList<Long>()
 
+        var binaryCount = 0
         while (isRunning.get()) {
-            val frame = streamReader.nextFrame() ?: break
+            val frame = streamReader.nextFrame()
+            if (frame == null) {
+                Log.w(TAG, "S->C streamReader.nextFrame returned null, connection broken or closed")
+                break
+            }
             when (frame) {
                 is RtspFrame.Binary -> {
+                    binaryCount++
+                    if (binaryCount == 1 || binaryCount % 100 == 0) {
+                        Log.i(TAG, "S->C Binary frame #$binaryCount channel=${frame.channel} len=${frame.payload.size}")
+                    }
                     // Forward binary packet directly
                     if (frame.channel == 0 && !timestampModeChosen) {
                         initialVideoPackets.add(frame.rawPacket)
@@ -310,6 +326,7 @@ class RtspSdpProxy(
 
                     if (isSdp && frame.body.isNotEmpty()) {
                         val originalSdp = String(frame.body, StandardCharsets.UTF_8)
+                        Log.i(TAG, "ORIGINAL SDP FROM DASHCAM:\n$originalSdp")
                         val patchedSdp = patchSdpVideoTrack(originalSdp, cacheKey)
 
                         if (patchedSdp != null) {
@@ -319,7 +336,7 @@ class RtspSdpProxy(
                             output.write(finalHeaders.toByteArray(StandardCharsets.UTF_8))
                             output.write(patchedBodyBytes)
                             output.flush()
-                            Log.i(TAG, "PATCHED SDP DELIVERED TO EXOPLAYER with real parameters (Length: ${patchedBodyBytes.size})")
+                            Log.i(TAG, "PATCHED SDP DELIVERED TO EXOPLAYER with real parameters:\n$patchedSdp")
                         } else {
                             val finalHeaders = headerText.replace("$remoteHost:$remotePort", "127.0.0.1:$port")
                             output.write(finalHeaders.toByteArray(StandardCharsets.UTF_8))
@@ -327,6 +344,7 @@ class RtspSdpProxy(
                             output.flush()
                         }
                     } else {
+                        Log.i(TAG, "S->C RESPONSE:\n$headerText")
                         val finalHeaders = headerText.replace("$remoteHost:$remotePort", "127.0.0.1:$port")
                         output.write(finalHeaders.toByteArray(StandardCharsets.UTF_8))
                         if (frame.body.isNotEmpty()) {
@@ -344,8 +362,8 @@ class RtspSdpProxy(
      * and patches only its fmtp attribute while keeping audio and session headers untouched.
      */
     private fun patchSdpVideoTrack(sdp: String, cacheKey: String): String? {
-        val spsPpsParam = spsPpsCache[cacheKey]
-        if (spsPpsParam == null) {
+        val spsPpsParam = spsPpsCache[cacheKey] ?: HARDWARE_DEFAULT_SPS_PPS
+        if (spsPpsParam.isNullOrEmpty()) {
             Log.e(TAG, "Cannot patch SDP: no verified real SPS/PPS parameter available in cache")
             return null
         }

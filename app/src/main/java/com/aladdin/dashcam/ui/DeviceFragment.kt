@@ -40,13 +40,13 @@ class DeviceFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
-                    viewModel.connectionStatus.collect { status ->
-                        binding.tvDeviceInfoTitle.text = when (status) {
-                            ConnectionStatus.CONNECTED -> "記錄器：已連線 (Generalplus)"
-                            ConnectionStatus.CONNECTING -> "記錄器：連線中..."
-                            ConnectionStatus.STREAM_INTERRUPTED -> "記錄器：已連線 (串流中斷)"
-                            ConnectionStatus.DISCONNECTED -> "記錄器：未連線"
-                        }
+                    viewModel.captureResolutionDisplay.collect { resText ->
+                        binding.tvCurrentCaptureRes.text = resText
+                    }
+                }
+                launch {
+                    viewModel.captureQualityDisplay.collect { qualityText ->
+                        binding.tvCurrentCaptureQuality.text = qualityText
                     }
                 }
                 launch {
@@ -60,6 +60,42 @@ class DeviceFragment : Fragment() {
                     }
                 }
                 launch {
+                    viewModel.exposureDisplay.collect { expText ->
+                        binding.tvCurrentExposure.text = expText
+                    }
+                }
+                launch {
+                    viewModel.watermarkDisplay.collect { wmText ->
+                        binding.tvCurrentWatermark.text = wmText
+                    }
+                }
+                launch {
+                    viewModel.audioRecordingDisplay.collect { audioText ->
+                        binding.tvCurrentAudio.text = audioText
+                        binding.switchAudioRecord.isChecked = (audioText == "開啟")
+                    }
+                }
+                launch {
+                    viewModel.firmwareVersionDisplay.collect { fwText ->
+                        binding.tvDeviceFirmware.text = fwText
+                    }
+                }
+                launch {
+                    viewModel.wifiSsidDisplay.collect { ssidText ->
+                        binding.tvWifiName.text = ssidText
+                    }
+                }
+                launch {
+                    viewModel.rtcSyncState.collect { rtcState ->
+                        binding.tvRtcStatus.text = "校時狀態：${rtcState.message}"
+                    }
+                }
+                launch {
+                    viewModel.storageEstimate.collect { est ->
+                        binding.tvSdStatusDesc.text = est.statusText
+                    }
+                }
+                launch {
                     viewModel.targetIdentity.collect { identity ->
                         val isSwitching = identity.state == com.aladdin.dashcam.network.TargetState.CONNECTING
                         binding.tvDeviceHost.text = if (isSwitching) {
@@ -67,9 +103,6 @@ class DeviceFragment : Fragment() {
                         } else {
                             "連線目標：${identity.requestedHost} (點擊可切換 Host)"
                         }
-                        binding.rowResolution.isEnabled = !isSwitching
-                        binding.rowLoopRecording.isEnabled = !isSwitching
-                        binding.btnSyncRtc.isEnabled = !isSwitching
                     }
                 }
                 launch {
@@ -118,58 +151,115 @@ class DeviceFragment : Fragment() {
                 .show()
         }
 
-        binding.btnSyncRtc.setOnClickListener {
-            viewLifecycleOwner.lifecycleScope.launch {
-                Toast.makeText(requireContext(), "正在同步手機時間至記錄器...", Toast.LENGTH_SHORT).show()
-                val res = viewModel.syncRtc()
-                res.onSuccess {
-                    Toast.makeText(requireContext(), "校時命令已接受，尚未回讀確認", Toast.LENGTH_SHORT).show()
-                }.onFailure { err ->
-                    Toast.makeText(requireContext(), "無法同步時間，請確認記錄器仍已連線", Toast.LENGTH_LONG).show()
+        // Photo Resolution dialog
+        binding.rowCaptureResolution.setOnClickListener {
+            val options = arrayOf("5M (2592x1944)", "3M (2048x1536)", "2M (1920x1080)", "1M (1280x720)")
+            AlertDialog.Builder(requireContext())
+                .setTitle("圖片解析度")
+                .setItems(options) { _, which ->
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        viewModel.setCaptureResolution(which, options[which])
+                    }
+                }
+                .show()
+        }
+
+        // Photo Quality dialog
+        binding.rowCaptureQuality.setOnClickListener {
+            val options = arrayOf("優質", "標準", "經濟")
+            AlertDialog.Builder(requireContext())
+                .setTitle("圖片畫質")
+                .setItems(options) { _, which ->
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        viewModel.setCaptureQuality(which, options[which])
+                    }
+                }
+                .show()
+        }
+
+        // Video Resolution dialog
+        binding.rowResolution.setOnClickListener {
+            val options = arrayOf("2K", "1080P", "720P")
+            AlertDialog.Builder(requireContext())
+                .setTitle("影像解析度")
+                .setItems(options) { _, which ->
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        viewModel.setResolution(which, options[which])
+                    }
+                }
+                .show()
+        }
+
+        // Loop Duration dialog
+        binding.rowLoopRecording.setOnClickListener {
+            val options = arrayOf("1 分鐘", "3 分鐘", "5 分鐘")
+            val minutes = intArrayOf(1, 3, 5)
+            AlertDialog.Builder(requireContext())
+                .setTitle("影片長度")
+                .setItems(options) { _, which ->
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        viewModel.setLoopDuration(minutes[which], options[which])
+                    }
+                }
+                .show()
+        }
+
+        // Exposure SeekBar (-2.0 ~ +2.0, max 12, progress 6 = 0.0)
+        binding.seekExposure.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
+                if (fromUser) {
+                    val expVal = (progress - 6) / 3.0f
+                    binding.tvCurrentExposure.text = String.format(java.util.Locale.US, "%+.1f", expVal)
                 }
             }
-        }
 
-        binding.rowResolution.setOnClickListener {
-            val resolutions = arrayOf(
-                "2K 2560×1440 30fps",
-                "1080FHD 1920×1080 30fps",
-                "1080P 1440×1080 30fps",
-                "720P 1280×720 30fps"
-            )
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) {}
+
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {
+                val progress = seekBar?.progress ?: 6
+                val expVal = (progress - 6) / 3.0f
+                viewLifecycleOwner.lifecycleScope.launch {
+                    viewModel.setExposure(expVal)
+                }
+            }
+        })
+
+        // Watermark dialog
+        binding.rowWatermark.setOnClickListener {
+            val options = arrayOf("Date/Time", "關閉")
             AlertDialog.Builder(requireContext())
-                .setTitle("選擇錄影解析度")
-                .setItems(resolutions) { _, which ->
-                    binding.tvCurrentResolution.text = "已送出設定，等待裝置確認..."
+                .setTitle("時間浮水印")
+                .setItems(options) { _, which ->
+                    val enable = (which == 0)
                     viewLifecycleOwner.lifecycleScope.launch {
-                        val res = viewModel.setResolution(which, resolutions[which])
-                        res.onSuccess {
-                            Toast.makeText(requireContext(), "已送出設定，等待裝置確認: ${resolutions[which]}", Toast.LENGTH_SHORT).show()
-                        }.onFailure { _ ->
-                            Toast.makeText(requireContext(), "無法套用設定，請確認記錄器仍已連線", Toast.LENGTH_LONG).show()
-                        }
+                        viewModel.setWatermark(enable)
                     }
                 }
                 .show()
         }
 
-        binding.rowLoopRecording.setOnClickListener {
-            val loops = arrayOf("1分鐘", "2分鐘", "3分鐘", "5分鐘")
-            val minutes = intArrayOf(1, 2, 3, 5)
+        // Audio Recording toggle
+        val audioToggle = View.OnClickListener {
+            viewLifecycleOwner.lifecycleScope.launch {
+                viewModel.toggleAudioRecording()
+            }
+        }
+        binding.rowAudioRecord.setOnClickListener(audioToggle)
+        binding.switchAudioRecord.setOnClickListener(audioToggle)
+
+        // Wi-Fi Password guidance dialog
+        binding.rowWifiPassword.setOnClickListener {
             AlertDialog.Builder(requireContext())
-                .setTitle("選擇循環片長")
-                .setItems(loops) { _, which ->
-                    binding.tvCurrentLoop.text = "已送出設定，等待裝置確認..."
-                    viewLifecycleOwner.lifecycleScope.launch {
-                        val res = viewModel.setLoopDuration(minutes[which], loops[which])
-                        res.onSuccess {
-                            Toast.makeText(requireContext(), "已送出設定，等待裝置確認: ${loops[which]}", Toast.LENGTH_SHORT).show()
-                        }.onFailure { _ ->
-                            Toast.makeText(requireContext(), "無法套用設定，請確認記錄器仍已連線", Toast.LENGTH_LONG).show()
-                        }
-                    }
-                }
+                .setTitle("記錄器 Wi-Fi 密碼")
+                .setMessage("預設密碼為 12345678。\n如需修改，完成後請至系統 [Wi-Fi] 設定，重新輸入新密碼以連線。")
+                .setPositiveButton("確定", null)
                 .show()
+        }
+
+        // Manual RTC Sync
+        binding.btnSyncRtc.setOnClickListener {
+            viewModel.syncRtcManual()
+            Toast.makeText(requireContext(), "已發送校時命令", Toast.LENGTH_SHORT).show()
         }
     }
 

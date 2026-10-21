@@ -758,6 +758,147 @@ class DashCamClient(
             }
         }
     }
+    /**
+     * Starts RTSP streaming playback for recorded file (deviceIndex) via CMD_PLAYBACK_START (Spec 25.8)
+     */
+    suspend fun startPlayback(deviceIndex: Int, expectedEpoch: Long? = null): Result<Unit> = withContext(Dispatchers.IO) {
+        synchronized(commandLock) {
+            if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                return@withContext Result.failure(IllegalStateException("Target epoch expired before startPlayback"))
+            }
+            try {
+                ensureConnected()
+                val req = GPSocketProtocol.buildPlaybackStartPacket(deviceIndex)
+                val resp = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_PLAYBACK_START, req)
+                when (resp) {
+                    is GPSocketResponse.Ack -> {
+                        Log.i(TAG, "StartPlayback accepted by hardware for index $deviceIndex")
+                        Result.success(Unit)
+                    }
+                    is GPSocketResponse.Nak -> {
+                        Result.failure(Exception("StartPlayback NAK: 0x${resp.errorCode.toString(16).uppercase()}"))
+                    }
+                    is GPSocketResponse.Error -> {
+                        Result.failure(Exception(resp.message))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start playback for index $deviceIndex", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Stops RTSP playback and restores live stream readiness via CMD_PLAYBACK_STOP
+     */
+    suspend fun stopPlayback(expectedEpoch: Long? = null): Result<Unit> = withContext(Dispatchers.IO) {
+        synchronized(commandLock) {
+            try {
+                ensureConnected()
+                val req = GPSocketProtocol.buildPlaybackStopPacket()
+                val resp = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_PLAYBACK_STOP, req)
+                when (resp) {
+                    is GPSocketResponse.Ack -> {
+                        Log.i(TAG, "StopPlayback accepted by hardware")
+                        Result.success(Unit)
+                    }
+                    is GPSocketResponse.Nak -> {
+                        Result.failure(Exception("StopPlayback NAK: 0x${resp.errorCode.toString(16).uppercase()}"))
+                    }
+                    is GPSocketResponse.Error -> {
+                        Result.failure(Exception(resp.message))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to stop playback", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Fetches file thumbnail from hardware via CMD_GET_THUMBNAIL (0x04)
+     */
+    suspend fun getThumbnail(deviceIndex: Int, expectedEpoch: Long? = null): Result<ByteArray> = withContext(Dispatchers.IO) {
+        synchronized(commandLock) {
+            try {
+                ensureConnected()
+                val req = GPSocketProtocol.buildGetThumbnailPacket(deviceIndex)
+                val resp = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_GET_THUMBNAIL, req)
+                when (resp) {
+                    is GPSocketResponse.Ack -> {
+                        Result.success(resp.payload)
+                    }
+                    is GPSocketResponse.Nak -> {
+                        Result.failure(Exception("GetThumbnail NAK: 0x${resp.errorCode.toString(16).uppercase()}"))
+                    }
+                    is GPSocketResponse.Error -> {
+                        Result.failure(Exception(resp.message))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get thumbnail for index $deviceIndex", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Deletes media file from hardware SD card via CMD_DELETE_FILE (0x08)
+     */
+    suspend fun deleteFile(deviceIndex: Int, expectedEpoch: Long? = null): Result<Unit> = withContext(Dispatchers.IO) {
+        synchronized(commandLock) {
+            try {
+                ensureConnected()
+                val req = GPSocketProtocol.buildDeleteFilePacket(deviceIndex)
+                val resp = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_DELETE_FILE, req)
+                when (resp) {
+                    is GPSocketResponse.Ack -> {
+                        Log.i(TAG, "Delete file accepted by hardware for index $deviceIndex")
+                        Result.success(Unit)
+                    }
+                    is GPSocketResponse.Nak -> {
+                        Result.failure(Exception("DeleteFile NAK: 0x${resp.errorCode.toString(16).uppercase()}"))
+                    }
+                    is GPSocketResponse.Error -> {
+                        Result.failure(Exception(resp.message))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to delete file for index $deviceIndex", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Toggles recording audio microphone via CMD_RECORD_AUDIO (0x01)
+     */
+    suspend fun toggleAudio(): Result<Unit> = withContext(Dispatchers.IO) {
+        synchronized(commandLock) {
+            try {
+                ensureConnected()
+                val req = GPSocketProtocol.buildRecordAudioTogglePacket()
+                val resp = sendAndReceive(GPSocketProtocol.MODE_RECORD, GPSocketProtocol.CMD_RECORD_AUDIO, req)
+                when (resp) {
+                    is GPSocketResponse.Ack -> {
+                        Log.i(TAG, "Audio toggle accepted by hardware")
+                        Result.success(Unit)
+                    }
+                    is GPSocketResponse.Nak -> {
+                        Result.failure(Exception("ToggleAudio NAK: 0x${resp.errorCode.toString(16).uppercase()}"))
+                    }
+                    is GPSocketResponse.Error -> {
+                        Result.failure(Exception(resp.message))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to toggle audio", e)
+                Result.failure(e)
+            }
+        }
+    }
 
     private fun readFully(inStream: InputStream, buffer: ByteArray) {
         var offset = 0

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/card_strip_container"
+    android:layout_width="88dp"
+    android:layout_height="52dp"
+    android:layout_marginEnd="6dp"
+    app:cardBackgroundColor="@color/surface_dark"
+    app:cardCornerRadius="4dp"
+    app:cardElevation="0dp"
+    app:strokeWidth="0dp">
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+
+        <ImageView
+            android:id="@+id/iv_strip_thumbnail"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:contentDescription="片段縮圖" />
+
+        <TextView
+            android:id="@+id/tv_strip_time"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:background="#B311161B"
+            android:gravity="center"
+            android:paddingVertical="1dp"
+            android:text="14:32:05"
+            android:textColor="@color/text_primary"
+            android:textSize="9sp" />
+    </FrameLayout>
+</com.google.android.material.card.MaterialCardView>

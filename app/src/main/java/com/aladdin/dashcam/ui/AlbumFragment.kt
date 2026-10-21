@@ -38,8 +38,10 @@ class AlbumFragment : Fragment() {
 
     private val viewModel: DashCamViewModel by activityViewModels()
     private lateinit var adapter: MediaAdapter
+    private lateinit var viewerStripAdapter: ViewerStripAdapter
 
     private var isDeviceSource = true
+    private var isTimelineMode = false
     private var currentFilter = FilterCategory.ALL
 
     // Media viewer & player state
@@ -61,7 +63,11 @@ class AlbumFragment : Fragment() {
 
     private val backPressedCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
-            closeViewer()
+            if (binding.layoutMediaViewer.visibility == View.VISIBLE) {
+                closeViewer()
+            } else if (adapter.isSelectionMode) {
+                exitBatchSelectionMode()
+            }
         }
     }
 
@@ -84,10 +90,31 @@ class AlbumFragment : Fragment() {
     }
 
     private fun setupRecyclerView() {
-        adapter = MediaAdapter { item ->
-            // Enter viewer directly. No automatic permanent download.
-            openViewer(item)
-        }
+        adapter = MediaAdapter(
+            onItemClick = { item ->
+                openViewer(item)
+            },
+            onItemLongClick = { _ ->
+                enterBatchSelectionMode()
+            },
+            onFetchThumbnail = { item, imageView ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val file = viewModel.getOrFetchThumbnail(item)
+                    if (file != null && imageView.drawable == null) {
+                        val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                        if (bitmap != null) {
+                            imageView.setImageBitmap(bitmap)
+                        }
+                    }
+                }
+            },
+            onSelectionChanged = { count, bytes ->
+                val sizeMb = bytes / (1024 * 1024)
+                binding.tvBatchSelectedCount.text = "已選取 $count 項 (${sizeMb} MB)"
+                binding.btnBatchDownload.isEnabled = count > 0
+                binding.btnBatchDelete.isEnabled = count > 0
+            }
+        )
 
         val gridLayoutManager = GridLayoutManager(requireContext(), 2)
         gridLayoutManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
@@ -97,6 +124,46 @@ class AlbumFragment : Fragment() {
         }
         binding.rvAlbum.layoutManager = gridLayoutManager
         binding.rvAlbum.adapter = adapter
+
+        // Setup adjacent segments strip under player
+        viewerStripAdapter = ViewerStripAdapter(
+            onItemClick = { clickedItem ->
+                openViewer(clickedItem)
+            },
+            onFetchThumbnail = { item, imageView ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val file = viewModel.getOrFetchThumbnail(item)
+                    if (file != null && imageView.drawable == null) {
+                        val bitmap = BitmapFactory.decodeFile(file.absolutePath)
+                        if (bitmap != null) {
+                            imageView.setImageBitmap(bitmap)
+                        }
+                    }
+                }
+            }
+        )
+        binding.rvViewerStrip.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(
+            requireContext(),
+            androidx.recyclerview.widget.LinearLayoutManager.HORIZONTAL,
+            false
+        )
+        binding.rvViewerStrip.adapter = viewerStripAdapter
+    }
+
+    private fun enterBatchSelectionMode() {
+        adapter.setSelectionMode(true)
+        binding.layoutNormalHeader.visibility = View.GONE
+        binding.layoutBatchHeader.visibility = View.VISIBLE
+        binding.layoutBatchBottomBar.visibility = View.VISIBLE
+        backPressedCallback.isEnabled = true
+    }
+
+    private fun exitBatchSelectionMode() {
+        adapter.setSelectionMode(false)
+        binding.layoutNormalHeader.visibility = View.VISIBLE
+        binding.layoutBatchHeader.visibility = View.GONE
+        binding.layoutBatchBottomBar.visibility = View.GONE
+        backPressedCallback.isEnabled = binding.layoutMediaViewer.visibility == View.VISIBLE
     }
 
     private fun triggerRemoteListRefresh() {
@@ -119,6 +186,74 @@ class AlbumFragment : Fragment() {
             if (isChecked) {
                 isDeviceSource = (checkedId == R.id.btn_source_device)
                 applyFilters()
+            }
+        }
+
+        binding.toggleViewMode.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                isTimelineMode = (checkedId == R.id.btn_mode_timeline)
+                updateViewModeLayout()
+            }
+        }
+
+        binding.btnEnterSelect.setOnClickListener {
+            enterBatchSelectionMode()
+        }
+
+        binding.btnBatchCancel.setOnClickListener {
+            exitBatchSelectionMode()
+        }
+
+        binding.btnBatchSelectAll.setOnClickListener {
+            val currentList = if (isDeviceSource) viewModel.deviceMediaList.value else viewModel.localMediaList.value
+            adapter.selectAll(currentList)
+        }
+
+        binding.btnBatchDownload.setOnClickListener {
+            val selected = adapter.getSelectedList()
+            if (selected.isEmpty()) return@setOnClickListener
+            Toast.makeText(requireContext(), "開始批次下載 ${selected.size} 個檔案", Toast.LENGTH_SHORT).show()
+            for (item in selected) {
+                if (!item.isDownloaded) {
+                    viewModel.startPermanentDownload(item)
+                }
+            }
+            exitBatchSelectionMode()
+        }
+
+        binding.btnBatchDelete.setOnClickListener {
+            val selected = adapter.getSelectedList()
+            if (selected.isEmpty()) return@setOnClickListener
+            androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle("確認刪除檔案")
+                .setMessage("確定要從 ${if (isDeviceSource) "記錄器 SD 卡" else "本機儲存空間"} 刪除選取的 ${selected.size} 個檔案？此操作無法還原。")
+                .setPositiveButton("確定刪除") { _, _ ->
+                    executeBatchDelete(selected)
+                }
+                .setNegativeButton("取消", null)
+                .show()
+        }
+
+        // Timeline Seek Listeners
+        binding.timelineRuler.onTimeSeekListener = { targetMillis, isFinished ->
+            val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(targetMillis))
+            val hitItem = binding.timelineRuler.findItemAtCursor()
+            if (hitItem != null) {
+                binding.tvTimelineCursorInfo.text = "定位到影片：${hitItem.fileName} ($timeStr)"
+                binding.btnTimelineJumpNext.visibility = View.GONE
+                if (isFinished) {
+                    openViewer(hitItem)
+                }
+            } else {
+                binding.tvTimelineCursorInfo.text = "此時段無錄影片段 ($timeStr)"
+                val nextItem = binding.timelineRuler.findNextItem()
+                binding.btnTimelineJumpNext.visibility = if (nextItem != null) View.VISIBLE else View.GONE
+                binding.btnTimelineJumpNext.setOnClickListener {
+                    nextItem?.let {
+                        binding.timelineRuler.seekToTime(it.timestampMillis)
+                        openViewer(it)
+                    }
+                }
             }
         }
 
@@ -151,6 +286,42 @@ class AlbumFragment : Fragment() {
         }
     }
 
+    private fun executeBatchDelete(items: List<MediaItem>) {
+        viewLifecycleOwner.lifecycleScope.launch {
+            binding.layoutLoadingState.visibility = View.VISIBLE
+            var successCount = 0
+            for (item in items) {
+                val ok = if (isDeviceSource) {
+                    viewModel.deleteRemoteMedia(item).isSuccess
+                } else {
+                    viewModel.deleteLocalFile(item)
+                }
+                if (ok) successCount++
+            }
+            binding.layoutLoadingState.visibility = View.GONE
+            Toast.makeText(requireContext(), "成功刪除 $successCount / ${items.size} 個檔案", Toast.LENGTH_SHORT).show()
+            exitBatchSelectionMode()
+            if (isDeviceSource) {
+                triggerRemoteListRefresh()
+            } else {
+                applyFilters()
+            }
+        }
+    }
+
+    private fun updateViewModeLayout() {
+        if (isTimelineMode) {
+            binding.rvAlbum.visibility = View.GONE
+            binding.scrollFilterChips.visibility = View.GONE
+            binding.layoutTimelineContainer.visibility = View.VISIBLE
+            applyTimelineData()
+        } else {
+            binding.layoutTimelineContainer.visibility = View.GONE
+            binding.scrollFilterChips.visibility = View.VISIBLE
+            applyFilters()
+        }
+    }
+
     private fun selectFilter(filter: FilterCategory) {
         currentFilter = filter
         val context = requireContext()
@@ -165,7 +336,78 @@ class AlbumFragment : Fragment() {
         applyFilters()
     }
 
+    private fun formatGroupHeader(timestamp: Long): String {
+        if (timestamp <= 0L) return "時間未知"
+        val calNow = java.util.Calendar.getInstance()
+        val calItem = java.util.Calendar.getInstance().apply { timeInMillis = timestamp }
+
+        val isSameYear = calNow.get(java.util.Calendar.YEAR) == calItem.get(java.util.Calendar.YEAR)
+        val dayDiff = if (isSameYear) {
+            calNow.get(java.util.Calendar.DAY_OF_YEAR) - calItem.get(java.util.Calendar.DAY_OF_YEAR)
+        } else {
+            val days = (calNow.timeInMillis - calItem.timeInMillis) / (24 * 3600_000L)
+            days.toInt()
+        }
+
+        val ymd = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(timestamp))
+        return when (dayDiff) {
+            0 -> "今天 ($ymd)"
+            1 -> "昨天 ($ymd)"
+            else -> ymd
+        }
+    }
+
+    private fun applyTimelineData() {
+        val rawList = if (isDeviceSource) viewModel.deviceMediaList.value else viewModel.localMediaList.value
+        val videoList = rawList.filter { it.isVideo && it.timestampMillis > 0L }
+        if (videoList.isEmpty()) {
+            binding.containerTimelineDates.removeAllViews()
+            binding.tvTimelineCursorInfo.text = "無可用錄影片段"
+            binding.btnTimelineJumpNext.visibility = View.GONE
+            return
+        }
+
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val dateMap = videoList.groupBy { dateFormat.format(Date(it.timestampMillis)) }
+        binding.containerTimelineDates.removeAllViews()
+
+        val dates = dateMap.keys.sortedDescending()
+        var selectedDateStr = dates.firstOrNull() ?: return
+
+        for (dateStr in dates) {
+            val isSelected = dateStr == selectedDateStr
+            val chip = android.widget.TextView(requireContext()).apply {
+                text = dateStr
+                textSize = 13f
+                setPadding(32, 16, 32, 16)
+                setTextColor(ContextCompat.getColor(context, if (isSelected) R.color.accent_teal else R.color.text_secondary))
+                setBackgroundResource(if (isSelected) R.drawable.bg_status_badge else 0)
+                setOnClickListener {
+                    selectedDateStr = dateStr
+                    val items = dateMap[dateStr] ?: emptyList()
+                    val targetTimestamp = items.firstOrNull()?.timestampMillis ?: System.currentTimeMillis()
+                    binding.timelineRuler.setDayMedia(targetTimestamp, items)
+                    val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(binding.timelineRuler.currentCursorMillis))
+                    binding.tvTimelineCursorInfo.text = "當前定位時刻：$timeStr (共 ${items.size} 個片段)"
+                    applyTimelineData() // refresh chip selection
+                }
+            }
+            binding.containerTimelineDates.addView(chip)
+        }
+
+        val itemsForDate = dateMap[selectedDateStr] ?: emptyList()
+        val targetTimestamp = itemsForDate.firstOrNull()?.timestampMillis ?: System.currentTimeMillis()
+        binding.timelineRuler.setDayMedia(targetTimestamp, itemsForDate)
+        val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(binding.timelineRuler.currentCursorMillis))
+        binding.tvTimelineCursorInfo.text = "當前定位時刻：$timeStr (共 ${itemsForDate.size} 個片段)"
+    }
+
     private fun applyFilters() {
+        if (isTimelineMode) {
+            applyTimelineData()
+            return
+        }
+
         val rawList = if (isDeviceSource) viewModel.deviceMediaList.value else viewModel.localMediaList.value
 
         // Filter by category
@@ -191,17 +433,12 @@ class AlbumFragment : Fragment() {
             }
         }
 
-        // Group by recording date into AlbumListItem items
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        // Group by recording date into AlbumListItem items (Today / Yesterday / YYYY-MM-DD / Unknown)
         val itemsWithHeaders = mutableListOf<AlbumListItem>()
         var lastHeader = ""
 
         for (item in sortedList) {
-            val headerText = if (item.timestampMillis > 0L) {
-                dateFormat.format(Date(item.timestampMillis))
-            } else {
-                "時間未知"
-            }
+            val headerText = formatGroupHeader(item.timestampMillis)
             if (headerText != lastHeader) {
                 itemsWithHeaders.add(AlbumListItem.Header(headerText))
                 lastHeader = headerText
@@ -266,15 +503,13 @@ class AlbumFragment : Fragment() {
     }
 
     /**
-     * Opens media viewer with proper loading and retry handling.
-     * Does NOT download permanently automatically.
+     * Opens media viewer with fast RTSP playback on remote dashcam and offline local playback.
      */
     private fun openViewer(item: MediaItem) {
         currentViewingItem = item
         binding.layoutMediaViewer.visibility = View.VISIBLE
         backPressedCallback.isEnabled = true
 
-        // Monotonically increasing request token to invalidate any stale in-flight preview (R2)
         val currentToken = ++previewRequestId
         previewJob?.cancel()
         previewJob = null
@@ -289,7 +524,6 @@ class AlbumFragment : Fragment() {
         }
         binding.tvViewerTime.text = if (item.isVideo) "錄製時間：$timeStr" else "拍攝時間：$timeStr"
 
-        // Update independent download button state
         updateViewerDownloadButton(item)
 
         // Reset player & photo view
@@ -298,6 +532,20 @@ class AlbumFragment : Fragment() {
         binding.ivPhotoViewer.visibility = View.GONE
         binding.viewerLoadingLayout.visibility = View.GONE
         binding.viewerErrorLayout.visibility = View.GONE
+
+        // Update adjacent segments strip
+        val allList = if (isDeviceSource) viewModel.deviceMediaList.value else viewModel.localMediaList.value
+        val videoList = allList.filter { it.isVideo }
+        if (item.isVideo && videoList.isNotEmpty()) {
+            binding.layoutViewerStripContainer.visibility = View.VISIBLE
+            viewerStripAdapter.submitList(videoList, item.id)
+            val activeIdx = videoList.indexOfFirst { it.id == item.id }
+            if (activeIdx >= 0) {
+                binding.rvViewerStrip.scrollToPosition(activeIdx)
+            }
+        } else {
+            binding.layoutViewerStripContainer.visibility = View.GONE
+        }
 
         // Check if file is already on local device
         val localFile = viewModel.getLocalMediaFile(item)
@@ -313,9 +561,34 @@ class AlbumFragment : Fragment() {
             return
         }
 
-        // Remote fetch into viewing cache
+        // Fast Remote Playback: Stream via RTSP directly from DashCam
+        if (isDeviceSource && item.isVideo) {
+            binding.viewerLoadingLayout.visibility = View.VISIBLE
+            binding.tvViewerLoadingText.text = "正在啟動快速開片串流..."
+
+            previewJob = viewLifecycleOwner.lifecycleScope.launch {
+                val streamResult = viewModel.startRemotePlayback(item)
+                if (!isAdded || previewRequestId != currentToken || currentViewingItem?.fileName != item.fileName) return@launch
+
+                binding.viewerLoadingLayout.visibility = View.GONE
+                streamResult.onSuccess {
+                    val host = viewModel.deviceHost.value
+                    setupExoPlayerStream("rtsp://$host:8080/?action=stream")
+                }.onFailure { err ->
+                    // Fallback to preview cache download if stream handshake rejected
+                    fetchPreviewFallback(item, currentToken)
+                }
+            }
+            return
+        }
+
+        // Remote Photo fetch or fallback
+        fetchPreviewFallback(item, currentToken)
+    }
+
+    private fun fetchPreviewFallback(item: MediaItem, currentToken: Long) {
         binding.viewerLoadingLayout.visibility = View.VISIBLE
-        binding.tvViewerLoadingText.text = "正在準備觀看，需先讀取此檔案..."
+        binding.tvViewerLoadingText.text = "正在讀取此檔案..."
 
         previewJob = viewLifecycleOwner.lifecycleScope.launch {
             val res = viewModel.fetchPreviewCache(item) { bytesRead ->
@@ -323,7 +596,7 @@ class AlbumFragment : Fragment() {
                 val progress = if (item.sizeBytes > 0) {
                     ((bytesRead * 100) / item.sizeBytes).toInt().coerceIn(0, 100)
                 } else 0
-                binding.tvViewerLoadingText.text = if (progress > 0) "讀取中: $progress%" else "正在準備觀看..."
+                binding.tvViewerLoadingText.text = if (progress > 0) "讀取中: $progress%" else "正在讀取..."
             }
 
             if (!isAdded || previewRequestId != currentToken || currentViewingItem?.fileName != item.fileName) return@launch
@@ -340,6 +613,29 @@ class AlbumFragment : Fragment() {
                 }
             }
         }
+    }
+
+    private fun setupExoPlayerStream(streamUri: String) {
+        releasePlayer()
+        val player = ExoPlayer.Builder(requireContext()).build()
+        binding.playerView.player = player
+        binding.playerView.visibility = View.VISIBLE
+        binding.ivPhotoViewer.visibility = View.GONE
+
+        player.addListener(object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                binding.viewerErrorLayout.visibility = View.VISIBLE
+                binding.tvViewerErrorMsg.text = "影片串流播放中斷：${error.message ?: "無法讀取串流"}"
+            }
+        })
+
+        val factory = androidx.media3.exoplayer.rtsp.RtspMediaSource.Factory()
+            .setForceUseRtpTcp(true)
+        val mediaSource = factory.createMediaSource(ExoMediaItem.fromUri(streamUri))
+        player.setMediaSource(mediaSource)
+        player.prepare()
+        player.playWhenReady = true
+        exoPlayer = player
     }
 
     private fun displayMediaContent(item: MediaItem, file: File) {
@@ -491,6 +787,12 @@ class AlbumFragment : Fragment() {
         currentViewingItem = null
         binding.layoutMediaViewer.visibility = View.GONE
         backPressedCallback.isEnabled = false
+
+        if (isDeviceSource) {
+            viewLifecycleOwner.lifecycleScope.launch {
+                viewModel.stopRemotePlayback()
+            }
+        }
     }
 
     private fun releasePlayer() {

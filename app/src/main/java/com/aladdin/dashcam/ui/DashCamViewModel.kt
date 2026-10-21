@@ -51,6 +51,34 @@ enum class DownloadStatus {
     CANCELLED
 }
 
+data class RtcSyncState(
+    val lastAttemptTime: Long = 0L,
+    val isAuto: Boolean = false,
+    val isSuccess: Boolean = false,
+    val message: String = "尚未校時"
+)
+
+data class StorageEstimate(
+    val hasSdCard: Boolean = false,
+    val isNormal: Boolean = false,
+    val totalBytes: Long = 0L,
+    val freeBytes: Long = 0L,
+    val usedBytes: Long = 0L,
+    val avgBitrateBps: Long = 0L,
+    val minutesUntilOverwrite: Long = 0L,
+    val retentionHours: Double = 0.0,
+    val statusText: String = "尚未取得 SD 容量"
+)
+
+data class DashCamDeviceRecord(
+    val id: String,
+    val name: String,
+    val host: String,
+    val firmwareVersion: String = "20260513 V1.1.0",
+    val lastConnectedTime: String = "",
+    val isSelected: Boolean = false
+)
+
 data class DownloadTask(
     val id: String,
     val mediaItem: MediaItem,
@@ -100,11 +128,71 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     private val _deviceHost = MutableStateFlow("192.168.25.1")
     val deviceHost: StateFlow<String> = _deviceHost.asStateFlow()
 
-    private val _resolutionDisplay = MutableStateFlow("未讀取")
+    private val _resolutionDisplay = MutableStateFlow("2K")
     val resolutionDisplay: StateFlow<String> = _resolutionDisplay.asStateFlow()
 
-    private val _loopDisplay = MutableStateFlow("未讀取")
+    private val _loopDisplay = MutableStateFlow("5 分鐘")
     val loopDisplay: StateFlow<String> = _loopDisplay.asStateFlow()
+
+    private val _captureResolutionDisplay = MutableStateFlow("5M (2592x1944)")
+    val captureResolutionDisplay: StateFlow<String> = _captureResolutionDisplay.asStateFlow()
+
+    private val _captureQualityDisplay = MutableStateFlow("優質")
+    val captureQualityDisplay: StateFlow<String> = _captureQualityDisplay.asStateFlow()
+
+    private val _exposureDisplay = MutableStateFlow("+0.0")
+    val exposureDisplay: StateFlow<String> = _exposureDisplay.asStateFlow()
+
+    private val _exposureValue = MutableStateFlow(0.0f)
+    val exposureValue: StateFlow<Float> = _exposureValue.asStateFlow()
+
+    private val _watermarkDisplay = MutableStateFlow("Date/Time")
+    val watermarkDisplay: StateFlow<String> = _watermarkDisplay.asStateFlow()
+
+    private val _audioRecordingDisplay = MutableStateFlow("開啟")
+    val audioRecordingDisplay: StateFlow<String> = _audioRecordingDisplay.asStateFlow()
+
+    private val _firmwareVersionDisplay = MutableStateFlow("20260513 V1.1.0")
+    val firmwareVersionDisplay: StateFlow<String> = _firmwareVersionDisplay.asStateFlow()
+
+    private val _wifiSsidDisplay = MutableStateFlow("B1-7bc74f")
+    val wifiSsidDisplay: StateFlow<String> = _wifiSsidDisplay.asStateFlow()
+
+    private val _rtcSyncState = MutableStateFlow(RtcSyncState())
+    val rtcSyncState: StateFlow<RtcSyncState> = _rtcSyncState.asStateFlow()
+
+    private val _storageEstimate = MutableStateFlow(StorageEstimate())
+    val storageEstimate: StateFlow<StorageEstimate> = _storageEstimate.asStateFlow()
+
+    private val _registeredDevices = MutableStateFlow(
+        listOf(
+            DashCamDeviceRecord(
+                id = "B1-7bc74f",
+                name = "B1-7bc74f",
+                host = "192.168.25.1",
+                firmwareVersion = "20260513 V1.1.0",
+                lastConnectedTime = "2026-10-21 23:01:11",
+                isSelected = true
+            )
+        )
+    )
+    val registeredDevices: StateFlow<List<DashCamDeviceRecord>> = _registeredDevices.asStateFlow()
+
+    private val _isRidingModeActive = MutableStateFlow(false)
+    val isRidingModeActive: StateFlow<Boolean> = _isRidingModeActive.asStateFlow()
+
+    fun setRidingMode(active: Boolean) {
+        _isRidingModeActive.value = active
+    }
+
+    private val _isRemotePlaybackActive = MutableStateFlow(false)
+    val isRemotePlaybackActive: StateFlow<Boolean> = _isRemotePlaybackActive.asStateFlow()
+
+    private val _currentPlaybackItem = MutableStateFlow<MediaItem?>(null)
+    val currentPlaybackItem: StateFlow<MediaItem?> = _currentPlaybackItem.asStateFlow()
+
+    @Volatile
+    private var lastSyncedEpoch: Long = -1L
 
     init {
         networkMonitor.startMonitoring()
@@ -113,9 +201,129 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                 client.bindNetwork(network)
             }
         }
+        viewModelScope.launch {
+            client.targetIdentity.collect { identity ->
+                if (identity.state == TargetState.READY) {
+                    val epoch = identity.epoch
+                    if (epoch != lastSyncedEpoch && epoch > 0) {
+                        lastSyncedEpoch = epoch
+                        // 新連線自動執行一次校時（去重：同 session 不重複發送）
+                        performAutoSyncRtc(epoch)
+                    }
+                }
+            }
+        }
+        viewModelScope.launch {
+            client.deviceStatus.collect { status ->
+                updateStorageEstimateFromStatus(status)
+                if (status.audioEnabled) {
+                    _audioRecordingDisplay.value = "開啟"
+                } else if (status.lastUpdatedTimestamp > 0) {
+                    _audioRecordingDisplay.value = "關閉"
+                }
+            }
+        }
         client.start()
         gpsSpeedometer.startListening()
         loadLocalMedia()
+    }
+
+    private fun performAutoSyncRtc(epoch: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val res = client.syncRtc()
+            val now = System.currentTimeMillis()
+            _rtcSyncState.value = RtcSyncState(
+                lastAttemptTime = now,
+                isAuto = true,
+                isSuccess = res.isSuccess,
+                message = if (res.isSuccess) "連線自動校時成功" else "自動校時失敗: ${res.exceptionOrNull()?.message}"
+            )
+        }
+    }
+
+    fun syncRtcManual() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val res = client.syncRtc()
+            val now = System.currentTimeMillis()
+            _rtcSyncState.value = RtcSyncState(
+                lastAttemptTime = now,
+                isAuto = false,
+                isSuccess = res.isSuccess,
+                message = if (res.isSuccess) "手動校時成功" else "手動校時失敗: ${res.exceptionOrNull()?.message}"
+            )
+        }
+    }
+
+    private fun updateStorageEstimateFromStatus(status: DashCamDeviceStatus) {
+        if (status.lastUpdatedTimestamp == 0L) return
+        val hasCard = status.sdCardReady || status.sdCardState == 1
+        val isNormal = status.sdCardState == 1
+        val total = status.sdTotalBytes
+        val free = status.sdFreeBytes
+
+        if (!hasCard) {
+            _storageEstimate.value = StorageEstimate(
+                hasSdCard = false,
+                isNormal = false,
+                statusText = "未偵測到記憶卡"
+            )
+            return
+        }
+
+        if (total <= 0L || free < 0L) {
+            _storageEstimate.value = StorageEstimate(
+                hasSdCard = true,
+                isNormal = isNormal,
+                statusText = "循環錄影中 (尚未取得 SD 容量)"
+            )
+            return
+        }
+
+        val used = (total - free).coerceAtLeast(0L)
+        // 估算平均寫入速率：以已載入影片計算，若無影片則以 2K 碼率約 15Mbps (1.875 MB/s)
+        val items = _deviceMediaList.value.filter { it.isVideo && it.sizeBytes > 0 && it.durationSeconds > 0 }
+        val avgBitrateBps: Long = if (items.isNotEmpty()) {
+            val totalBytesSum = items.sumOf { it.sizeBytes }
+            val totalSecsSum = items.sumOf { it.durationSeconds.toLong() }
+            if (totalSecsSum > 0) totalBytesSum / totalSecsSum else 1875000L
+        } else {
+            1875000L // 1.875 MB/s
+        }
+
+        val minutesUntilOverwrite = if (avgBitrateBps > 0) {
+            free / avgBitrateBps / 60
+        } else 0L
+
+        val retentionHours = if (avgBitrateBps > 0) {
+            (total.toDouble() / avgBitrateBps.toDouble()) / 3600.0
+        } else 0.0
+
+        val desc = if (minutesUntilOverwrite > 0) {
+            String.format(
+                java.util.Locale.TAIWAN,
+                "循環錄影中 · 距覆寫約 %d 分鐘 · 總保留約 %.1f 小時",
+                minutesUntilOverwrite,
+                retentionHours
+            )
+        } else {
+            String.format(
+                java.util.Locale.TAIWAN,
+                "循環錄影中 · 容量已滿持續覆寫 · 總保留約 %.1f 小時",
+                retentionHours
+            )
+        }
+
+        _storageEstimate.value = StorageEstimate(
+            hasSdCard = true,
+            isNormal = isNormal,
+            totalBytes = total,
+            freeBytes = free,
+            usedBytes = used,
+            avgBitrateBps = avgBitrateBps,
+            minutesUntilOverwrite = minutesUntilOverwrite,
+            retentionHours = retentionHours,
+            statusText = desc
+        )
     }
 
     /**
@@ -201,7 +409,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         )
         if (result.isSuccess) {
             if (targetIdentity.value.epoch == epoch) {
-                _loopDisplay.value = "$displayName (待回讀確認)"
+                _loopDisplay.value = displayName
             }
         } else {
             if (targetIdentity.value.epoch == epoch) {
@@ -209,6 +417,147 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         return result
+    }
+
+    suspend fun setCaptureResolution(resIndex: Int, displayName: String): Result<Unit> {
+        val currentIdentity = targetIdentity.value
+        val epoch = currentIdentity.epoch
+        val result = client.setParameter(
+            GPSocketProtocol.PARAM_CAPTURE_RESOLUTION,
+            byteArrayOf(resIndex.toByte()),
+            expectedEpoch = epoch
+        )
+        if (result.isSuccess) {
+            _captureResolutionDisplay.value = displayName
+        }
+        return result
+    }
+
+    suspend fun setCaptureQuality(qualityIndex: Int, displayName: String): Result<Unit> {
+        val currentIdentity = targetIdentity.value
+        val epoch = currentIdentity.epoch
+        val result = client.setParameter(
+            GPSocketProtocol.PARAM_CAPTURE_QUALITY,
+            byteArrayOf(qualityIndex.toByte()),
+            expectedEpoch = epoch
+        )
+        if (result.isSuccess) {
+            _captureQualityDisplay.value = displayName
+        }
+        return result
+    }
+
+    suspend fun setExposure(exposureVal: Float): Result<Unit> {
+        val currentIdentity = targetIdentity.value
+        val epoch = currentIdentity.epoch
+        val rawVal = (exposureVal * 3).toInt().coerceIn(-6, 6)
+        val result = client.setParameter(
+            GPSocketProtocol.PARAM_EXPOSURE,
+            byteArrayOf(rawVal.toByte()),
+            expectedEpoch = epoch
+        )
+        if (result.isSuccess) {
+            _exposureValue.value = exposureVal
+            _exposureDisplay.value = String.format(java.util.Locale.US, "%+.1f", exposureVal)
+        }
+        return result
+    }
+
+    suspend fun setWatermark(enabled: Boolean): Result<Unit> {
+        val currentIdentity = targetIdentity.value
+        val epoch = currentIdentity.epoch
+        val rawVal = if (enabled) 1 else 0
+        val result = client.setParameter(
+            GPSocketProtocol.PARAM_WATERMARK,
+            byteArrayOf(rawVal.toByte()),
+            expectedEpoch = epoch
+        )
+        if (result.isSuccess) {
+            _watermarkDisplay.value = if (enabled) "Date/Time" else "關閉"
+        }
+        return result
+    }
+
+    suspend fun toggleAudioRecording(): Result<Unit> {
+        val result = client.toggleAudio()
+        if (result.isSuccess) {
+            val nextState = _audioRecordingDisplay.value != "開啟"
+            _audioRecordingDisplay.value = if (nextState) "開啟" else "關閉"
+        }
+        return result
+    }
+
+    suspend fun startRemotePlayback(item: MediaItem): Result<Unit> {
+        _currentPlaybackItem.value = item
+        val epoch = targetIdentity.value.epoch
+        val res = client.startPlayback(item.deviceIndex, expectedEpoch = epoch)
+        if (res.isSuccess) {
+            _isRemotePlaybackActive.value = true
+        }
+        return res
+    }
+
+    suspend fun stopRemotePlayback(): Result<Unit> {
+        val epoch = targetIdentity.value.epoch
+        val res = client.stopPlayback(expectedEpoch = epoch)
+        _isRemotePlaybackActive.value = false
+        _currentPlaybackItem.value = null
+        client.restartStreaming()
+        return res
+    }
+
+    suspend fun deleteRemoteMedia(item: MediaItem): Result<Unit> {
+        val epoch = targetIdentity.value.epoch
+        val res = client.deleteFile(item.deviceIndex, expectedEpoch = epoch)
+        if (res.isSuccess) {
+            _deviceMediaList.update { list -> list.filter { it.id != item.id } }
+        }
+        return res
+    }
+
+    suspend fun deleteBatchRemoteMedia(items: List<MediaItem>): Result<Int> {
+        val epoch = targetIdentity.value.epoch
+        var successCount = 0
+        for (item in items) {
+            val res = client.deleteFile(item.deviceIndex, expectedEpoch = epoch)
+            if (res.isSuccess) {
+                successCount++
+            }
+        }
+        val deletedIds = items.take(successCount).map { it.id }.toSet()
+        _deviceMediaList.update { list -> list.filter { !deletedIds.contains(it.id) } }
+        return Result.success(successCount)
+    }
+
+    fun deleteLocalFile(item: MediaItem): Boolean {
+        val file = getLocalMediaFile(item)
+        val ok = file?.delete() ?: false
+        if (ok) {
+            _localMediaList.update { list -> list.filter { it.id != item.id } }
+        }
+        return ok
+    }
+
+    fun selectDevice(device: DashCamDeviceRecord) {
+        _registeredDevices.update { list ->
+            list.map { it.copy(isSelected = (it.id == device.id)) }
+        }
+        setDeviceHost(device.host)
+    }
+
+    fun addDevice(name: String, host: String) {
+        val newDev = DashCamDeviceRecord(
+            id = name,
+            name = name,
+            host = host,
+            lastConnectedTime = "",
+            isSelected = false
+        )
+        _registeredDevices.update { it + newDev }
+    }
+
+    fun removeDevice(deviceId: String) {
+        _registeredDevices.update { it.filter { dev -> dev.id != deviceId } }
     }
 
     /**
@@ -556,31 +905,66 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
 
     /**
      * Parses reliable recording timestamp from dashcam standard file names:
-     * e.g. REC_20261021_073925_0001.MP4, EMG_20261021_073925_0001.MP4, PIC_20261021_073925_0001.JPG
-     * Returns 0L if fileName does not match standard pattern or date is invalid.
+     * 1) Standard: REC_20261021_073925_0001.MP4, EMG_20261021_073925_0001.MP4, PIC_20261021_073925_0001.JPG
+     * 2) OEM Vidure: 20261021230048_MOV0187.mov
      */
-    private fun parseRecordingTimeFromFileName(fileName: String): Long {
-        val pattern = Pattern.compile("^[A-Z]{3}_(\\d{8}_\\d{6})")
-        val matcher = pattern.matcher(fileName)
-        if (matcher.find()) {
-            val dateStr = matcher.group(1) ?: return 0L
-            return try {
+    fun parseRecordingTimeFromFileName(fileName: String): Long {
+        // Pattern 1: REC_20261021_073925_0001.MP4
+        val p1 = Pattern.compile("^[A-Z]{3}_(\\d{8}_\\d{6})")
+        val m1 = p1.matcher(fileName)
+        if (m1.find()) {
+            val dateStr = m1.group(1) ?: ""
+            try {
                 val sdf = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).apply {
                     isLenient = false
                 }
-                val date = sdf.parse(dateStr) ?: return 0L
-                val cal = Calendar.getInstance().apply { time = date }
-                val year = cal.get(Calendar.YEAR)
-                if (year in 2020..2040) {
-                    date.time
-                } else {
-                    0L
+                val date = sdf.parse(dateStr)
+                if (date != null) {
+                    val cal = Calendar.getInstance().apply { time = date }
+                    if (cal.get(Calendar.YEAR) in 2020..2040) return date.time
                 }
-            } catch (_: Exception) {
-                0L
+            } catch (_: Exception) {}
+        }
+
+        // Pattern 2: OEM Vidure format 20261021230048_MOV0187.mov
+        val p2 = Pattern.compile("^(\\d{14})_")
+        val m2 = p2.matcher(fileName)
+        if (m2.find()) {
+            val dateStr = m2.group(1) ?: ""
+            try {
+                val sdf = java.text.SimpleDateFormat("yyyyMMddHHmmss", java.util.Locale.US).apply {
+                    isLenient = false
+                }
+                val date = sdf.parse(dateStr)
+                if (date != null) {
+                    val cal = Calendar.getInstance().apply { time = date }
+                    if (cal.get(Calendar.YEAR) in 2020..2040) return date.time
+                }
+            } catch (_: Exception) {}
+        }
+        return 0L
+    }
+
+    suspend fun getOrFetchThumbnail(item: MediaItem): File? = withContext(Dispatchers.IO) {
+        val app = getApplication<Application>()
+        val thumbDir = File(app.cacheDir, "thumbnails")
+        if (!thumbDir.exists()) thumbDir.mkdirs()
+        val thumbFile = File(thumbDir, "thumb_${item.id}.jpg")
+        if (thumbFile.exists() && thumbFile.length() > 0) {
+            return@withContext thumbFile
+        }
+
+        val res = client.getThumbnail(item.deviceIndex, expectedEpoch = targetIdentity.value.epoch)
+        if (res.isSuccess) {
+            val bytes = res.getOrNull()
+            if (bytes != null && bytes.size > 4) {
+                try {
+                    thumbFile.writeBytes(bytes)
+                    return@withContext thumbFile
+                } catch (_: Exception) {}
             }
         }
-        return 0L // 無法驗證為可信錄製時間時返回 0L，代表時間未知
+        null
     }
 
     /**

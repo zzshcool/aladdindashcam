@@ -78,6 +78,7 @@ object GPSocketProtocol {
     const val CMD_GET_PARAM_FILE: Byte = 0x02
     const val CMD_RESTART_STREAM: Byte = 0x04
     const val CMD_RECORD_TOGGLE: Byte = 0x00
+    const val CMD_RECORD_AUDIO: Byte = 0x01
     const val CMD_CAPTURE_PHOTO: Byte = 0x00
     const val CMD_PLAYBACK_START: Byte = 0x00
     const val CMD_PLAYBACK_PAUSE: Byte = 0x01
@@ -86,15 +87,19 @@ object GPSocketProtocol {
     const val CMD_GET_THUMBNAIL: Byte = 0x04
     const val CMD_GET_RAW_DATA: Byte = 0x05
     const val CMD_PLAYBACK_STOP: Byte = 0x06
+    const val CMD_DELETE_FILE: Byte = 0x08
     const val CMD_GET_PARAM: Byte = 0x00
     const val CMD_SET_PARAM: Byte = 0x01
     const val CMD_VENDOR_TIME: Byte = 0x00
 
     // Parameter IDs per Spec 25.7 & Menu.xml (VR-01)
     const val PARAM_RESOLUTION = 0x0000 // 錄影解析度
-    const val PARAM_EXPOSURE = 0x0001   // 曝光值
+    const val PARAM_EXPOSURE = 0x0001   // 曝光補償
     const val PARAM_LOOP_RECORDING = 0x0003 // 循環錄影
-    const val PARAM_WATERMARK = 0x0004  // 浮水印
+    const val PARAM_WATERMARK = 0x0004  // 時間浮水印
+    const val PARAM_CAPTURE_RESOLUTION = 0x0100 // 圖片解析度 (256)
+    const val PARAM_CAPTURE_QUALITY = 0x0101   // 圖片畫質 (257)
+    const val PARAM_VERSION = 0x0209           // 韌體版本 (521)
 
     // Error Codes (Spec 25.10)
     const val ERR_SERVER_IS_BUSY = 0xFFFF
@@ -126,6 +131,9 @@ object GPSocketProtocol {
     fun buildRecordTogglePacket(): ByteArray =
         buildPacket(TYPE_CMD, MODE_RECORD, CMD_RECORD_TOGGLE)
 
+    fun buildRecordAudioTogglePacket(): ByteArray =
+        buildPacket(TYPE_CMD, MODE_RECORD, CMD_RECORD_AUDIO)
+
     fun buildRestartStreamPacket(): ByteArray =
         buildPacket(TYPE_CMD, MODE_DEVICE, CMD_RESTART_STREAM)
 
@@ -146,6 +154,32 @@ object GPSocketProtocol {
         val payload = ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN)
         payload.putShort(deviceIndex.toShort())
         return buildPacket(TYPE_CMD, MODE_PLAYBACK, CMD_GET_RAW_DATA, payload.array())
+    }
+
+    fun buildPlaybackStartPacket(deviceIndex: Int): ByteArray {
+        val payload = ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN)
+        payload.putShort(deviceIndex.toShort())
+        return buildPacket(TYPE_CMD, MODE_PLAYBACK, CMD_PLAYBACK_START, payload.array())
+    }
+
+    fun buildPlaybackPausePacket(): ByteArray =
+        buildPacket(TYPE_CMD, MODE_PLAYBACK, CMD_PLAYBACK_PAUSE)
+
+    fun buildPlaybackStopPacket(): ByteArray {
+        val payload = byteArrayOf(0)
+        return buildPacket(TYPE_CMD, MODE_PLAYBACK, CMD_PLAYBACK_STOP, payload)
+    }
+
+    fun buildGetThumbnailPacket(deviceIndex: Int): ByteArray {
+        val payload = ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN)
+        payload.putShort(deviceIndex.toShort())
+        return buildPacket(TYPE_CMD, MODE_PLAYBACK, CMD_GET_THUMBNAIL, payload.array())
+    }
+
+    fun buildDeleteFilePacket(deviceIndex: Int): ByteArray {
+        val payload = ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN)
+        payload.putShort(deviceIndex.toShort())
+        return buildPacket(TYPE_CMD, MODE_PLAYBACK, CMD_DELETE_FILE, payload.array())
     }
 
     fun buildGetParameterPacket(paramId: Int): ByteArray {
@@ -278,6 +312,33 @@ object GPSocketProtocol {
         val captureResolutionIndex = payload[9].toInt() and 0xFF
         val availablePhotos = buffer.getInt(10).toLong() and 0xFFFFFFFFL
 
+        var sdCardState = if (sdCardReady) 1 else 0
+        var sdFreeBytes = -1L
+        var sdTotalBytes = -1L
+
+        if (payload.size >= 16) {
+            val rawSdState = payload[15].toInt() and 0xFF
+            sdCardState = when (rawSdState) {
+                0 -> 0 // 無卡
+                1 -> 1 // 正常
+                2 -> 2 // 寫保護/異常
+                else -> rawSdState
+            }
+            if (rawSdState == 1 && payload.size >= 24) {
+                // OEM o6/b.java:49 + utils/c.k: bytes 16..19 free KB, bytes 20..23 capacity KB (Big Endian)
+                val freeKb = (((payload[16].toLong() and 0xFF) shl 24) or
+                              ((payload[17].toLong() and 0xFF) shl 16) or
+                              ((payload[18].toLong() and 0xFF) shl 8) or
+                              (payload[19].toLong() and 0xFF)) and 0xFFFFFFFFL
+                val totalKb = (((payload[20].toLong() and 0xFF) shl 24) or
+                               ((payload[21].toLong() and 0xFF) shl 16) or
+                               ((payload[22].toLong() and 0xFF) shl 8) or
+                               (payload[23].toLong() and 0xFF)) and 0xFFFFFFFFL
+                sdFreeBytes = freeKb * 1024L
+                sdTotalBytes = totalKb * 1024L
+            }
+        }
+
         return DashCamDeviceStatus(
             mode = mode,
             recordingStatus = recordingStatus,
@@ -288,9 +349,11 @@ object GPSocketProtocol {
             sdCardReady = sdCardReady,
             recordResolutionIndex = recordResolutionIndex,
             rawRecordSeconds = rawRecordSeconds,
-            remainingRecordingSeconds = 0L,
             captureResolutionIndex = captureResolutionIndex,
             availablePhotos = availablePhotos,
+            sdCardState = sdCardState,
+            sdFreeBytes = sdFreeBytes,
+            sdTotalBytes = sdTotalBytes,
             lastUpdatedTimestamp = System.currentTimeMillis()
         )
     }

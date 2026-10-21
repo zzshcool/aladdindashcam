@@ -222,7 +222,8 @@ class LiveFragment : Fragment() {
                     return@launch
                 }
 
-                // 8081 命令確認成功後，才啟動本機 Proxy 與 ExoPlayer prepare
+                // 8081 命令確認成功後，給予設備管線 350ms 穩定時間，才啟動本機 Proxy 與 ExoPlayer prepare
+                kotlinx.coroutines.delay(350)
                 sdpProxy?.stop()
                 val proxy = com.aladdin.dashcam.network.RtspSdpProxy(host, 8080, network)
                 val localPort = proxy.start()
@@ -332,6 +333,15 @@ class LiveFragment : Fragment() {
                 (activity as? MainActivity)?.requestLocationPermission()
             }
         }
+
+        // Toggle Live Mode: Normal vs Ride Mode
+        binding.toggleLiveMode?.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                val isRide = checkedId == R.id.btn_mode_ride
+                binding.layoutNormalControls?.visibility = if (isRide) View.GONE else View.VISIBLE
+                binding.layoutRideMode?.visibility = if (isRide) View.VISIBLE else View.GONE
+            }
+        }
     }
 
     private fun showMoreMenu(anchor: View) {
@@ -367,8 +377,9 @@ class LiveFragment : Fragment() {
         if (_binding == null) return
         val controlsVisibility = if (isFullscreen) View.GONE else View.VISIBLE
         binding.statusStrip.visibility = controlsVisibility
-        binding.root.findViewById<View>(R.id.action_buttons_container)?.visibility = controlsVisibility
-        binding.root.findViewById<View>(R.id.side_controls_container)?.visibility = controlsVisibility
+        binding.layoutLiveModeToggle?.visibility = controlsVisibility
+        binding.layoutNormalControls?.visibility = if (isFullscreen) View.GONE else (if (binding.toggleLiveMode?.checkedButtonId == R.id.btn_mode_normal) View.VISIBLE else View.GONE)
+        binding.layoutRideMode?.visibility = if (isFullscreen) View.GONE else (if (binding.toggleLiveMode?.checkedButtonId == R.id.btn_mode_ride) View.VISIBLE else View.GONE)
         binding.btnFullscreen.visibility = View.VISIBLE
         binding.hudPipStatusContainer.visibility = if (isFullscreen) View.VISIBLE else View.GONE
         updatePreviewGeometry(isFullscreen)
@@ -426,8 +437,9 @@ class LiveFragment : Fragment() {
         }
         val vis = if (isInPip) View.GONE else View.VISIBLE
         binding.statusStrip.visibility = vis
-        binding.root.findViewById<View>(R.id.action_buttons_container)?.visibility = vis
-        binding.root.findViewById<View>(R.id.side_controls_container)?.visibility = vis
+        binding.layoutLiveModeToggle?.visibility = vis
+        binding.layoutNormalControls?.visibility = vis
+        binding.layoutRideMode?.visibility = View.GONE
         binding.btnFullscreen.visibility = vis
         binding.hudPipStatusContainer.visibility = if (isInPip) View.VISIBLE else View.GONE
         updatePreviewGeometry(isInPip || (activity as? MainActivity)?.isFullscreen == true)
@@ -451,15 +463,28 @@ class LiveFragment : Fragment() {
                         // S3 / S4: Battery vector icons and accessibility texts
                         updateBatteryUi(status.batteryLevel, status.isCharging, status.lastUpdatedTimestamp != 0L)
 
-                        // V1 / S2: 原廠 APK 證實 bytes 5~8 語意為錄影時間 (times = rawRecordSeconds * 1000)，非剩餘容量。在無可信容量來源時以未知呈現，不自行估算
-                        binding.tvSdStatus.text = getString(R.string.sd_remaining_unknown)
+                        // SD Card status & estimate
+                        val estimate = viewModel.storageEstimate.value
+                        if (estimate != null && estimate.freeBytes > 0) {
+                            val freeGb = estimate.freeBytes / (1024.0 * 1024.0 * 1024.0)
+                            val estMinutes = estimate.minutesUntilOverwrite
+                            if (estMinutes > 0) {
+                                binding.tvSdStatus.text = String.format(java.util.Locale.getDefault(), "距覆寫約 %d 分鐘 (餘 %.1f GB)", estMinutes, freeGb)
+                            } else {
+                                binding.tvSdStatus.text = String.format(java.util.Locale.getDefault(), "循環錄影中 (餘 %.1f GB)", freeGb)
+                            }
+                        } else if (status.sdTotalBytes > 0) {
+                            val freeGb = status.sdFreeBytes / (1024.0 * 1024.0 * 1024.0)
+                            binding.tvSdStatus.text = String.format(java.util.Locale.getDefault(), "SD 餘 %.1f GB", freeGb)
+                        } else {
+                            binding.tvSdStatus.text = getString(R.string.sd_remaining_unknown)
+                        }
                     }
                 }
 
                 launch {
                     viewModel.gpsStatus.collect { gps ->
                         (binding.tvHudSpeed.parent as View).visibility = if (gps.speedKmh != null) View.VISIBLE else View.GONE
-                        // C08: Display "--" when speed is unknown, formatted speed only when locked
                         binding.tvHudSpeed.text = if (gps.speedKmh != null) {
                             String.format("%02d", gps.speedKmh)
                         } else {
@@ -472,6 +497,52 @@ class LiveFragment : Fragment() {
                             getString(R.string.hud_gps_disabled)
                         } else {
                             getString(R.string.hud_gps_searching)
+                        }
+
+                        // Ride Mode HUD Updates (safe call for landscape mode)
+                        binding.speedGauge?.setSpeed(gps.speedKmh)
+                        binding.tvRideAltitude?.text = if (gps.altitudeMeters != null) {
+                            String.format(java.util.Locale.getDefault(), "%.0f m", gps.altitudeMeters)
+                        } else {
+                            "-- m"
+                        }
+
+                        binding.tvRideAscent?.text = String.format(
+                            java.util.Locale.getDefault(),
+                            "+%.0f m",
+                            gps.accumulatedAscentMeters
+                        )
+
+                        binding.tvRideBearing?.text = if (gps.bearingDegrees != null) {
+                            val deg = gps.bearingDegrees
+                            val dirStr = when (((deg + 22.5f) % 360 / 45).toInt()) {
+                                0 -> "北"
+                                1 -> "東北"
+                                2 -> "東"
+                                3 -> "東南"
+                                4 -> "南"
+                                5 -> "西南"
+                                6 -> "西"
+                                7 -> "西北"
+                                else -> "北"
+                            }
+                            String.format(java.util.Locale.getDefault(), "%.0f° %s", deg, dirStr)
+                        } else {
+                            "--°"
+                        }
+
+                        binding.tvRideGforce?.text = if (gps.accelerationG != null) {
+                            String.format(java.util.Locale.getDefault(), "%.2f G", gps.accelerationG)
+                        } else {
+                            "1.00 G"
+                        }
+
+                        binding.tvRideGpsSource?.text = if (gps.isLocked) {
+                            "資料來源：${gps.sourceName} (定位正常)"
+                        } else if (!gps.hasPermission) {
+                            "未授權位置權限，點擊上方 HUD 開啟"
+                        } else {
+                            "資料來源：${gps.sourceName} (衛星搜尋中...)"
                         }
                     }
                 }

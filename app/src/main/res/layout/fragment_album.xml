@@ -13,19 +13,20 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Source Selector: Device Album vs Local Storage (Touch target min 48dp) -->
+        <!-- Top Control Bar: Source Selector, View Mode (Grid/Timeline), Batch Select -->
         <LinearLayout
+            android:id="@+id/layout_normal_header"
             android:layout_width="match_parent"
             android:layout_height="56dp"
             android:background="@color/surface_dark"
-            android:gravity="center"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="4dp">
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp">
 
             <com.google.android.material.button.MaterialButtonToggleGroup
                 android:id="@+id/toggle_album_source"
                 android:layout_width="wrap_content"
-                android:layout_height="48dp"
+                android:layout_height="44dp"
                 app:checkedButton="@id/btn_source_device"
                 app:singleSelection="true">
 
@@ -34,25 +35,117 @@
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:minHeight="48dp"
+                    android:minHeight="44dp"
+                    android:paddingHorizontal="10dp"
                     android:text="@string/album_source_device"
                     android:textColor="@color/text_primary"
-                    android:textSize="13sp" />
+                    android:textSize="12sp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_source_local"
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
-                    android:minHeight="48dp"
+                    android:minHeight="44dp"
+                    android:paddingHorizontal="10dp"
                     android:text="@string/album_source_local"
                     android:textColor="@color/text_primary"
-                    android:textSize="13sp" />
+                    android:textSize="12sp" />
             </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <View
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <!-- View Mode Switch: Grid vs Timeline -->
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/toggle_view_mode"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                app:checkedButton="@id/btn_mode_grid"
+                app:singleSelection="true">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_mode_grid"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:minHeight="44dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="網格"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_mode_timeline"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:minHeight="44dp"
+                    android:paddingHorizontal="10dp"
+                    android:text="時間軸"
+                    android:textColor="@color/text_primary"
+                    android:textSize="12sp" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <!-- Enter Batch Selection Mode Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_enter_select"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:layout_marginStart="4dp"
+                android:minHeight="44dp"
+                android:text="選取"
+                android:textColor="@color/accent_teal"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- Batch Selection Action Header (Visible only during batch mode) -->
+        <LinearLayout
+            android:id="@+id/layout_batch_header"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="@color/surface_elevated"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:visibility="gone">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_batch_select_all"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="全選"
+                android:textColor="@color/accent_teal"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/tv_batch_selected_count"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:text="已選取 0 項 (0 MB)"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_batch_cancel"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="44dp"
+                android:text="完成"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp" />
         </LinearLayout>
 
         <!-- Sub-category filters (Touch target min 48dp) -->
         <HorizontalScrollView
+            android:id="@+id/scroll_filter_chips"
             android:layout_width="match_parent"
             android:layout_height="52dp"
             android:background="@color/surface_elevated"
@@ -118,12 +211,112 @@
             android:layout_height="0dp"
             android:layout_weight="1">
 
+            <!-- 1. Grid List View -->
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rv_album"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
                 android:padding="8dp" />
+
+            <!-- 2. Interactive Timeline View -->
+            <LinearLayout
+                android:id="@+id/layout_timeline_container"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:background="@color/bg_dark"
+                android:visibility="gone">
+
+                <!-- Date selector chips -->
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:background="@color/surface_dark"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/container_timeline_dates"
+                        android:layout_width="wrap_content"
+                        android:layout_height="match_parent"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal"
+                        android:paddingHorizontal="12dp" />
+                </HorizontalScrollView>
+
+                <!-- Status indicator: Green for regular, Red for emergency -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="horizontal"
+                    android:paddingVertical="8dp">
+
+                    <View
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
+                        android:background="@color/accent_teal" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:layout_marginEnd="16dp"
+                        android:text="常規循環錄影"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <View
+                        android:layout_width="12dp"
+                        android:layout_height="12dp"
+                        android:background="@color/error_red" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="緊急鎖檔事件"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <!-- Timeline Ruler View -->
+                <com.aladdin.dashcam.ui.TimelineRulerView
+                    android:id="@+id/timeline_ruler"
+                    android:layout_width="match_parent"
+                    android:layout_height="130dp"
+                    android:layout_marginTop="8dp"
+                    android:background="@color/surface_dark" />
+
+                <!-- Timeline Seek Details & Quick Jump -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:orientation="vertical"
+                    android:padding="16dp">
+
+                    <TextView
+                        android:id="@+id/tv_timeline_cursor_info"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="拖曳時間軸游標以定位影片"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_timeline_jump_next"
+                        style="@style/Widget.MaterialComponents.Button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="12dp"
+                        android:backgroundTint="@color/surface_elevated"
+                        android:text="此時段無影片，跳至下一段"
+                        android:textColor="@color/accent_teal"
+                        android:visibility="gone"
+                        app:cornerRadius="8dp" />
+                </LinearLayout>
+            </LinearLayout>
 
             <!-- Empty / Unqueried State View -->
             <LinearLayout
@@ -179,6 +372,44 @@
                     android:textSize="14sp" />
             </LinearLayout>
         </FrameLayout>
+
+        <!-- Batch Selection Bottom Action Bar (Download & Delete) -->
+        <LinearLayout
+            android:id="@+id/layout_batch_bottom_bar"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:background="@color/surface_dark"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:visibility="gone">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_batch_download"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_marginEnd="8dp"
+                android:layout_weight="1"
+                android:backgroundTint="@color/accent_teal"
+                android:text="批次下載"
+                android:textColor="@color/bg_dark"
+                android:textSize="13sp"
+                app:cornerRadius="8dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_batch_delete"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:backgroundTint="@color/error_red"
+                android:text="刪除所選"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                app:cornerRadius="8dp" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- Fullscreen Media Viewer Overlay (Playback & Photo Viewer) -->
@@ -208,6 +439,34 @@
             android:contentDescription="照片檢視"
             android:scaleType="matrix"
             android:visibility="gone" />
+
+        <!-- Adjacent Segments Thumbnail Strip (Bottom overlay on player) -->
+        <LinearLayout
+            android:id="@+id/layout_viewer_strip_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:background="#B311161B"
+            android:orientation="vertical"
+            android:paddingVertical="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:layout_marginBottom="4dp"
+                android:text="相鄰錄影片段快速切換"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_viewer_strip"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:clipToPadding="false"
+                android:orientation="horizontal"
+                android:paddingHorizontal="12dp" />
+        </LinearLayout>
 
         <!-- Viewer Top Bar (Back button, File title, Recording time, Independent Download button) -->
         <LinearLayout

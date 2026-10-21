@@ -225,111 +225,320 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:singleLine="true"
-            android:text="@string/sd_remaining_unknown"
             android:textColor="@color/text_secondary"
+            android:text="@string/sd_remaining_unknown"
             android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- Compact Single-Row Action Buttons (52dp, LIVE-03) -->
+    <!-- Mode Toggle: Normal Preview vs Ride Mode -->
     <LinearLayout
-        android:id="@+id/action_buttons_container"
+        android:id="@+id/layout_live_mode_toggle"
         android:layout_width="0dp"
-        android:layout_height="52dp"
+        android:layout_height="44dp"
         android:layout_marginHorizontal="12dp"
-        android:layout_marginBottom="8dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        app:layout_constraintTop_toBottomOf="@id/status_strip"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/status_strip">
+        app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- 1. Ensure Recording Toggle Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_toggle_recording"
-            style="@style/Widget.MaterialComponents.Button"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1.2"
-            android:layout_marginEnd="6dp"
-            android:backgroundTint="@color/accent_teal"
-            android:minHeight="48dp"
-            android:text="@string/btn_start_recording"
-            android:textColor="@color/bg_dark"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            app:cornerRadius="8dp" />
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/toggle_live_mode"
+            android:layout_width="wrap_content"
+            android:layout_height="38dp"
+            app:checkedButton="@id/btn_mode_normal"
+            app:singleSelection="true">
 
-        <!-- 2. Snapshot Photo Button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_snapshot"
-            style="@style/Widget.MaterialComponents.Button"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:layout_marginHorizontal="4dp"
-            android:backgroundTint="@color/surface_elevated"
-            android:minHeight="48dp"
-            android:text="@string/btn_take_photo"
-            android:textColor="@color/text_primary"
-            android:textSize="13sp"
-            app:cornerRadius="8dp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_mode_normal"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:minHeight="38dp"
+                android:paddingHorizontal="16dp"
+                android:text="一般預覽"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
 
-        <!-- 3. More Actions Button (Opens PopupMenu: PiP, Fullscreen, etc.) -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_more_options"
-            style="@style/Widget.MaterialComponents.Button"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="0.8"
-            android:layout_marginStart="6dp"
-            android:backgroundTint="@color/surface_dark"
-            android:minHeight="48dp"
-            android:maxLines="1"
-            android:paddingHorizontal="8dp"
-            android:text="@string/btn_more_options"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp"
-            app:cornerRadius="8dp"
-            app:strokeColor="@color/border_subtle"
-            app:strokeWidth="1dp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_mode_ride"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:minHeight="38dp"
+                android:paddingHorizontal="16dp"
+                android:text="騎乘模式"
+                android:textColor="@color/text_primary"
+                android:textSize="12sp" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
     </LinearLayout>
 
+    <!-- Normal Preview Controls Container -->
     <LinearLayout
-        android:id="@+id/live_view_actions"
+        android:id="@+id/layout_normal_controls"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="12dp"
-        android:layout_marginTop="16dp"
-        android:orientation="horizontal"
+        android:orientation="vertical"
+        app:layout_constraintTop_toBottomOf="@id/layout_live_mode_toggle"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/action_buttons_container">
+        app:layout_constraintEnd_toEndOf="parent">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_live_expand"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:layout_marginEnd="6dp"
-            android:text="@string/live_expand"
-            android:textSize="13sp"
-            android:textColor="@color/accent_teal"
-            app:cornerRadius="12dp"
-            app:strokeColor="@color/border_subtle" />
+        <!-- Compact Single-Row Action Buttons (52dp, LIVE-03) -->
+        <LinearLayout
+            android:id="@+id/action_buttons_container"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_live_pip"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:layout_marginStart="6dp"
-            android:text="@string/live_pip"
-            android:textSize="13sp"
-            android:textColor="@color/text_secondary"
-            app:cornerRadius="12dp"
-            app:strokeColor="@color/border_subtle" />
+            <!-- 1. Ensure Recording Toggle Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_toggle_recording"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1.2"
+                android:layout_marginEnd="6dp"
+                android:backgroundTint="@color/accent_teal"
+                android:minHeight="48dp"
+                android:text="@string/btn_start_recording"
+                android:textColor="@color/bg_dark"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                app:cornerRadius="8dp" />
+
+            <!-- 2. Snapshot Photo Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_snapshot"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="4dp"
+                android:backgroundTint="@color/surface_elevated"
+                android:minHeight="48dp"
+                android:text="@string/btn_take_photo"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp"
+                app:cornerRadius="8dp" />
+
+            <!-- 3. More Actions Button (Opens PopupMenu: PiP, Fullscreen, etc.) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_more_options"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="0.8"
+                android:layout_marginStart="6dp"
+                android:backgroundTint="@color/surface_dark"
+                android:minHeight="48dp"
+                android:maxLines="1"
+                android:paddingHorizontal="8dp"
+                android:text="@string/btn_more_options"
+                android:textColor="@color/text_secondary"
+                android:textSize="13sp"
+                app:cornerRadius="8dp"
+                app:strokeColor="@color/border_subtle"
+                app:strokeWidth="1dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/live_view_actions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_live_expand"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:text="@string/live_expand"
+                android:textSize="13sp"
+                android:textColor="@color/accent_teal"
+                app:cornerRadius="12dp"
+                app:strokeColor="@color/border_subtle" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_live_pip"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="48dp"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:text="@string/live_pip"
+                android:textSize="13sp"
+                android:textColor="@color/text_secondary"
+                app:cornerRadius="12dp"
+                app:strokeColor="@color/border_subtle" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Full GPS Ride Mode HUD (Speedometer Gauge + Altitude + Bearing + G-Force) -->
+    <LinearLayout
+        android:id="@+id/layout_ride_mode"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:background="@color/bg_dark"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/layout_live_mode_toggle"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <!-- Speed Gauge View (Center stage) -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <com.aladdin.dashcam.ui.SpeedGaugeView
+                android:id="@+id/speed_gauge"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <TextView
+                android:id="@+id/tv_ride_gps_source"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom|center_horizontal"
+                android:layout_marginBottom="4dp"
+                android:text="資料來源：手機 GPS 定位"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
+        </FrameLayout>
+
+        <!-- Metric Cards: Altitude, Ascent, Bearing, G-Force -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="12dp"
+            android:layout_marginBottom="12dp"
+            android:orientation="horizontal">
+
+            <!-- 1. Altitude -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:background="@drawable/bg_status_badge"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="目前海拔"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/tv_ride_altitude"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="-- m"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- 2. Ascent -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="4dp"
+                android:background="@drawable/bg_status_badge"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="累積爬升"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/tv_ride_ascent"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="+0 m"
+                    android:textColor="@color/accent_teal"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- 3. Bearing / Compass -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginHorizontal="4dp"
+                android:background="@drawable/bg_status_badge"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="方位航向"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/tv_ride_bearing"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="--°"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+
+            <!-- 4. Acceleration G-Force -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:background="@drawable/bg_status_badge"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingVertical="8dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="加速度 G 值"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+
+                <TextView
+                    android:id="@+id/tv_ride_gforce"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="1.00 G"
+                    android:textColor="@color/warning_yellow"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </LinearLayout>
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

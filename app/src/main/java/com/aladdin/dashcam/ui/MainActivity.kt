@@ -173,26 +173,87 @@ class MainActivity : AppCompatActivity() {
         return true
     }
 
+    private fun setupTopBarActions() {
+        binding.tvDeviceName.setOnClickListener {
+            showMyDashCamDialog()
+        }
+    }
+
+    private fun showMyDashCamDialog() {
+        val devices = viewModel.registeredDevices.value
+        val items = devices.map { dev ->
+            val mark = if (dev.isSelected) "✓ " else "   "
+            "$mark${dev.name} (${dev.host}) - ${dev.firmwareVersion}"
+        }.toTypedArray()
+
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("我的記錄器")
+            .setItems(items) { _, which ->
+                if (which in devices.indices) {
+                    val selected = devices[which]
+                    viewModel.selectDevice(selected)
+                    binding.tvDeviceName.text = selected.name
+                    android.widget.Toast.makeText(this, "已切換至記錄器：${selected.name}", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setPositiveButton("新增記錄器") { _, _ ->
+                promptAddDevice()
+            }
+            .setNegativeButton("關閉", null)
+            .show()
+    }
+
+    private fun promptAddDevice() {
+        val input = android.widget.EditText(this).apply {
+            hint = "請輸入記錄器 IP (例如 192.168.25.1)"
+            setText("192.168.25.1")
+        }
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("新增行車記錄器")
+            .setView(input)
+            .setPositiveButton("新增") { _, _ ->
+                val host = input.text.toString().trim()
+                if (host.isNotEmpty()) {
+                    val name = "Aladdin B1-${host.takeLast(4)}"
+                    viewModel.addDevice(name, host)
+                    android.widget.Toast.makeText(this, "已新增記錄器 $name", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
     private fun observeConnectionStatus() {
+        setupTopBarActions()
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.connectionStatus.collect { status ->
-                    when (status) {
-                        ConnectionStatus.CONNECTED -> {
-                            binding.tvConnectionStatus.text = getString(R.string.device_status_connected)
-                            binding.tvConnectionStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_green))
+                launch {
+                    viewModel.registeredDevices.collect { devs ->
+                        val current = devs.firstOrNull { it.isSelected } ?: devs.firstOrNull()
+                        if (current != null) {
+                            binding.tvDeviceName.text = current.name
                         }
-                        ConnectionStatus.CONNECTING -> {
-                            binding.tvConnectionStatus.text = getString(R.string.device_status_connecting)
-                            binding.tvConnectionStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.warning_yellow))
-                        }
-                        ConnectionStatus.STREAM_INTERRUPTED -> {
-                            binding.tvConnectionStatus.text = getString(R.string.device_status_stream_interrupted)
-                            binding.tvConnectionStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.warning_yellow))
-                        }
-                        ConnectionStatus.DISCONNECTED -> {
-                            binding.tvConnectionStatus.text = getString(R.string.device_status_disconnected)
-                            binding.tvConnectionStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                    }
+                }
+                launch {
+                    viewModel.connectionStatus.collect { status ->
+                        when (status) {
+                            ConnectionStatus.CONNECTED -> {
+                                binding.tvConnectionStatus.text = getString(R.string.device_status_connected)
+                                binding.tvConnectionStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.status_green))
+                            }
+                            ConnectionStatus.CONNECTING -> {
+                                binding.tvConnectionStatus.text = getString(R.string.device_status_connecting)
+                                binding.tvConnectionStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.warning_yellow))
+                            }
+                            ConnectionStatus.STREAM_INTERRUPTED -> {
+                                binding.tvConnectionStatus.text = getString(R.string.device_status_stream_interrupted)
+                                binding.tvConnectionStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.warning_yellow))
+                            }
+                            ConnectionStatus.DISCONNECTED -> {
+                                binding.tvConnectionStatus.text = getString(R.string.device_status_disconnected)
+                                binding.tvConnectionStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
+                            }
                         }
                     }
                 }

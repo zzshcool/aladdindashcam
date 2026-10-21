@@ -24,8 +24,60 @@ sealed class AlbumListItem {
 }
 
 class MediaAdapter(
-    private val onItemClick: (MediaItem) -> Unit
+    private val onItemClick: (MediaItem) -> Unit,
+    private val onItemLongClick: ((MediaItem) -> Unit)? = null,
+    private val onFetchThumbnail: ((MediaItem, android.widget.ImageView) -> Unit)? = null,
+    private val onSelectionChanged: ((selectedCount: Int, selectedBytes: Long) -> Unit)? = null
 ) : ListAdapter<AlbumListItem, RecyclerView.ViewHolder>(DiffCallback) {
+
+    var isSelectionMode: Boolean = false
+        private set
+
+    private val selectedItems = mutableMapOf<String, MediaItem>()
+
+    fun setSelectionMode(enabled: Boolean) {
+        if (isSelectionMode != enabled) {
+            isSelectionMode = enabled
+            if (!enabled) {
+                selectedItems.clear()
+            }
+            notifyDataSetChanged()
+            notifySelectionStats()
+        }
+    }
+
+    fun toggleSelection(item: MediaItem) {
+        if (selectedItems.containsKey(item.id)) {
+            selectedItems.remove(item.id)
+        } else {
+            selectedItems[item.id] = item
+        }
+        notifyDataSetChanged()
+        notifySelectionStats()
+    }
+
+    fun selectAll(allItems: List<MediaItem>) {
+        selectedItems.clear()
+        for (item in allItems) {
+            selectedItems[item.id] = item
+        }
+        notifyDataSetChanged()
+        notifySelectionStats()
+    }
+
+    fun clearSelection() {
+        selectedItems.clear()
+        notifyDataSetChanged()
+        notifySelectionStats()
+    }
+
+    fun getSelectedList(): List<MediaItem> = selectedItems.values.toList()
+
+    private fun notifySelectionStats() {
+        val count = selectedItems.size
+        val totalBytes = selectedItems.values.sumOf { it.sizeBytes }
+        onSelectionChanged?.invoke(count, totalBytes)
+    }
 
     companion object {
         const val TYPE_HEADER = 0
@@ -123,7 +175,6 @@ class MediaAdapter(
                         binding.tvDurationBadge.visibility = View.VISIBLE
                         binding.tvDurationBadge.text = String.format(Locale.getDefault(), "%02d:%02d", min, sec)
                     } else {
-                        // Do not display hardcoded 01:00, hide when real duration is unknown
                         binding.tvDurationBadge.visibility = View.GONE
                     }
                 } else {
@@ -134,8 +185,34 @@ class MediaAdapter(
                 // Downloaded badge
                 binding.tvDownloadedBadge.visibility = if (media.isDownloaded) View.VISIBLE else View.GONE
 
+                // Batch Selection Checkbox
+                if (isSelectionMode) {
+                    binding.cbSelect.visibility = View.VISIBLE
+                    binding.cbSelect.isChecked = selectedItems.containsKey(media.id)
+                } else {
+                    binding.cbSelect.visibility = View.GONE
+                }
+
+                // Fetch real thumbnail asynchronously if callback provided
+                binding.ivThumbnail.setImageDrawable(null)
+                onFetchThumbnail?.invoke(media, binding.ivThumbnail)
+
+                // Click and Long click handling
                 binding.root.setOnClickListener {
-                    onItemClick(media)
+                    if (isSelectionMode) {
+                        toggleSelection(media)
+                    } else {
+                        onItemClick(media)
+                    }
+                }
+
+                binding.root.setOnLongClickListener {
+                    if (!isSelectionMode) {
+                        setSelectionMode(true)
+                        toggleSelection(media)
+                        onItemLongClick?.invoke(media)
+                    }
+                    true
                 }
             }
         }

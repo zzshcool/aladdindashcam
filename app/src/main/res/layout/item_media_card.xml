@@ -54,6 +54,20 @@
                 android:textSize="10sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
+
+            <!-- Batch Selection Checkbox -->
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/cb_select"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|end"
+                android:layout_margin="2dp"
+                android:minWidth="36dp"
+                android:minHeight="36dp"
+                android:clickable="false"
+                android:focusable="false"
+                app:buttonTint="@color/accent_teal"
+                android:visibility="gone" />
         </FrameLayout>
 
         <!-- Media Info -->
