@@ -62,6 +62,8 @@ Thumbs.db
 captures/
 *.hprof
 !gradle/wrapper/gradle-wrapper.jar
-gradle/wrapper/gradle-wrapper.jar
+
+# User ignored files (do not commit png or test/)
+*.png
+**/test/
 docs/screenshots/
-app/src/test/

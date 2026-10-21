@@ -2,6 +2,7 @@ package com.aladdin.dashcam.protocol
 
 import com.aladdin.dashcam.model.DashCamDeviceStatus
 import com.aladdin.dashcam.model.DeviceMode
+import com.aladdin.dashcam.model.MediaItem
 import com.aladdin.dashcam.model.RecordingStatus
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -44,6 +45,25 @@ object GPSocketProtocol {
     const val TYPE_CMD: Short = 1
     const val TYPE_ACK: Short = 2
     const val TYPE_NAK: Short = 3
+
+    /**
+     * Validates that the received response matches the expected request mode and command (C01 / VR-02 / R3-03).
+     * If an ACK has a mismatched mode or command, it is converted to GPSocketResponse.Error.
+     */
+    fun validateResponsePair(expectedMode: Byte, expectedCmd: Byte, response: GPSocketResponse): GPSocketResponse {
+        return when (response) {
+            is GPSocketResponse.Ack -> {
+                if (response.mode != expectedMode || response.command != expectedCmd) {
+                    GPSocketResponse.Error(
+                        "Mismatched ACK pair: expected mode=0x${expectedMode.toString(16).uppercase()}, cmd=0x${expectedCmd.toString(16).uppercase()}, got mode=0x${response.mode.toString(16).uppercase()}, cmd=0x${response.command.toString(16).uppercase()}"
+                    )
+                } else {
+                    response
+                }
+            }
+            else -> response
+        }
+    }
 
     // Modes
     const val MODE_DEVICE: Byte = 0x00
@@ -117,6 +137,12 @@ object GPSocketProtocol {
         payload.put(flag)
         payload.putShort(cursor)
         return buildPacket(TYPE_CMD, MODE_PLAYBACK, CMD_GET_NAME_LIST, payload.array())
+    }
+
+    fun buildGetRawDataPacket(deviceIndex: Int): ByteArray {
+        val payload = ByteBuffer.allocate(2).order(ByteOrder.LITTLE_ENDIAN)
+        payload.putShort(deviceIndex.toShort())
+        return buildPacket(TYPE_CMD, MODE_PLAYBACK, CMD_GET_RAW_DATA, payload.array())
     }
 
     fun buildGetParameterPacket(paramId: Int): ByteArray {
@@ -262,5 +288,84 @@ object GPSocketProtocol {
             availablePhotos = availablePhotos,
             lastUpdatedTimestamp = System.currentTimeMillis()
         )
+    }
+
+    /**
+     * Parses real media items list from GetNameList ACK payload per Specification 25.8 (VR-08)
+     */
+    fun parseFileList(payload: ByteArray): List<MediaItem> {
+        val items = mutableListOf<MediaItem>()
+        if (payload.isEmpty()) return items
+
+        var offset = 0
+        val buf = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)
+
+        // Check if prefix contains 2-byte count field
+        if (payload.size >= 2) {
+            val candidateCount = buf.short.toInt() and 0xFFFF
+            if (candidateCount in 1..1000 && 2 + candidateCount * 13 <= payload.size) {
+                offset = 2
+            } else {
+                buf.rewind()
+            }
+        }
+
+        while (offset + 13 <= payload.size) {
+            buf.position(offset)
+            val type = buf.get().toInt() and 0xFF
+            val deviceIndex = buf.short.toInt() and 0xFFFF
+            val yearOffset = buf.get().toInt() and 0xFF
+            val month = buf.get().toInt() and 0xFF
+            val day = buf.get().toInt() and 0xFF
+            val hour = buf.get().toInt() and 0xFF
+            val minute = buf.get().toInt() and 0xFF
+            val second = buf.get().toInt() and 0xFF
+            val rawSize = buf.int.toLong() and 0xFFFFFFFFL
+
+            val year = 2000 + yearOffset
+            val isVideo = (type != 2) // type 2 is photo
+            val isEmergency = (type == 3)
+            val ext = if (isVideo) "MP4" else "JPG"
+            val prefix = if (isEmergency) "EMG" else if (isVideo) "REC" else "PIC"
+            val fileName = String.format(
+                java.util.Locale.US,
+                "%s_%04d%02d%02d_%02d%02d%02d_%04d.%s",
+                prefix,
+                year,
+                month.coerceIn(1, 12),
+                day.coerceIn(1, 31),
+                hour.coerceIn(0, 23),
+                minute.coerceIn(0, 59),
+                second.coerceIn(0, 59),
+                deviceIndex,
+                ext
+            )
+
+            val cal = java.util.Calendar.getInstance()
+            cal.set(
+                year,
+                if (month in 1..12) month - 1 else 0,
+                day.coerceIn(1, 31),
+                hour.coerceIn(0, 23),
+                minute.coerceIn(0, 59),
+                second.coerceIn(0, 59)
+            )
+
+            items.add(
+                MediaItem(
+                    id = "DEV_$deviceIndex",
+                    fileName = fileName,
+                    sizeBytes = rawSize,
+                    durationSeconds = if (isVideo) 60 else 0,
+                    timestampMillis = cal.timeInMillis,
+                    isVideo = isVideo,
+                    isEmergency = isEmergency,
+                    isDownloaded = false,
+                    deviceIndex = deviceIndex
+                )
+            )
+            offset += 13
+        }
+        return items
     }
 }

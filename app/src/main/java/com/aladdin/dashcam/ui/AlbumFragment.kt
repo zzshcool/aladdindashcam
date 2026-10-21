@@ -47,10 +47,19 @@ class AlbumFragment : Fragment() {
 
     private fun setupRecyclerView() {
         adapter = MediaAdapter { item ->
-            if (viewModel.isDemoMode.value) {
-                Toast.makeText(requireContext(), "展示模式：範例檔案 ${item.fileName}", Toast.LENGTH_SHORT).show()
+            if (item.isDownloaded) {
+                Toast.makeText(requireContext(), "本機檔案已就緒: ${item.fileName}", Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(requireContext(), "實機檔案傳輸佇列實作中 (M4進行中): ${item.fileName}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), "開始從記錄器下載: ${item.fileName}", Toast.LENGTH_SHORT).show()
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val res = viewModel.downloadDeviceMedia(item)
+                    res.onSuccess { file ->
+                        Toast.makeText(requireContext(), "下載完成，已保存至本機: ${file.name}", Toast.LENGTH_LONG).show()
+                        applyFilters()
+                    }.onFailure { err ->
+                        Toast.makeText(requireContext(), "下載失敗: ${err.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
             }
         }
         binding.rvAlbum.layoutManager = GridLayoutManager(requireContext(), 2)
@@ -71,29 +80,18 @@ class AlbumFragment : Fragment() {
         binding.filterEmergency.setOnClickListener { selectFilter(FilterCategory.EMERGENCY) }
 
         binding.btnRefreshAlbum.setOnClickListener {
-            binding.layoutLoadingState.visibility = View.VISIBLE
-            binding.layoutEmptyState.visibility = View.GONE
+            if (!isDeviceSource) {
+                binding.toggleAlbumSource.check(R.id.btn_source_device)
+                return@setOnClickListener
+            }
             viewLifecycleOwner.lifecycleScope.launch {
-                val res = viewModel.fetchRemoteFileCount()
-                binding.layoutLoadingState.visibility = View.GONE
-                res.onSuccess { count ->
-                    Toast.makeText(requireContext(), "記錄器回報遠端檔案總數: $count 筆", Toast.LENGTH_LONG).show()
-                    applyFilters()
+                val res = viewModel.fetchRemoteFileList()
+                res.onSuccess { list ->
+                    Toast.makeText(requireContext(), "成功取得記錄器清單: ${list.size} 筆", Toast.LENGTH_SHORT).show()
                 }.onFailure { err ->
-                    Toast.makeText(requireContext(), "查詢記錄器檔案失敗: ${err.message}", Toast.LENGTH_LONG).show()
-                    applyFilters()
+                    Toast.makeText(requireContext(), "取得影片清單失敗: ${err.message}", Toast.LENGTH_LONG).show()
                 }
             }
-        }
-
-        binding.btnToggleDemoMode.setOnClickListener {
-            val nextState = !viewModel.isDemoMode.value
-            viewModel.setDemoMode(nextState)
-            Toast.makeText(
-                requireContext(),
-                if (nextState) "已開啟展示範例模式" else "已返回真實模式",
-                Toast.LENGTH_SHORT
-            ).show()
         }
     }
 
@@ -126,6 +124,18 @@ class AlbumFragment : Fragment() {
         if (filtered.isEmpty()) {
             binding.layoutEmptyState.visibility = View.VISIBLE
             binding.rvAlbum.visibility = View.GONE
+            if (isDeviceSource) {
+                if (viewModel.albumQueryState.value is AlbumQueryState.Success) {
+                    binding.tvAlbumEmpty.text = "記錄器記憶卡內無檔案"
+                    binding.btnRefreshAlbum.text = "重新整理"
+                } else {
+                    binding.tvAlbumEmpty.text = "已連接記錄器，尚未讀取影片清單"
+                    binding.btnRefreshAlbum.text = "讀取記錄器影片清單"
+                }
+            } else {
+                binding.tvAlbumEmpty.text = "本機尚未下載任何影片"
+                binding.btnRefreshAlbum.text = "切換至記錄器相簿"
+            }
         } else {
             binding.layoutEmptyState.visibility = View.GONE
             binding.rvAlbum.visibility = View.VISIBLE
@@ -146,10 +156,34 @@ class AlbumFragment : Fragment() {
                     }
                 }
                 launch {
-                    viewModel.isDemoMode.collect { isDemo ->
-                        binding.tvDemoModeBanner.visibility = if (isDemo) View.VISIBLE else View.GONE
-                        binding.btnToggleDemoMode.text = if (isDemo) "退出展示模式（切回實機）" else "切換展示範例模式"
-                        applyFilters()
+                    viewModel.albumQueryState.collect { state ->
+                        when (state) {
+                            is AlbumQueryState.Idle -> {
+                                binding.layoutLoadingState.visibility = View.GONE
+                                if (isDeviceSource && viewModel.deviceMediaList.value.isEmpty()) {
+                                    binding.layoutEmptyState.visibility = View.VISIBLE
+                                    binding.tvAlbumEmpty.text = "已連接記錄器，尚未讀取影片清單"
+                                    binding.btnRefreshAlbum.text = "讀取記錄器影片清單"
+                                    binding.rvAlbum.visibility = View.GONE
+                                }
+                            }
+                            is AlbumQueryState.Loading -> {
+                                binding.layoutLoadingState.visibility = View.VISIBLE
+                                binding.layoutEmptyState.visibility = View.GONE
+                                binding.rvAlbum.visibility = View.GONE
+                            }
+                            is AlbumQueryState.Success -> {
+                                binding.layoutLoadingState.visibility = View.GONE
+                                applyFilters()
+                            }
+                            is AlbumQueryState.Error -> {
+                                binding.layoutLoadingState.visibility = View.GONE
+                                binding.layoutEmptyState.visibility = View.VISIBLE
+                                binding.tvAlbumEmpty.text = "讀取記錄器清單失敗：${state.message}"
+                                binding.btnRefreshAlbum.text = "重試讀取"
+                                binding.rvAlbum.visibility = View.GONE
+                            }
+                        }
                     }
                 }
             }

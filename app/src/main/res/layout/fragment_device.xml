@@ -44,6 +44,15 @@
                     android:textStyle="bold" />
 
                 <TextView
+                    android:id="@+id/tv_device_host"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="連線目標：192.168.25.1 (點擊可切換)"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="12sp" />
+
+                <TextView
                     android:id="@+id/tv_device_firmware"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
@@ -95,7 +104,7 @@
                 android:id="@+id/tv_current_resolution"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="2K 2560×1440 30fps"
+                android:text="未讀取"
                 android:textColor="@color/accent_teal"
                 android:textSize="13sp" />
         </LinearLayout>
@@ -122,7 +131,7 @@
                 android:id="@+id/tv_current_loop"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="3分鐘"
+                android:text="未讀取"
                 android:textColor="@color/accent_teal"
                 android:textSize="13sp" />
         </LinearLayout>
@@ -178,6 +187,41 @@
                 app:thumbTint="@color/accent_teal"
                 app:trackTint="@color/surface_elevated" />
         </LinearLayout>
+
+        <!-- Telemetry & Network Diagnostic Card -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="連線通道與診斷"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            app:cardBackgroundColor="@color/surface_dark"
+            app:cardCornerRadius="10dp"
+            app:cardElevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <TextView
+                    android:id="@+id/tv_telemetry_details"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineSpacingExtra="4dp"
+                    android:text="控制通道：192.168.25.1:8081 (GPSOCKET TCP)\n串流端點：rtsp://192.168.25.1:8080/?action=stream\n通訊家族：Generalplus / GoPlus (B1樣機)\n網路路由：Wi-Fi 專屬 Process/Socket 綁定"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
 
         <!-- Dangerous Operations Zone -->
         <TextView

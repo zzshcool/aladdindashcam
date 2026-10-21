@@ -83,8 +83,9 @@ class LiveFragment : Fragment() {
             return
         }
 
-        // RTSP Stream endpoint per specification 25.2
-        val rtspUri = "rtsp://192.168.25.1:8080/?action=stream"
+        // RTSP Stream endpoint per specification 25.2 (dynamic host support)
+        val host = viewModel.deviceHost.value
+        val rtspUri = "rtsp://$host:8080/?action=stream"
         try {
             val mediaItem = MediaItem.fromUri(rtspUri)
             val rtspFactory = RtspMediaSource.Factory()
@@ -92,13 +93,21 @@ class LiveFragment : Fragment() {
                 rtspFactory.setSocketFactory(network.socketFactory)
                 android.util.Log.i("LiveFragment", "RtspMediaSource bound to Wi-Fi network: $network")
             } catch (e: Exception) {
-                android.util.Log.w("LiveFragment", "Could not bind Wi-Fi socketFactory: ${e.message}")
+                // VR-03 / R2-07: Bind failure must fail explicitly and must NOT fall back silently to default network!
+                android.util.Log.e("LiveFragment", "Fatal: Failed to bind Wi-Fi socketFactory: ${e.message}")
+                p.stop()
+                p.clearMediaItems()
+                binding.streamOverlay.visibility = View.VISIBLE
+                binding.tvStreamMessage.text = "Wi-Fi 網路綁定失敗，已停止播放 (點擊重試)"
+                return
             }
             val mediaSource = rtspFactory.createMediaSource(mediaItem)
             p.setMediaSource(mediaSource)
             p.prepare()
             p.playWhenReady = true
         } catch (e: Exception) {
+            p.stop()
+            p.clearMediaItems()
             binding.streamOverlay.visibility = View.VISIBLE
             binding.tvStreamMessage.text = getString(R.string.device_status_stream_interrupted)
         }
@@ -106,11 +115,18 @@ class LiveFragment : Fragment() {
 
     private fun setupListeners() {
         binding.btnToggleRecording.setOnClickListener {
-            viewLifecycleOwner.lifecycleScope.launch {
-                val ok = viewModel.toggleRecording()
-                if (!ok) {
-                    Toast.makeText(requireContext(), "錄影切換未執行或狀態不明，已啟動安全保護", Toast.LENGTH_SHORT).show()
-                }
+            val isRecording = viewModel.deviceStatus.value.recordingStatus == RecordingStatus.RECORDING
+            if (isRecording) {
+                androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                    .setTitle("停止錄影確認")
+                    .setMessage("確定要停止錄影嗎？騎乘中停止錄影可能遺失關鍵路況證據。")
+                    .setPositiveButton("確定停止") { _, _ ->
+                        performToggleRecording()
+                    }
+                    .setNegativeButton("取消", null)
+                    .show()
+            } else {
+                performToggleRecording()
             }
         }
 
@@ -169,12 +185,23 @@ class LiveFragment : Fragment() {
         }
     }
 
+    private fun performToggleRecording() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val ok = viewModel.toggleRecording()
+            if (!ok) {
+                Toast.makeText(requireContext(), "錄影切換未執行或狀態不明，已啟動安全保護", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     fun updatePipLayout(isInPip: Boolean) {
         if (_binding == null) return
         if (isInPip) {
+            binding.headerBar.visibility = View.GONE
             binding.statusStrip.visibility = View.GONE
             binding.actionButtonsContainer.visibility = View.GONE
         } else {
+            binding.headerBar.visibility = View.VISIBLE
             binding.statusStrip.visibility = View.VISIBLE
             binding.actionButtonsContainer.visibility = View.VISIBLE
         }
@@ -183,6 +210,28 @@ class LiveFragment : Fragment() {
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    viewModel.connectionStatus.collect { conn ->
+                        val (text, colorRes) = when (conn) {
+                            ConnectionStatus.CONNECTED -> "裝置已連線" to R.color.accent_teal
+                            ConnectionStatus.CONNECTING -> "連線中..." to R.color.warning_yellow
+                            ConnectionStatus.STREAM_INTERRUPTED -> "串流中斷" to R.color.warning_yellow
+                            ConnectionStatus.DISCONNECTED -> "未連線" to R.color.text_secondary
+                        }
+                        binding.tvTopConnectionStatus.text = text
+                        binding.tvTopConnectionStatus.setTextColor(
+                            ContextCompat.getColor(requireContext(), colorRes)
+                        )
+                        if (conn == ConnectionStatus.DISCONNECTED || conn == ConnectionStatus.STREAM_INTERRUPTED) {
+                            binding.streamOverlay.visibility = View.VISIBLE
+                            binding.tvStreamMessage.text = if (conn == ConnectionStatus.DISCONNECTED) {
+                                getString(R.string.device_status_disconnected)
+                            } else {
+                                getString(R.string.device_status_stream_interrupted)
+                            }
+                        }
+                    }
+                }
                 launch {
                     viewModel.deviceStatus.collect { status ->
                         // Recording status
@@ -266,6 +315,15 @@ class LiveFragment : Fragment() {
                 launch {
                     viewModel.wifiNetwork.collect { network ->
                         setupMediaStream(network)
+                    }
+                }
+
+                launch {
+                    viewModel.deviceHost.collect { _ ->
+                        val network = viewModel.wifiNetwork.value
+                        if (network != null) {
+                            setupMediaStream(network)
+                        }
                     }
                 }
 

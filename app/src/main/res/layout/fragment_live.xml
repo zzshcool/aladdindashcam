@@ -7,6 +7,37 @@
     android:background="@color/bg_dark">
 
     <!-- Video Preview Container (16:9 aspect ratio preservation) -->
+    <!-- Top Device Header Bar -->
+    <LinearLayout
+        android:id="@+id/header_bar"
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:background="@color/surface_dark"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <TextView
+            android:id="@+id/tv_device_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Aladdin B1 行車記錄器"
+            android:textColor="@color/text_primary"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_top_connection_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="裝置已連線"
+            android:textColor="@color/accent_teal"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <!-- Video Preview Container (Adaptive 16:9 within available space) -->
     <FrameLayout
         android:id="@+id/preview_container"
         android:layout_width="0dp"
@@ -15,7 +46,8 @@
         app:layout_constraintDimensionRatio="16:9"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent">
+        app:layout_constraintTop_toBottomOf="@id/header_bar"
+        app:layout_constraintBottom_toTopOf="@id/status_strip">
 
         <androidx.media3.ui.PlayerView
             android:id="@+id/player_view"
@@ -29,7 +61,7 @@
             android:id="@+id/stream_overlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="#A0101418"
+            android:background="#D0101418"
             android:gravity="center"
             android:orientation="vertical"
             android:visibility="gone">
@@ -38,18 +70,20 @@
                 android:id="@+id/tv_stream_message"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/device_status_stream_interrupted"
+                android:text="即時串流連線中 / 暫無影像"
                 android:textColor="@color/text_secondary"
-                android:textSize="16sp" />
+                android:textSize="15sp" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_retry_stream"
+                style="@style/Widget.MaterialComponents.Button"
                 android:layout_width="wrap_content"
-                android:layout_height="48dp"
+                android:layout_height="44dp"
                 android:layout_marginTop="12dp"
                 android:backgroundTint="@color/surface_elevated"
                 android:text="@string/btn_retry_connect"
-                android:textColor="@color/accent_teal" />
+                android:textColor="@color/accent_teal"
+                app:cornerRadius="8dp" />
         </LinearLayout>
 
         <!-- Speedometer HUD in top-left of video preview -->
@@ -77,7 +111,7 @@
                     android:fontFamily="monospace"
                     android:text="00"
                     android:textColor="@color/text_primary"
-                    android:textSize="44sp"
+                    android:textSize="36sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -86,7 +120,7 @@
                     android:layout_marginStart="4dp"
                     android:text="@string/hud_speed_unit"
                     android:textColor="@color/text_secondary"
-                    android:textSize="14sp" />
+                    android:textSize="13sp" />
             </LinearLayout>
 
             <TextView
@@ -97,7 +131,7 @@
                 android:textColor="@color/accent_teal"
                 android:textSize="11sp" />
 
-            <!-- PiP visible recording dot & battery status (C10) -->
+            <!-- PiP visible recording dot & battery status -->
             <LinearLayout
                 android:id="@+id/hud_pip_status_container"
                 android:layout_width="wrap_content"
@@ -118,7 +152,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="4dp"
-                    android:text="停錄"
+                    android:text="未錄影"
                     android:textColor="@color/text_primary"
                     android:textSize="11sp" />
 
@@ -145,9 +179,9 @@
         android:paddingHorizontal="16dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/preview_container">
+        app:layout_constraintBottom_toTopOf="@id/action_buttons_container">
 
-        <!-- Recording Indicator -->
+        <!-- Recording Indicator with clear text & icon -->
         <ImageView
             android:id="@+id/iv_record_dot"
             android:layout_width="12dp"
@@ -190,34 +224,36 @@
         android:id="@+id/action_buttons_container"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginBottom="8dp"
         android:orientation="vertical"
         android:paddingHorizontal="16dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/status_strip">
+        app:layout_constraintBottom_toBottomOf="parent">
 
-        <!-- Ensure Recording Toggle Button -->
+        <!-- Main Ride Navigation PiP Mode Button (52dp target, high contrast) -->
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_toggle_recording"
+            android:id="@+id/btn_pip_navigation"
+            style="@style/Widget.MaterialComponents.Button"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="52dp"
             android:backgroundTint="@color/accent_teal"
-            android:text="@string/btn_start_recording"
+            android:text="開始導航 (開啟子母畫面 PiP)"
             android:textColor="@color/bg_dark"
-            android:textSize="16sp"
+            android:textSize="15sp"
             android:textStyle="bold"
             app:cornerRadius="10dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:layout_marginTop="12dp"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
             android:orientation="horizontal">
 
             <!-- Snapshot Photo Button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_snapshot"
+                style="@style/Widget.MaterialComponents.Button"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_marginEnd="6dp"
@@ -225,61 +261,23 @@
                 android:backgroundTint="@color/surface_elevated"
                 android:text="@string/btn_take_photo"
                 android:textColor="@color/text_primary"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 app:cornerRadius="10dp" />
 
-            <!-- Navigation Mode PiP Button -->
+            <!-- Ensure Recording Toggle Button -->
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_pip_navigation"
+                android:id="@+id/btn_toggle_recording"
+                style="@style/Widget.MaterialComponents.Button"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
                 android:backgroundTint="@color/surface_elevated"
-                android:text="@string/btn_navigation_mode"
+                android:text="開始錄影"
                 android:textColor="@color/accent_teal"
-                android:textSize="15sp"
+                android:textSize="14sp"
                 app:cornerRadius="10dp" />
         </LinearLayout>
     </LinearLayout>
-
-    <!-- Telemetry Diagnostic Info Card -->
-    <androidx.cardview.widget.CardView
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_margin="16dp"
-        app:cardBackgroundColor="@color/surface_dark"
-        app:cardCornerRadius="10dp"
-        app:cardElevation="0dp"
-        app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/action_buttons_container">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:padding="14dp">
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="即時通訊與通道資訊"
-                android:textColor="@color/accent_teal"
-                android:textSize="14sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tv_telemetry_details"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:lineSpacingExtra="4dp"
-                android:text="控制通道：192.168.25.1:8081 (GPSOCKET TCP)\n串流端點：rtsp://192.168.25.1:8080/?action=stream\n裝置型號：GoPlus / Generalplus B1 系列\n網路狀態：專屬 Wi-Fi 已綁定"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp" />
-        </LinearLayout>
-    </androidx.cardview.widget.CardView>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

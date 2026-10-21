@@ -104,18 +104,6 @@
         </LinearLayout>
     </HorizontalScrollView>
 
-    <!-- Demo Mode Indicator Banner -->
-    <TextView
-        android:id="@+id/tv_demo_mode_banner"
-        android:layout_width="match_parent"
-        android:layout_height="28dp"
-        android:background="#4A3B00"
-        android:gravity="center"
-        android:text="目前為展示範例模式（非實機資料）"
-        android:textColor="#FFD54F"
-        android:textSize="12sp"
-        android:visibility="gone" />
-
     <!-- Media Content List & State Containers -->
     <FrameLayout
         android:layout_width="match_parent"
@@ -129,40 +117,35 @@
             android:clipToPadding="false"
             android:padding="8dp" />
 
-        <!-- Empty State View -->
+        <!-- Empty / Unqueried State View -->
         <LinearLayout
             android:id="@+id/layout_empty_state"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:gravity="center"
             android:orientation="vertical"
+            android:padding="24dp"
             android:visibility="gone">
 
             <TextView
                 android:id="@+id/tv_album_empty"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/album_empty"
+                android:gravity="center"
+                android:text="已連接記錄器，尚未讀取影片清單"
                 android:textColor="@color/text_secondary"
-                android:textSize="16sp" />
+                android:textSize="15sp" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_refresh_album"
+                style="@style/Widget.MaterialComponents.Button"
                 android:layout_width="wrap_content"
                 android:layout_height="48dp"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="16dp"
                 android:backgroundTint="@color/surface_elevated"
-                android:text="查詢記錄器檔案數量"
-                android:textColor="@color/accent_teal" />
-
-            <Button
-                android:id="@+id/btn_toggle_demo_mode"
-                android:layout_width="wrap_content"
-                android:layout_height="48dp"
-                android:layout_marginTop="8dp"
-                android:backgroundTint="@color/surface_dark"
-                android:text="切換展示範例模式"
-                android:textColor="@color/text_secondary" />
+                android:text="讀取記錄器影片清單"
+                android:textColor="@color/accent_teal"
+                app:cornerRadius="8dp" />
         </LinearLayout>
 
         <!-- Loading State View -->

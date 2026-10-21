@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import com.aladdin.dashcam.model.MediaItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,15 +25,77 @@ import java.net.InetSocketAddress
 import java.net.Socket
 import java.util.Calendar
 
+enum class TargetState {
+    DISCONNECTED,
+    CONNECTING,
+    READY
+}
+
+data class TargetIdentity(
+    val requestedHost: String,
+    val activeHost: String?,
+    val epoch: Long,
+    val state: TargetState
+)
+
 class DashCamClient(
     val host: String = "192.168.25.1",
     val port: Int = 8081,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
 ) {
     @Volatile
+    var currentHost: String = host
+        private set
+
+    @Volatile
+    var activeHost: String? = null
+        private set
+
+    @Volatile
+    private var targetEpoch: Long = 1L
+    private val epochCounter = java.util.concurrent.atomic.AtomicLong(1L)
+
+    private val _targetIdentity = MutableStateFlow(
+        TargetIdentity(
+            requestedHost = host,
+            activeHost = null,
+            epoch = 1L,
+            state = TargetState.DISCONNECTED
+        )
+    )
+    val targetIdentity: StateFlow<TargetIdentity> = _targetIdentity.asStateFlow()
+
+    @Volatile
+    private var currentSessionId: Long = 0L
+    private val sessionCounter = java.util.concurrent.atomic.AtomicLong(1L)
+
+    /**
+     * Updates target host atomically in lock, increments target epoch, and invalidates obsolete session (R5-01)
+     */
+    suspend fun updateHost(newHost: String): Long = withContext(Dispatchers.IO) {
+        synchronized(commandLock) {
+            val newEpoch = epochCounter.incrementAndGet()
+            targetEpoch = newEpoch
+            currentHost = newHost
+            activeHost = null
+            disconnectInternal()
+            _targetIdentity.value = TargetIdentity(
+                requestedHost = newHost,
+                activeHost = null,
+                epoch = newEpoch,
+                state = TargetState.CONNECTING
+            )
+            Log.i(TAG, "Device host updated to $newHost (epoch: $newEpoch), synchronously invalidating session")
+            newEpoch
+        }
+    }
+
+    @Volatile
     private var boundNetwork: Network? = null
     @Volatile
     private var connectedNetwork: Network? = null
+    @Volatile
+    private var connectedHost: String? = null
 
     private var socket: Socket? = null
     private var inputStream: InputStream? = null
@@ -68,12 +131,19 @@ class DashCamClient(
             while (isActive) {
                 try {
                     ensureConnected()
-                    val status = queryStatusInternal()
-                    if (status != null && status.recordingStatus != RecordingStatus.UNKNOWN) {
-                        _deviceStatus.value = status
-                        _connectionStatus.value = ConnectionStatus.CONNECTED
-                    } else {
-                        markStatusExpired()
+                    val (status, sessionId) = queryStatusWithSessionInternal()
+                    synchronized(commandLock) {
+                        // R4-02: Validate session generation before committing state to prevent stale responses from overriding new session
+                        if (sessionId != 0L && sessionId == currentSessionId) {
+                            if (status != null && status.recordingStatus != RecordingStatus.UNKNOWN) {
+                                _deviceStatus.value = status
+                                _connectionStatus.value = ConnectionStatus.CONNECTED
+                            } else {
+                                markStatusExpired()
+                            }
+                        } else {
+                            Log.w(TAG, "Discarding obsolete status read from session $sessionId (current active session is $currentSessionId)")
+                        }
                     }
                 } catch (e: Exception) {
                     Log.w(TAG, "Communication cycle warning: ${e.javaClass.simpleName} - ${e.message}")
@@ -110,7 +180,7 @@ class DashCamClient(
                 throw IllegalStateException("Wi-Fi network not bound yet")
             }
             if (socket != null && socket!!.isConnected && !socket!!.isClosed) {
-                if (connectedNetwork == currentTargetNetwork) {
+                if (connectedNetwork == currentTargetNetwork && connectedHost == currentHost) {
                     return
                 }
                 disconnectInternal()
@@ -121,13 +191,23 @@ class DashCamClient(
             currentTargetNetwork.bindSocket(newSocket)
             Log.i(TAG, "Successfully bound new socket to dedicated Wi-Fi network $currentTargetNetwork")
 
-            newSocket.connect(InetSocketAddress(host, port), 3000)
+            val newSession = sessionCounter.incrementAndGet()
+            newSocket.connect(InetSocketAddress(currentHost, port), 3000)
             newSocket.soTimeout = 4000
             socket = newSocket
             connectedNetwork = currentTargetNetwork
+            connectedHost = currentHost
+            currentSessionId = newSession
             inputStream = newSocket.getInputStream()
             outputStream = newSocket.getOutputStream()
-            Log.i(TAG, "Connected to dashcam at $host:$port")
+            activeHost = currentHost
+            _targetIdentity.value = TargetIdentity(
+                requestedHost = currentHost,
+                activeHost = currentHost,
+                epoch = targetEpoch,
+                state = TargetState.READY
+            )
+            Log.i(TAG, "Connected to dashcam at $currentHost:$port (sessionId: $newSession, epoch: $targetEpoch)")
         }
     }
 
@@ -144,6 +224,15 @@ class DashCamClient(
                 outputStream = null
                 socket = null
                 connectedNetwork = null
+                connectedHost = null
+                activeHost = null
+                currentSessionId = 0L
+                _targetIdentity.value = TargetIdentity(
+                    requestedHost = currentHost,
+                    activeHost = null,
+                    epoch = targetEpoch,
+                    state = TargetState.DISCONNECTED
+                )
                 markStatusExpired()
             }
         }
@@ -175,38 +264,37 @@ class DashCamClient(
             lenBytes
         }
 
-        val resp = GPSocketProtocol.decodeResponse(header, dataBytes)
-        return when (resp) {
+        val rawResp = GPSocketProtocol.decodeResponse(header, dataBytes)
+        val resp = GPSocketProtocol.validateResponsePair(expectedMode, expectedCmd, rawResp)
+        when (resp) {
             is GPSocketResponse.Ack -> {
-                if (resp.mode != expectedMode || resp.command != expectedCmd) {
-                    val errMsg = "Mismatched ACK pair: expected mode=0x${expectedMode.toString(16).uppercase()}, cmd=0x${expectedCmd.toString(16).uppercase()}, got mode=0x${resp.mode.toString(16).uppercase()}, cmd=0x${resp.command.toString(16).uppercase()}"
-                    Log.e(TAG, errMsg)
-                    GPSocketResponse.Error(errMsg)
-                } else {
-                    resp
-                }
+                // Matched ACK
             }
             is GPSocketResponse.Nak -> {
                 Log.w(TAG, "Device returned NAK: mode=0x${resp.mode.toString(16).uppercase()}, cmd=0x${resp.command.toString(16).uppercase()}, errorCode=0x${resp.errorCode.toString(16).uppercase()}")
-                resp
             }
             is GPSocketResponse.Error -> {
-                Log.e(TAG, "Protocol decoding error: ${resp.message}")
-                resp
+                Log.e(TAG, "Protocol decoding or pair mismatch error: ${resp.message}")
             }
         }
+        return resp
     }
 
-    private fun queryStatusInternal(): DashCamDeviceStatus? {
+    private fun queryStatusWithSessionInternal(): Pair<DashCamDeviceStatus?, Long> {
         synchronized(commandLock) {
             val req = GPSocketProtocol.buildGetStatusPacket()
             val resp = sendAndReceive(GPSocketProtocol.MODE_DEVICE, GPSocketProtocol.CMD_GET_STATUS, req)
-            return if (resp is GPSocketResponse.Ack) {
+            val status = if (resp is GPSocketResponse.Ack) {
                 GPSocketProtocol.parseDeviceStatus(resp.payload)
             } else {
                 null
             }
+            return Pair(status, currentSessionId)
         }
+    }
+
+    private fun queryStatusInternal(): DashCamDeviceStatus? {
+        return queryStatusWithSessionInternal().first
     }
 
     suspend fun queryStatus(): DashCamDeviceStatus? = withContext(Dispatchers.IO) {
@@ -353,14 +441,23 @@ class DashCamClient(
     }
 
     /**
-     * Fetches file count from hardware (C05 real album preparation)
+     * Fetches file count from hardware with epoch validation (Spec 25.8, C05)
      */
-    suspend fun getFileCount(): Result<Int> = withContext(Dispatchers.IO) {
+    suspend fun getFileCount(expectedEpoch: Long? = null): Result<Int> = withContext(Dispatchers.IO) {
         synchronized(commandLock) {
+            if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                return@withContext Result.failure(IllegalStateException("Target epoch expired before getFileCount (expected $expectedEpoch, current $targetEpoch)"))
+            }
             try {
                 ensureConnected()
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during connect (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 val req = GPSocketProtocol.buildGetFileCountPacket()
                 val resp = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_GET_FILE_COUNT, req)
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during getFileCount wait (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 if (resp is GPSocketResponse.Ack && resp.payload.size >= 2) {
                     val count = ((resp.payload[1].toInt() and 0xFF) shl 8) or (resp.payload[0].toInt() and 0xFF)
                     Log.i(TAG, "Hardware reported file count: $count")
@@ -378,14 +475,137 @@ class DashCamClient(
     }
 
     /**
-     * Reads parameter from hardware (C06)
+     * Fetches real media items list from hardware via CMD_GET_NAME_LIST (Spec 25.8, VR-08)
      */
-    suspend fun getParameter(paramId: Int): Result<ByteArray> = withContext(Dispatchers.IO) {
+    suspend fun getFileList(expectedEpoch: Long? = null): Result<List<MediaItem>> = withContext(Dispatchers.IO) {
         synchronized(commandLock) {
+            if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                return@withContext Result.failure(IllegalStateException("Target epoch expired before getFileList (expected $expectedEpoch, current $targetEpoch)"))
+            }
             try {
                 ensureConnected()
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during connect (expected $expectedEpoch, current $targetEpoch)"))
+                }
+                val req = GPSocketProtocol.buildGetNameListPacket()
+                val resp = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_GET_NAME_LIST, req)
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during getFileList wait (expected $expectedEpoch, current $targetEpoch)"))
+                }
+                when (resp) {
+                    is GPSocketResponse.Ack -> {
+                        val items = GPSocketProtocol.parseFileList(resp.payload)
+                        Log.i(TAG, "Hardware returned real file list: ${items.size} items")
+                        Result.success(items)
+                    }
+                    is GPSocketResponse.Nak -> {
+                        val msg = "GetNameList NAK: 0x${resp.errorCode.toString(16).uppercase()}"
+                        Log.w(TAG, msg)
+                        Result.failure(Exception(msg))
+                    }
+                    is GPSocketResponse.Error -> {
+                        Result.failure(Exception(resp.message))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to get file list", e)
+                disconnectInternal()
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Downloads raw file from dashcam via CMD_GET_RAW_DATA with multi-ACK streaming (Spec 25.8, M4)
+     */
+    suspend fun downloadRawData(
+        deviceIndex: Int,
+        destinationFile: java.io.File,
+        expectedEpoch: Long? = null,
+        onProgress: (Long) -> Unit = {}
+    ): Result<Long> = withContext(Dispatchers.IO) {
+        synchronized(commandLock) {
+            if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                return@withContext Result.failure(IllegalStateException("Target epoch expired before download (expected $expectedEpoch, current $targetEpoch)"))
+            }
+            try {
+                ensureConnected()
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during connect (expected $expectedEpoch, current $targetEpoch)"))
+                }
+                val out = outputStream ?: throw java.io.IOException("Socket output stream is null")
+                val inStream = inputStream ?: throw java.io.IOException("Socket input stream is null")
+
+                val req = GPSocketProtocol.buildGetRawDataPacket(deviceIndex)
+                out.write(req)
+                out.flush()
+
+                var totalBytes = 0L
+                val tempFile = java.io.File(destinationFile.parentFile, "${destinationFile.name}.tmp")
+                if (tempFile.exists()) tempFile.delete()
+
+                java.io.FileOutputStream(tempFile).use { fileOut ->
+                    while (true) {
+                        val header = ByteArray(12)
+                        readFully(inStream, header)
+
+                        val lenBytes = ByteArray(2)
+                        readFully(inStream, lenBytes)
+                        val lenOrError = ((lenBytes[1].toInt() and 0xFF) shl 8) or (lenBytes[0].toInt() and 0xFF)
+
+                        val type = ((header[9].toInt() and 0xFF) shl 8) or (header[8].toInt() and 0xFF)
+                        if (type == GPSocketProtocol.TYPE_NAK.toInt()) {
+                            throw java.io.IOException("Download returned NAK error 0x${lenOrError.toString(16).uppercase()}")
+                        }
+
+                        if (lenOrError == 0) {
+                            // Empty payload ACK marks the end of transmission (Spec 25.8)
+                            Log.i(TAG, "Download completed with empty ACK. Total bytes: $totalBytes")
+                            break
+                        }
+
+                        val chunk = ByteArray(lenOrError)
+                        readFully(inStream, chunk)
+                        fileOut.write(chunk)
+                        totalBytes += lenOrError
+                        onProgress(totalBytes)
+                    }
+                    fileOut.flush()
+                }
+
+                if (tempFile.renameTo(destinationFile)) {
+                    Log.i(TAG, "Successfully downloaded file to ${destinationFile.absolutePath} ($totalBytes bytes)")
+                    Result.success(totalBytes)
+                } else {
+                    Result.failure(java.io.IOException("Failed to rename temp file to ${destinationFile.absolutePath}"))
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Download failed for deviceIndex $deviceIndex", e)
+                // Spec 25.8: On abortion/failure, close socket to prevent residual bytes from corrupting subsequent commands
+                disconnectInternal()
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
+     * Reads parameter from hardware with epoch validation (C06)
+     */
+    suspend fun getParameter(paramId: Int, expectedEpoch: Long? = null): Result<ByteArray> = withContext(Dispatchers.IO) {
+        synchronized(commandLock) {
+            if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                return@withContext Result.failure(IllegalStateException("Target epoch expired before getParameter (expected $expectedEpoch, current $targetEpoch)"))
+            }
+            try {
+                ensureConnected()
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during connect (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 val req = GPSocketProtocol.buildGetParameterPacket(paramId)
                 val resp = sendAndReceive(GPSocketProtocol.MODE_PARAM, GPSocketProtocol.CMD_GET_PARAM, req)
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during getParameter wait (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 when (resp) {
                     is GPSocketResponse.Ack -> {
                         Result.success(resp.payload)
@@ -405,14 +625,23 @@ class DashCamClient(
     }
 
     /**
-     * Sets parameter on hardware and returns ACK/NAK result (C06)
+     * Sets parameter on hardware with atomic epoch validation before sending and upon response (R5-01)
      */
-    suspend fun setParameter(paramId: Int, value: ByteArray): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun setParameter(paramId: Int, value: ByteArray, expectedEpoch: Long? = null): Result<Unit> = withContext(Dispatchers.IO) {
         synchronized(commandLock) {
+            if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                return@withContext Result.failure(IllegalStateException("Target epoch expired before setParameter (expected $expectedEpoch, current $targetEpoch)"))
+            }
             try {
                 ensureConnected()
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during connect (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 val req = GPSocketProtocol.buildSetParameterPacket(paramId, value)
                 val resp = sendAndReceive(GPSocketProtocol.MODE_PARAM, GPSocketProtocol.CMD_SET_PARAM, req)
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during setParameter response wait (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 when (resp) {
                     is GPSocketResponse.Ack -> {
                         Log.i(TAG, "SetParameter accepted by hardware: paramId=0x${paramId.toString(16).uppercase()}")
