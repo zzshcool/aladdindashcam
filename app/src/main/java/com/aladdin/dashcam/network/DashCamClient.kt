@@ -19,9 +19,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.coroutineContext
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetSocketAddress
+import java.util.concurrent.atomic.AtomicBoolean
 import java.net.Socket
 import java.util.Calendar
 
@@ -125,10 +127,28 @@ class DashCamClient(
         }
     }
 
+    private val isPollingPaused = AtomicBoolean(false)
+
+    fun pausePolling() {
+        isPollingPaused.set(true)
+        disconnectInternal()
+        Log.i(TAG, "DashCamClient polling paused and socket disconnected for exclusivity")
+    }
+
+    fun resumePolling() {
+        isPollingPaused.set(false)
+        Log.i(TAG, "DashCamClient polling resumed")
+    }
+
     fun start() {
         if (pollingJob?.isActive == true) return
         pollingJob = scope.launch(Dispatchers.IO) {
+            var consecutiveFailures = 0
             while (isActive) {
+                if (isPollingPaused.get()) {
+                    delay(1000)
+                    continue
+                }
                 try {
                     ensureConnected()
                     val (status, sessionId) = queryStatusWithSessionInternal()
@@ -138,6 +158,7 @@ class DashCamClient(
                             if (status != null && status.recordingStatus != RecordingStatus.UNKNOWN) {
                                 _deviceStatus.value = status
                                 _connectionStatus.value = ConnectionStatus.CONNECTED
+                                consecutiveFailures = 0
                             } else {
                                 markStatusExpired()
                             }
@@ -146,10 +167,16 @@ class DashCamClient(
                         }
                     }
                 } catch (e: Exception) {
-                    Log.w(TAG, "Communication cycle warning: ${e.javaClass.simpleName} - ${e.message}")
+                    consecutiveFailures++
+                    Log.w(TAG, "Communication cycle warning (fail #$consecutiveFailures): ${e.javaClass.simpleName} - ${e.message}")
                     disconnectInternal()
                 }
-                delay(2500)
+                val delayMs = if (consecutiveFailures == 0) {
+                    2500L
+                } else {
+                    minOf(2500L * (1L shl minOf(consecutiveFailures - 1, 3)), 15000L)
+                }
+                delay(delayMs)
             }
         }
     }
@@ -401,6 +428,37 @@ class DashCamClient(
     }
 
     /**
+     * Sends CMD_RESTART_STREAM (0x04) on control port 8081 to trigger live video stream output (Spec 25.4)
+     */
+    suspend fun restartStreaming(): Result<Unit> = withContext(Dispatchers.IO) {
+        synchronized(commandLock) {
+            try {
+                ensureConnected()
+                val req = GPSocketProtocol.buildRestartStreamPacket()
+                val resp = sendAndReceive(GPSocketProtocol.MODE_DEVICE, GPSocketProtocol.CMD_RESTART_STREAM, req)
+                when (resp) {
+                    is GPSocketResponse.Ack -> {
+                        Log.i(TAG, "Restart streaming accepted by hardware (ACK)")
+                        Result.success(Unit)
+                    }
+                    is GPSocketResponse.Nak -> {
+                        val errMsg = "Restart streaming NAK error: 0x${resp.errorCode.toString(16).uppercase()}"
+                        Log.w(TAG, errMsg)
+                        Result.failure(Exception(errMsg))
+                    }
+                    is GPSocketResponse.Error -> {
+                        Result.failure(Exception(resp.message))
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error restarting streaming", e)
+                disconnectInternal()
+                Result.failure(e)
+            }
+        }
+    }
+
+    /**
      * Synchronizes phone's local time to dashcam RTC via GPVENDOR packet (Chapter 25.9, C01)
      */
     suspend fun syncRtc(): Result<Unit> = withContext(Dispatchers.IO) {
@@ -516,6 +574,17 @@ class DashCamClient(
     }
 
     /**
+     * Aborts any in-flight raw data transfer or blocked socket read immediately (C1).
+     * Closes the active socket to interrupt blocking I/O, forcing commandLock release
+     * and socket reconnect on next command.
+     */
+    fun abortActiveTransfer() {
+        try {
+            socket?.close()
+        } catch (_: Exception) {}
+    }
+
+    /**
      * Downloads raw file from dashcam via CMD_GET_RAW_DATA with multi-ACK streaming (Spec 25.8, M4)
      */
     suspend fun downloadRawData(
@@ -528,6 +597,7 @@ class DashCamClient(
             if (expectedEpoch != null && expectedEpoch != targetEpoch) {
                 return@withContext Result.failure(IllegalStateException("Target epoch expired before download (expected $expectedEpoch, current $targetEpoch)"))
             }
+            val tempFile = java.io.File(destinationFile.parentFile, "${destinationFile.name}.tmp")
             try {
                 ensureConnected()
                 if (expectedEpoch != null && expectedEpoch != targetEpoch) {
@@ -541,48 +611,74 @@ class DashCamClient(
                 out.flush()
 
                 var totalBytes = 0L
-                val tempFile = java.io.File(destinationFile.parentFile, "${destinationFile.name}.tmp")
                 if (tempFile.exists()) tempFile.delete()
 
-                java.io.FileOutputStream(tempFile).use { fileOut ->
-                    while (true) {
-                        val header = ByteArray(12)
-                        readFully(inStream, header)
+                try {
+                    java.io.FileOutputStream(tempFile).use { fileOut ->
+                        while (true) {
+                            if (!coroutineContext.isActive) {
+                                throw kotlinx.coroutines.CancellationException("Download cancelled by caller")
+                            }
 
-                        val lenBytes = ByteArray(2)
-                        readFully(inStream, lenBytes)
-                        val lenOrError = ((lenBytes[1].toInt() and 0xFF) shl 8) or (lenBytes[0].toInt() and 0xFF)
+                            val header = ByteArray(12)
+                            readFully(inStream, header)
 
-                        val type = ((header[9].toInt() and 0xFF) shl 8) or (header[8].toInt() and 0xFF)
-                        if (type == GPSocketProtocol.TYPE_NAK.toInt()) {
-                            throw java.io.IOException("Download returned NAK error 0x${lenOrError.toString(16).uppercase()}")
+                            if (!coroutineContext.isActive) {
+                                throw kotlinx.coroutines.CancellationException("Download cancelled by caller")
+                            }
+
+                            val lenBytes = ByteArray(2)
+                            readFully(inStream, lenBytes)
+                            val lenOrError = ((lenBytes[1].toInt() and 0xFF) shl 8) or (lenBytes[0].toInt() and 0xFF)
+
+                            val type = ((header[9].toInt() and 0xFF) shl 8) or (header[8].toInt() and 0xFF)
+                            if (type == GPSocketProtocol.TYPE_NAK.toInt()) {
+                                throw java.io.IOException("Download returned NAK error 0x${lenOrError.toString(16).uppercase()}")
+                            }
+
+                            if (lenOrError == 0) {
+                                // Empty payload ACK marks the end of transmission (Spec 25.8)
+                                Log.i(TAG, "Download completed with empty ACK. Total bytes: $totalBytes")
+                                break
+                            }
+
+                            val chunk = ByteArray(lenOrError)
+                            readFully(inStream, chunk)
+
+                            if (!coroutineContext.isActive) {
+                                throw kotlinx.coroutines.CancellationException("Download cancelled by caller")
+                            }
+
+                            fileOut.write(chunk)
+                            totalBytes += lenOrError
+                            onProgress(totalBytes)
                         }
-
-                        if (lenOrError == 0) {
-                            // Empty payload ACK marks the end of transmission (Spec 25.8)
-                            Log.i(TAG, "Download completed with empty ACK. Total bytes: $totalBytes")
-                            break
-                        }
-
-                        val chunk = ByteArray(lenOrError)
-                        readFully(inStream, chunk)
-                        fileOut.write(chunk)
-                        totalBytes += lenOrError
-                        onProgress(totalBytes)
+                        fileOut.flush()
                     }
-                    fileOut.flush()
-                }
 
-                if (tempFile.renameTo(destinationFile)) {
-                    Log.i(TAG, "Successfully downloaded file to ${destinationFile.absolutePath} ($totalBytes bytes)")
-                    Result.success(totalBytes)
-                } else {
-                    Result.failure(java.io.IOException("Failed to rename temp file to ${destinationFile.absolutePath}"))
+                    if (!coroutineContext.isActive) {
+                        throw kotlinx.coroutines.CancellationException("Download cancelled before file rename")
+                    }
+
+                    if (tempFile.renameTo(destinationFile)) {
+                        Log.i(TAG, "Successfully downloaded file to ${destinationFile.absolutePath} ($totalBytes bytes)")
+                        Result.success(totalBytes)
+                    } else {
+                        Result.failure(java.io.IOException("Failed to rename temp file to ${destinationFile.absolutePath}"))
+                    }
+                } finally {
+                    if (tempFile.exists() && !destinationFile.exists()) {
+                        tempFile.delete()
+                    }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Download failed for deviceIndex $deviceIndex", e)
+                Log.e(TAG, "Download failed or aborted for deviceIndex $deviceIndex", e)
+                if (tempFile.exists()) tempFile.delete()
                 // Spec 25.8: On abortion/failure, close socket to prevent residual bytes from corrupting subsequent commands
                 disconnectInternal()
+                if (e is kotlinx.coroutines.CancellationException) {
+                    throw e
+                }
                 Result.failure(e)
             }
         }

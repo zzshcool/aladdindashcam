@@ -35,6 +35,9 @@ data class DashCamDeviceStatus(
     val isCharging: Boolean = false,
     val sdCardReady: Boolean = false,
     val recordResolutionIndex: Int = 0,
+    // V1 / S2: 原廠 APK (o6/b.java:148,156) 證實 bytes 5~8 語意為錄影時間 (times = seconds * 1000)，非剩餘記憶卡容量
+    val rawRecordSeconds: Long = 0L,
+    @Deprecated("語意錯誤，原廠用於錄影時間而非剩餘容量。若無可信容量來源請以未知呈現")
     val remainingRecordingSeconds: Long = 0L,
     val captureResolutionIndex: Int = 0,
     val availablePhotos: Long = 0L,

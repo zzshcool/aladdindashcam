@@ -126,6 +126,9 @@ object GPSocketProtocol {
     fun buildRecordTogglePacket(): ByteArray =
         buildPacket(TYPE_CMD, MODE_RECORD, CMD_RECORD_TOGGLE)
 
+    fun buildRestartStreamPacket(): ByteArray =
+        buildPacket(TYPE_CMD, MODE_DEVICE, CMD_RESTART_STREAM)
+
     fun buildCapturePacket(): ByteArray =
         buildPacket(TYPE_CMD, MODE_CAPTURE, CMD_CAPTURE_PHOTO)
 
@@ -269,7 +272,8 @@ object GPSocketProtocol {
         val recordResolutionIndex = payload[4].toInt() and 0xFF
 
         val buffer = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)
-        val remainingSeconds = buffer.getInt(5).toLong() and 0xFFFFFFFFL
+        // V1: 原廠 APK 證實 bytes 5~8 為錄影計時/已錄秒數 (times = rawRecordSeconds * 1000)，非剩餘記憶卡容量
+        val rawRecordSeconds = buffer.getInt(5).toLong() and 0xFFFFFFFFL
 
         val captureResolutionIndex = payload[9].toInt() and 0xFF
         val availablePhotos = buffer.getInt(10).toLong() and 0xFFFFFFFFL
@@ -283,7 +287,8 @@ object GPSocketProtocol {
             isCharging = isCharging,
             sdCardReady = sdCardReady,
             recordResolutionIndex = recordResolutionIndex,
-            remainingRecordingSeconds = remainingSeconds,
+            rawRecordSeconds = rawRecordSeconds,
+            remainingRecordingSeconds = 0L,
             captureResolutionIndex = captureResolutionIndex,
             availablePhotos = availablePhotos,
             lastUpdatedTimestamp = System.currentTimeMillis()

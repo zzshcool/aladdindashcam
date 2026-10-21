@@ -6,53 +6,22 @@
     android:layout_height="match_parent"
     android:background="@color/bg_dark">
 
-    <!-- Video Preview Container (16:9 aspect ratio preservation) -->
-    <!-- Top Device Header Bar -->
-    <LinearLayout
-        android:id="@+id/header_bar"
-        android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:background="@color/surface_dark"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
-        app:layout_constraintTop_toTopOf="parent">
-
-        <TextView
-            android:id="@+id/tv_device_title"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="Aladdin B1 行車記錄器"
-            android:textColor="@color/text_primary"
-            android:textSize="15sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/tv_top_connection_status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="裝置已連線"
-            android:textColor="@color/accent_teal"
-            android:textSize="13sp" />
-    </LinearLayout>
-
-    <!-- Video Preview Container (Adaptive 16:9 within available space) -->
+    <!-- Video Preview Container (Adaptive Fit in all available space, LIVE-01 / LIVE-04) -->
     <FrameLayout
         android:id="@+id/preview_container"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:background="@color/black"
-        app:layout_constraintDimensionRatio="16:9"
-        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintDimensionRatio="H,16:10"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/header_bar"
-        app:layout_constraintBottom_toTopOf="@id/status_strip">
+        app:layout_constraintEnd_toEndOf="parent">
 
         <androidx.media3.ui.PlayerView
             android:id="@+id/player_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            app:resize_mode="fit"
             app:use_controller="false"
             app:surface_type="surface_view" />
 
@@ -66,13 +35,24 @@
             android:orientation="vertical"
             android:visibility="gone">
 
+            <ProgressBar
+                android:id="@+id/pb_stream_loading"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:layout_marginBottom="12dp"
+                android:indeterminate="true"
+                android:indeterminateTint="@color/accent_teal"
+                android:visibility="gone" />
+
             <TextView
                 android:id="@+id/tv_stream_message"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:paddingHorizontal="24dp"
+                android:gravity="center"
                 android:text="即時串流連線中 / 暫無影像"
                 android:textColor="@color/text_secondary"
-                android:textSize="15sp" />
+                android:textSize="14sp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_retry_stream"
@@ -96,8 +76,8 @@
             android:layout_margin="12dp"
             android:background="@drawable/bg_status_badge"
             android:orientation="vertical"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="6dp">
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp">
 
             <LinearLayout
                 android:layout_width="wrap_content"
@@ -112,7 +92,7 @@
                     android:fontFamily="monospace"
                     android:text="00"
                     android:textColor="@color/text_primary"
-                    android:textSize="36sp"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
 
                 <TextView
@@ -121,7 +101,7 @@
                     android:layout_marginStart="4dp"
                     android:text="@string/hud_speed_unit"
                     android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:textSize="12sp" />
             </LinearLayout>
 
             <TextView
@@ -135,16 +115,17 @@
             <!-- PiP visible recording dot & battery status -->
             <LinearLayout
                 android:id="@+id/hud_pip_status_container"
+                android:visibility="gone"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="2dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <ImageView
                     android:id="@+id/iv_hud_record_dot"
-                    android:layout_width="10dp"
-                    android:layout_height="10dp"
+                    android:layout_width="8dp"
+                    android:layout_height="8dp"
                     android:src="@drawable/ic_recording_dot"
                     android:contentDescription="HUD錄影指示" />
 
@@ -155,38 +136,49 @@
                     android:layout_marginStart="4dp"
                     android:text="未錄影"
                     android:textColor="@color/text_primary"
-                    android:textSize="11sp" />
+                    android:textSize="10sp" />
 
-                <TextView
-                    android:id="@+id/tv_hud_battery_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:text="電量4"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="11sp" />
+                <ImageView
+                    android:id="@+id/iv_hud_battery_icon"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="6dp"
+                    android:contentDescription="@string/battery_cd_unknown"
+                    android:src="@drawable/ic_battery_unknown" />
             </LinearLayout>
         </LinearLayout>
+
+        <!-- Fullscreen Switch Button in top-right of preview (48x48dp touch area) -->
+        <ImageButton
+            android:id="@+id/btn_fullscreen"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_gravity="top|end"
+            android:layout_margin="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/action_enter_fullscreen"
+            android:padding="12dp"
+            android:src="@drawable/ic_live_fullscreen"
+            app:tint="@color/text_primary" />
     </FrameLayout>
 
-    <!-- Dashcam Device Status Strip (Directly below preview) -->
+    <!-- Compact Dashcam Device Status Strip (Directly below preview, 32dp) -->
     <LinearLayout
         android:id="@+id/status_strip"
         android:layout_width="0dp"
-        android:layout_height="44dp"
+        android:layout_height="32dp"
         android:background="@color/surface_dark"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="16dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintBottom_toTopOf="@id/action_buttons_container">
+        app:layout_constraintTop_toBottomOf="@id/preview_container">
 
-        <!-- Recording Indicator with clear text & icon -->
         <ImageView
             android:id="@+id/iv_record_dot"
-            android:layout_width="12dp"
-            android:layout_height="12dp"
+            android:layout_width="10dp"
+            android:layout_height="10dp"
             android:src="@drawable/ic_recording_dot"
             android:contentDescription="@string/recording_active" />
 
@@ -194,97 +186,150 @@
             android:id="@+id/tv_record_status"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
+            android:layout_marginStart="6dp"
             android:layout_weight="1"
+            android:singleLine="true"
             android:text="@string/recording_stopped"
             android:textColor="@color/text_primary"
-            android:textSize="14sp" />
+            android:textSize="12sp" />
 
-        <!-- Battery Level -->
-        <TextView
-            android:id="@+id/tv_battery_level"
+        <LinearLayout
+            android:id="@+id/battery_container"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginEnd="16dp"
-            android:text="電量: 等級4"
-            android:textColor="@color/text_secondary"
-            android:textSize="13sp" />
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <!-- SD Card Remaining Time -->
+            <ImageView
+                android:id="@+id/iv_battery_icon"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:contentDescription="@string/battery_cd_unknown"
+                android:src="@drawable/ic_battery_unknown" />
+
+            <TextView
+                android:id="@+id/tv_battery_level"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:singleLine="true"
+                android:visibility="gone"
+                android:text=""
+                android:textColor="@color/text_secondary"
+                android:textSize="12sp" />
+        </LinearLayout>
+
         <TextView
             android:id="@+id/tv_sd_status"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="剩餘: 130分"
+            android:singleLine="true"
+            android:text="@string/sd_remaining_unknown"
             android:textColor="@color/text_secondary"
-            android:textSize="13sp" />
+            android:textSize="12sp" />
     </LinearLayout>
 
-    <!-- Primary Rider Action Buttons -->
+    <!-- Compact Single-Row Action Buttons (52dp, LIVE-03) -->
     <LinearLayout
         android:id="@+id/action_buttons_container"
         android:layout_width="0dp"
-        android:layout_height="wrap_content"
+        android:layout_height="52dp"
+        android:layout_marginHorizontal="12dp"
         android:layout_marginBottom="8dp"
-        android:orientation="vertical"
-        android:paddingHorizontal="16dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintBottom_toBottomOf="parent">
+        app:layout_constraintTop_toBottomOf="@id/status_strip">
 
-        <!-- Primary Row: Recording Toggle & Photo Snapshot (52dp, UX-09) -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:orientation="horizontal">
-
-            <!-- Ensure Recording Toggle Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_toggle_recording"
-                style="@style/Widget.MaterialComponents.Button"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_marginEnd="6dp"
-                android:layout_weight="1.2"
-                android:backgroundTint="@color/accent_teal"
-                android:minHeight="48dp"
-                android:text="開始錄影"
-                android:textColor="@color/bg_dark"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                app:cornerRadius="10dp" />
-
-            <!-- Snapshot Photo Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_snapshot"
-                style="@style/Widget.MaterialComponents.Button"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:backgroundTint="@color/surface_elevated"
-                android:minHeight="48dp"
-                android:text="@string/btn_take_photo"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                app:cornerRadius="10dp" />
-        </LinearLayout>
-
-        <!-- Secondary Row: Navigation PiP Mode Button (48dp, secondary style, UX-09) -->
+        <!-- 1. Ensure Recording Toggle Button -->
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_pip_navigation"
+            android:id="@+id/btn_toggle_recording"
             style="@style/Widget.MaterialComponents.Button"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
             android:layout_height="48dp"
-            android:layout_marginTop="8dp"
+            android:layout_weight="1.2"
+            android:layout_marginEnd="6dp"
+            android:backgroundTint="@color/accent_teal"
+            android:minHeight="48dp"
+            android:text="@string/btn_start_recording"
+            android:textColor="@color/bg_dark"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            app:cornerRadius="8dp" />
+
+        <!-- 2. Snapshot Photo Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_snapshot"
+            style="@style/Widget.MaterialComponents.Button"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:layout_marginHorizontal="4dp"
+            android:backgroundTint="@color/surface_elevated"
+            android:minHeight="48dp"
+            android:text="@string/btn_take_photo"
+            android:textColor="@color/text_primary"
+            android:textSize="13sp"
+            app:cornerRadius="8dp" />
+
+        <!-- 3. More Actions Button (Opens PopupMenu: PiP, Fullscreen, etc.) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_more_options"
+            style="@style/Widget.MaterialComponents.Button"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="0.8"
+            android:layout_marginStart="6dp"
             android:backgroundTint="@color/surface_dark"
             android:minHeight="48dp"
-            android:text="開啟導航浮窗 (PiP)"
+            android:maxLines="1"
+            android:paddingHorizontal="8dp"
+            android:text="@string/btn_more_options"
             android:textColor="@color/text_secondary"
             android:textSize="13sp"
-            app:cornerRadius="10dp"
+            app:cornerRadius="8dp"
             app:strokeColor="@color/border_subtle"
             app:strokeWidth="1dp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/live_view_actions"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="12dp"
+        android:layout_marginTop="16dp"
+        android:orientation="horizontal"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/action_buttons_container">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_live_expand"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:text="@string/live_expand"
+            android:textSize="13sp"
+            android:textColor="@color/accent_teal"
+            app:cornerRadius="12dp"
+            app:strokeColor="@color/border_subtle" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_live_pip"
+            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            android:layout_width="0dp"
+            android:layout_height="48dp"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:text="@string/live_pip"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary"
+            app:cornerRadius="12dp"
+            app:strokeColor="@color/border_subtle" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

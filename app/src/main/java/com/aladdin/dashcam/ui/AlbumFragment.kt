@@ -376,8 +376,7 @@ class AlbumFragment : Fragment() {
             val bitmap = BitmapFactory.decodeFile(file.absolutePath)
             if (bitmap != null) {
                 binding.ivPhotoViewer.setImageBitmap(bitmap)
-                imageMatrix.reset()
-                binding.ivPhotoViewer.imageMatrix = imageMatrix
+                applyFitCenterMatrix(bitmap)
             } else {
                 binding.viewerErrorLayout.visibility = View.VISIBLE
                 binding.tvViewerErrorMsg.text = "無法解析照片檔案"
@@ -385,6 +384,37 @@ class AlbumFragment : Fragment() {
         } catch (e: Exception) {
             binding.viewerErrorLayout.visibility = View.VISIBLE
             binding.tvViewerErrorMsg.text = "照片載入失敗：${e.message}"
+        }
+    }
+
+    /**
+     * Calculates fit-center matrix preserving aspect ratio and centering photo in viewer (C3)
+     */
+    private fun applyFitCenterMatrix(bitmap: android.graphics.Bitmap) {
+        val view = binding.ivPhotoViewer
+        view.post {
+            if (_binding == null) return@post
+            val viewWidth = view.width.toFloat()
+            val viewHeight = view.height.toFloat()
+            val bmWidth = bitmap.width.toFloat()
+            val bmHeight = bitmap.height.toFloat()
+
+            if (viewWidth <= 0f || viewHeight <= 0f || bmWidth <= 0f || bmHeight <= 0f) {
+                imageMatrix.reset()
+                view.imageMatrix = imageMatrix
+                savedMatrix.set(imageMatrix)
+                return@post
+            }
+
+            val scale = minOf(viewWidth / bmWidth, viewHeight / bmHeight)
+            val dx = (viewWidth - bmWidth * scale) / 2f
+            val dy = (viewHeight - bmHeight * scale) / 2f
+
+            imageMatrix.reset()
+            imageMatrix.postScale(scale, scale)
+            imageMatrix.postTranslate(dx, dy)
+            view.imageMatrix = imageMatrix
+            savedMatrix.set(imageMatrix)
         }
     }
 
@@ -435,13 +465,7 @@ class AlbumFragment : Fragment() {
         binding.btnViewerDownload.isEnabled = false
         binding.btnViewerDownload.text = "下載中..."
 
-        downloadJob = viewModel.startPermanentDownload(item) { bytesRead ->
-            if (!isAdded || currentViewingItem?.fileName != item.fileName) return@startPermanentDownload
-            val progress = if (item.sizeBytes > 0) {
-                ((bytesRead * 100) / item.sizeBytes).toInt().coerceIn(0, 100)
-            } else 0
-            binding.btnViewerDownload.text = if (progress > 0) "下載中 $progress%" else "下載中..."
-        }
+        downloadJob = viewModel.startPermanentDownload(item)
     }
 
     private fun updateViewerDownloadButton(item: MediaItem) {
@@ -502,11 +526,22 @@ class AlbumFragment : Fragment() {
                             DownloadStatus.FAILED, DownloadStatus.CANCELLED -> {
                                 binding.btnViewerDownload.isEnabled = true
                                 binding.btnViewerDownload.text = "下載到本機"
+                                binding.btnViewerDownload.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.accent_teal))
+                                binding.btnViewerDownload.setTextColor(ContextCompat.getColor(requireContext(), R.color.bg_dark))
                             }
                             DownloadStatus.DOWNLOADING -> {
                                 binding.btnViewerDownload.isEnabled = false
+                                val progress = if (task.totalBytes > 0) {
+                                    ((task.bytesRead * 100) / task.totalBytes).toInt().coerceIn(0, 100)
+                                } else 0
+                                binding.btnViewerDownload.text = if (progress > 0) "下載中 $progress%" else "下載中..."
+                                binding.btnViewerDownload.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.surface_elevated))
+                                binding.btnViewerDownload.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary))
                             }
-                            DownloadStatus.PENDING -> {}
+                            DownloadStatus.PENDING -> {
+                                binding.btnViewerDownload.isEnabled = false
+                                binding.btnViewerDownload.text = "等待下載..."
+                            }
                         }
                     }
                 }
@@ -558,6 +593,7 @@ class AlbumFragment : Fragment() {
         previewJob?.cancel()
         previewJob = null
         downloadJob = null
+        currentViewingItem = null
         releasePlayer()
         _binding = null
     }

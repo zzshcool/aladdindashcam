@@ -2,6 +2,7 @@ package com.aladdin.dashcam.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
@@ -10,6 +11,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -53,6 +57,51 @@ class MainActivity : AppCompatActivity() {
 
         setupBottomNav()
         observeConnectionStatus()
+        setupBackPressedHandler()
+    }
+
+    var isFullscreen: Boolean = false
+        private set
+    private var orientationBeforeFullscreen = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (!isFullscreen && !isInPictureInPictureMode) recreate()
+    }
+
+    private fun setupBackPressedHandler() {
+        onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (isFullscreen) {
+                    setFullscreen(false)
+                    liveFragment?.updateFullscreenLayout(false)
+                } else {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                    isEnabled = true
+                }
+            }
+        })
+    }
+
+    fun setFullscreen(enabled: Boolean) {
+        if (enabled == isFullscreen) return
+        isFullscreen = enabled
+        val systemBars = WindowCompat.getInsetsController(window, binding.root)
+        if (enabled) {
+            orientationBeforeFullscreen = requestedOrientation
+            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            systemBars.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            systemBars.hide(WindowInsetsCompat.Type.systemBars())
+            binding.topBar.visibility = View.GONE
+            binding.bottomNav.visibility = View.GONE
+        } else {
+            requestedOrientation = orientationBeforeFullscreen
+            systemBars.show(WindowInsetsCompat.Type.systemBars())
+            binding.topBar.visibility = View.VISIBLE
+            binding.bottomNav.visibility = View.VISIBLE
+            recreate()
+        }
     }
 
     private fun setupFragments() {

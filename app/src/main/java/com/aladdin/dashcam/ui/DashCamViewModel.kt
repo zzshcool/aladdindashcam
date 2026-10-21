@@ -86,6 +86,8 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     private val _downloadTasks = MutableStateFlow<List<DownloadTask>>(emptyList())
     val downloadTasks: StateFlow<List<DownloadTask>> = _downloadTasks.asStateFlow()
     private val activeDownloadJobs = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
+    private val downloadGenerations = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val generationCounter = java.util.concurrent.atomic.AtomicLong(1L)
 
     private val _openMediaItemEvent = MutableSharedFlow<MediaItem>(replay = 0, extraBufferCapacity = 1)
     val openMediaItemEvent: SharedFlow<MediaItem> = _openMediaItemEvent.asSharedFlow()
@@ -152,6 +154,10 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
 
     suspend fun syncRtc(): Result<Unit> {
         return client.syncRtc()
+    }
+
+    suspend fun restartStreaming(): Result<Unit> {
+        return client.restartStreaming()
     }
 
     suspend fun refreshStatus(): DashCamDeviceStatus? {
@@ -304,11 +310,11 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
 
     /**
      * Permanently saves media item to local album upon explicit user request.
-     * Uses atomic CAS StateFlow updates (F2) and dispatches UI progress to Main thread (R1).
+     * Uses atomic CAS StateFlow updates (F2) and generation isolation (C2).
      */
     suspend fun saveToPermanentStorage(
         item: MediaItem,
-        onProgress: suspend (bytesRead: Long) -> Unit = {}
+        generation: Long = 0L
     ): Result<File> = withContext(Dispatchers.IO) {
         val currentEpoch = targetIdentity.value.epoch
         val moviesDir = getLocalMoviesDir()
@@ -330,20 +336,22 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         if (cacheFile.exists() && (item.sizeBytes <= 0 || cacheFile.length() == item.sizeBytes)) {
             try {
                 cacheFile.copyTo(destFile, overwrite = true)
-                _deviceMediaList.update { list ->
-                    list.map { if (it.fileName == item.fileName) it.copy(isDownloaded = true) else it }
-                }
-                updateDownloadTask(
-                    DownloadTask(
-                        id = item.fileName,
-                        mediaItem = item,
-                        status = DownloadStatus.COMPLETED,
-                        bytesRead = destFile.length(),
-                        totalBytes = destFile.length(),
-                        localFile = destFile
+                if (generation == 0L || downloadGenerations[item.fileName] == generation) {
+                    _deviceMediaList.update { list ->
+                        list.map { if (it.fileName == item.fileName) it.copy(isDownloaded = true) else it }
+                    }
+                    updateDownloadTask(
+                        DownloadTask(
+                            id = item.fileName,
+                            mediaItem = item,
+                            status = DownloadStatus.COMPLETED,
+                            bytesRead = destFile.length(),
+                            totalBytes = destFile.length(),
+                            localFile = destFile
+                        )
                     )
-                )
-                loadLocalMedia()
+                    loadLocalMedia()
+                }
                 return@withContext Result.success(destFile)
             } catch (e: Exception) {
                 // fallback to network download if copy fails
@@ -355,48 +363,47 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             destinationFile = destFile,
             expectedEpoch = currentEpoch,
             onProgress = { bytesRead ->
-                if (coroutineContext.isActive) {
+                if (coroutineContext.isActive && (generation == 0L || downloadGenerations[item.fileName] == generation)) {
                     updateDownloadTaskProgress(item.fileName, bytesRead)
-                    kotlinx.coroutines.runBlocking(Dispatchers.Main) {
-                        if (coroutineContext.isActive) {
-                            onProgress(bytesRead)
-                        }
-                    }
                 }
             }
         )
         if (res.isSuccess) {
-            _deviceMediaList.update { list ->
-                list.map { if (it.fileName == item.fileName) it.copy(isDownloaded = true) else it }
-            }
-            _downloadTasks.update { tasks ->
-                tasks.map { existing ->
-                    if (existing.id == item.fileName && existing.status != DownloadStatus.CANCELLED) {
-                        existing.copy(
-                            status = DownloadStatus.COMPLETED,
-                            bytesRead = destFile.length(),
-                            totalBytes = destFile.length(),
-                            localFile = destFile
-                        )
-                    } else {
-                        existing
+            if (generation == 0L || downloadGenerations[item.fileName] == generation) {
+                _deviceMediaList.update { list ->
+                    list.map { if (it.fileName == item.fileName) it.copy(isDownloaded = true) else it }
+                }
+                _downloadTasks.update { tasks ->
+                    tasks.map { existing ->
+                        if (existing.id == item.fileName && existing.status != DownloadStatus.CANCELLED) {
+                            existing.copy(
+                                status = DownloadStatus.COMPLETED,
+                                bytesRead = destFile.length(),
+                                totalBytes = destFile.length(),
+                                localFile = destFile
+                            )
+                        } else {
+                            existing
+                        }
                     }
                 }
+                loadLocalMedia()
             }
-            loadLocalMedia()
             Result.success(destFile)
         } else {
             val errMsg = res.exceptionOrNull()?.message ?: "永久儲存失敗"
-            _downloadTasks.update { tasks ->
-                tasks.map { existing ->
-                    if (existing.id == item.fileName && existing.status != DownloadStatus.CANCELLED) {
-                        existing.copy(
-                            status = DownloadStatus.FAILED,
-                            errorMessage = errMsg,
-                            totalBytes = item.sizeBytes
-                        )
-                    } else {
-                        existing
+            if (generation == 0L || downloadGenerations[item.fileName] == generation) {
+                _downloadTasks.update { tasks ->
+                    tasks.map { existing ->
+                        if (existing.id == item.fileName && existing.status != DownloadStatus.CANCELLED) {
+                            existing.copy(
+                                status = DownloadStatus.FAILED,
+                                errorMessage = errMsg,
+                                totalBytes = item.sizeBytes
+                            )
+                        } else {
+                            existing
+                        }
                     }
                 }
             }
@@ -406,28 +413,38 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
 
     /**
      * Unified entry point for starting permanent downloads (F1 / Single Ownership).
-     * Automatically registers and tracks Job in activeDownloadJobs.
+     * Decoupled from Fragment callbacks (C4) with generation isolation (C2).
      */
-    fun startPermanentDownload(
-        item: MediaItem,
-        onProgress: (suspend (bytesRead: Long) -> Unit)? = null
-    ): Job {
+    fun startPermanentDownload(item: MediaItem): Job {
         activeDownloadJobs[item.fileName]?.let { existing ->
             if (existing.isActive) return existing
         }
+        val gen = generationCounter.incrementAndGet()
+        downloadGenerations[item.fileName] = gen
+
+        var ownedJob: Job? = null
         val job = viewModelScope.launch(Dispatchers.IO) {
             try {
-                saveToPermanentStorage(item, onProgress = onProgress ?: {})
+                saveToPermanentStorage(item, generation = gen)
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) {
-                    _downloadTasks.update { tasks ->
-                        tasks.map { if (it.id == item.fileName) it.copy(status = DownloadStatus.CANCELLED) else it }
+                    if (downloadGenerations[item.fileName] == gen) {
+                        _downloadTasks.update { tasks ->
+                            tasks.map { if (it.id == item.fileName) it.copy(status = DownloadStatus.CANCELLED) else it }
+                        }
+                    }
+                } else {
+                    if (downloadGenerations[item.fileName] == gen) {
+                        _downloadTasks.update { tasks ->
+                            tasks.map { if (it.id == item.fileName) it.copy(status = DownloadStatus.FAILED, errorMessage = e.message) else it }
+                        }
                     }
                 }
             } finally {
-                activeDownloadJobs.remove(item.fileName)
+                ownedJob?.let { activeDownloadJobs.remove(item.fileName, it) }
             }
         }
+        ownedJob = job
         activeDownloadJobs[item.fileName] = job
         return job
     }
@@ -464,8 +481,11 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun cancelDownload(task: DownloadTask) {
-        val job = activeDownloadJobs.remove(task.id)
+        val job = activeDownloadJobs[task.id]
+        val currentGen = downloadGenerations[task.id] ?: 0L
+        downloadGenerations[task.id] = currentGen + 1
         job?.cancel()
+        client.abortActiveTransfer()
         _downloadTasks.update { tasks ->
             tasks.map { if (it.id == task.id) it.copy(status = DownloadStatus.CANCELLED) else it }
         }
@@ -474,10 +494,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     /**
      * Downloads real media item from dashcam to local app storage (M4 / P-02)
      */
-    suspend fun downloadDeviceMedia(
-        item: MediaItem,
-        onProgress: suspend (bytesRead: Long) -> Unit = {}
-    ): Result<File> = saveToPermanentStorage(item, onProgress)
+    suspend fun downloadDeviceMedia(item: MediaItem): Result<File> = saveToPermanentStorage(item)
 
     fun loadLocalMedia() {
         viewModelScope.launch(Dispatchers.IO) {

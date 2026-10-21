@@ -10,12 +10,15 @@
 
     <!-- Live Preview (5.4) -->
     <string name="live_title">即時影像</string>
+    <string name="live_expand">放大預覽</string>
+    <string name="live_pip">導航浮窗</string>
     <string name="device_status_connected">已連線</string>
     <string name="device_status_connecting">連線中…</string>
     <string name="device_status_disconnected">未連線</string>
     <string name="device_status_stream_interrupted">畫面已中斷</string>
 
     <string name="recording_active">正在錄影</string>
+    <string name="recording_elapsed">錄影中 %1$02d:%2$02d:%3$02d</string>
     <string name="recording_stopped">已停止錄影</string>
     <string name="recording_unknown">錄影狀態未知</string>
 
@@ -26,10 +29,20 @@
 
     <string name="btn_start_recording">開始錄影</string>
     <string name="btn_stop_recording">停止錄影</string>
+    <string name="btn_stop_recording_compact">停錄</string>
+    <string name="btn_start_recording_compact">錄影</string>
     <string name="btn_take_photo">拍照</string>
+    <string name="btn_more_options">更多</string>
     <string name="btn_protect_event">事件鎖檔</string>
     <string name="btn_navigation_mode">啟動導航 PiP</string>
     <string name="btn_retry_connect">重試連線</string>
+    <string name="action_enter_fullscreen">全螢幕檢視</string>
+    <string name="action_exit_fullscreen">結束全螢幕</string>
+    <string name="action_pip_mode">開啟導航浮窗 (PiP)</string>
+    <string name="stream_loading">即時影像讀取中…</string>
+    <string name="stream_stalled">影像暫停更新，請重試連線</string>
+    <string name="stream_connection_interrupted">暫時無法顯示影像，請重試連線</string>
+    <string name="stream_first_frame_rendered">即時串流正常</string>
 
     <!-- Album (5.6) -->
     <string name="album_source_device">裝置相簿</string>
@@ -69,6 +82,23 @@
     <string name="battery_unknown">電量未知</string>
     <string name="battery_charging_prefix">充電中 · </string>
     <string name="downloads_guide">開啟相簿中的影片或照片，再選擇下載</string>
+
+    <!-- Battery Accessibility & Charging (S3 / S4) -->
+    <string name="battery_cd_level_4">電量充足，四格</string>
+    <string name="battery_cd_level_3">電量良好，三格</string>
+    <string name="battery_cd_level_2">電量中等，二格</string>
+    <string name="battery_cd_level_1">電量偏低，請充電</string>
+    <string name="battery_cd_level_0">電量極低，請儘速充電</string>
+    <string name="battery_cd_unknown">電量未知</string>
+    <string name="battery_cd_charging_prefix">充電中，</string>
+
+    <!-- Storage Remaining & Actions (S2 / S5) -->
+    <string name="sd_remaining_format">可錄約 %d 分</string>
+    <string name="sd_remaining_detail_format">記憶卡可錄：約 %d 分鐘</string>
+    <string name="sd_remaining_unknown">可錄時間未知</string>
+    <string name="btn_stopping_recording">停止中…</string>
+    <string name="btn_starting_recording">啟動中…</string>
+    <string name="stream_error_format">畫面中斷 (%s)，點擊重試</string>
 
     <!-- Diagnostics -->
     <string name="diag_title">診斷資訊</string>
