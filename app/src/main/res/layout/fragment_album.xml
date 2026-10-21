@@ -1,160 +1,286 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/bg_dark"
-    android:orientation="vertical">
+    android:background="@color/bg_dark">
 
-    <!-- Source Selector: Device Album vs Local Storage -->
+    <!-- Album List View Hierarchy -->
     <LinearLayout
+        android:id="@+id/layout_album_main"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
-        android:background="@color/surface_dark"
-        android:gravity="center"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="6dp">
+        android:layout_height="match_parent"
+        android:orientation="vertical">
 
-        <com.google.android.material.button.MaterialButtonToggleGroup
-            android:id="@+id/toggle_album_source"
-            android:layout_width="wrap_content"
-            android:layout_height="36dp"
-            app:checkedButton="@id/btn_source_device"
-            app:singleSelection="true">
+        <!-- Source Selector: Device Album vs Local Storage -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:background="@color/surface_dark"
+            android:gravity="center"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="6dp">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_source_device"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/toggle_album_source"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                app:checkedButton="@id/btn_source_device"
+                app:singleSelection="true">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_source_device"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:text="@string/album_source_device"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_source_local"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:text="@string/album_source_local"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+        </LinearLayout>
+
+        <!-- Sub-category filters (All / Video / Photo / Emergency) -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="44dp"
+            android:background="@color/surface_elevated"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/filter_chips_container"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
-                android:text="@string/album_source_device"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="12dp">
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_source_local"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content"
+                <TextView
+                    android:id="@+id/filter_all"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/bg_status_badge"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="@string/album_filter_all"
+                    android:textColor="@color/accent_teal"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/filter_video"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:layout_marginEnd="8dp"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="@string/album_filter_video"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/filter_photo"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:layout_marginEnd="8dp"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="@string/album_filter_photo"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/filter_emergency"
+                    android:layout_width="wrap_content"
+                    android:layout_height="28dp"
+                    android:gravity="center"
+                    android:paddingHorizontal="12dp"
+                    android:text="@string/album_filter_emergency"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </HorizontalScrollView>
+
+        <!-- Media Content List & State Containers -->
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rv_album"
+                android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:text="@string/album_source_local"
-                android:textColor="@color/text_primary"
-                android:textSize="13sp" />
-        </com.google.android.material.button.MaterialButtonToggleGroup>
+                android:clipToPadding="false"
+                android:padding="8dp" />
+
+            <!-- Empty / Unqueried State View -->
+            <LinearLayout
+                android:id="@+id/layout_empty_state"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:padding="24dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/tv_album_empty"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center"
+                    android:text="已連接記錄器，尚未讀取影片清單"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="15sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_refresh_album"
+                    style="@style/Widget.MaterialComponents.Button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="16dp"
+                    android:backgroundTint="@color/surface_elevated"
+                    android:text="讀取記錄器影片清單"
+                    android:textColor="@color/accent_teal"
+                    app:cornerRadius="8dp" />
+            </LinearLayout>
+
+            <!-- Loading State View -->
+            <LinearLayout
+                android:id="@+id/layout_loading_state"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <ProgressBar
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:indeterminateTint="@color/accent_teal" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/album_loading"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="14sp" />
+            </LinearLayout>
+        </FrameLayout>
     </LinearLayout>
 
-    <!-- Sub-category filters (All / Video / Photo / Emergency) -->
-    <HorizontalScrollView
+    <!-- Fullscreen Media Viewer Overlay (Playback & Photo Viewer) -->
+    <FrameLayout
+        android:id="@+id/layout_media_viewer"
         android:layout_width="match_parent"
-        android:layout_height="44dp"
-        android:background="@color/surface_elevated"
-        android:scrollbars="none">
+        android:layout_height="match_parent"
+        android:background="@color/bg_dark"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
 
-        <LinearLayout
-            android:id="@+id/filter_chips_container"
-            android:layout_width="wrap_content"
+        <!-- Video Player View (Media3 ExoPlayer) -->
+        <androidx.media3.ui.PlayerView
+            android:id="@+id/player_view"
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
+            app:resize_mode="fit"
+            app:show_buffering="when_playing"
+            app:use_controller="true" />
+
+        <!-- Photo View for Images (Pinch to zoom supported) -->
+        <ImageView
+            android:id="@+id/iv_photo_viewer"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="照片檢視"
+            android:scaleType="fitCenter"
+            android:visibility="gone" />
+
+        <!-- Viewer Top Bar (Back button, File title, Recording time, Independent Download button) -->
+        <LinearLayout
+            android:id="@+id/viewer_top_bar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top"
+            android:background="#D911161B"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="12dp">
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="10dp">
 
-            <TextView
-                android:id="@+id/filter_all"
-                android:layout_width="wrap_content"
-                android:layout_height="28dp"
-                android:layout_marginEnd="8dp"
-                android:background="@drawable/bg_status_badge"
-                android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="@string/album_filter_all"
-                android:textColor="@color/accent_teal"
-                android:textSize="13sp" />
+            <ImageButton
+                android:id="@+id/btn_viewer_back"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="返回相簿"
+                android:src="@android:drawable/ic_menu_revert"
+                app:tint="@color/text_primary" />
 
-            <TextView
-                android:id="@+id/filter_video"
-                android:layout_width="wrap_content"
-                android:layout_height="28dp"
-                android:layout_marginEnd="8dp"
-                android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="@string/album_filter_video"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp" />
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:layout_marginEnd="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/filter_photo"
-                android:layout_width="wrap_content"
-                android:layout_height="28dp"
-                android:layout_marginEnd="8dp"
-                android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="@string/album_filter_photo"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp" />
+                <TextView
+                    android:id="@+id/tv_viewer_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="middle"
+                    android:singleLine="true"
+                    android:text="REC_20261021_143205_0001.MP4"
+                    android:textColor="@color/text_primary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
 
-            <TextView
-                android:id="@+id/filter_emergency"
+                <TextView
+                    android:id="@+id/tv_viewer_time"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:singleLine="true"
+                    android:text="錄製時間：2026-10-21 14:32:05"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <!-- Independent Download Button on Viewer Top Bar -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_viewer_download"
+                style="@style/Widget.MaterialComponents.Button"
                 android:layout_width="wrap_content"
-                android:layout_height="28dp"
-                android:gravity="center"
-                android:paddingHorizontal="12dp"
-                android:text="@string/album_filter_emergency"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp" />
+                android:layout_height="38dp"
+                android:backgroundTint="@color/accent_teal"
+                android:text="下載到本機"
+                android:textColor="@color/bg_dark"
+                android:textSize="12sp"
+                app:cornerRadius="6dp" />
         </LinearLayout>
-    </HorizontalScrollView>
 
-    <!-- Media Content List & State Containers -->
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/rv_album"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:padding="8dp" />
-
-        <!-- Empty / Unqueried State View -->
+        <!-- Loading Overlay (Presents preview loading / download progress) -->
         <LinearLayout
-            android:id="@+id/layout_empty_state"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:id="@+id/viewer_loading_layout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="#E6161E23"
             android:gravity="center"
             android:orientation="vertical"
             android:padding="24dp"
-            android:visibility="gone">
-
-            <TextView
-                android:id="@+id/tv_album_empty"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="已連接記錄器，尚未讀取影片清單"
-                android:textColor="@color/text_secondary"
-                android:textSize="15sp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_refresh_album"
-                style="@style/Widget.MaterialComponents.Button"
-                android:layout_width="wrap_content"
-                android:layout_height="48dp"
-                android:layout_marginTop="16dp"
-                android:backgroundTint="@color/surface_elevated"
-                android:text="讀取記錄器影片清單"
-                android:textColor="@color/accent_teal"
-                app:cornerRadius="8dp" />
-        </LinearLayout>
-
-        <!-- Loading State View -->
-        <LinearLayout
-            android:id="@+id/layout_loading_state"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:orientation="vertical"
             android:visibility="gone">
 
             <ProgressBar
@@ -163,13 +289,47 @@
                 android:indeterminateTint="@color/accent_teal" />
 
             <TextView
+                android:id="@+id/tv_viewer_loading_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="@string/album_loading"
-                android:textColor="@color/text_secondary"
+                android:text="載入媒體預覽中..."
+                android:textColor="@color/text_primary"
                 android:textSize="14sp" />
+        </LinearLayout>
+
+        <!-- Error / Retry Overlay -->
+        <LinearLayout
+            android:id="@+id/viewer_error_layout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:background="#E6161E23"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="24dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tv_viewer_error_msg"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:text="媒體載入失敗"
+                android:textColor="@color/error_red"
+                android:textSize="14sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_viewer_retry"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:layout_marginTop="16dp"
+                android:backgroundTint="@color/surface_elevated"
+                android:text="重試載入"
+                android:textColor="@color/accent_teal"
+                app:cornerRadius="8dp" />
         </LinearLayout>
     </FrameLayout>
 
-</LinearLayout>
+</FrameLayout>

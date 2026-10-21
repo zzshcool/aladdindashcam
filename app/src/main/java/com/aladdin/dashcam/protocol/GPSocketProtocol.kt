@@ -341,23 +341,30 @@ object GPSocketProtocol {
                 ext
             )
 
-            val cal = java.util.Calendar.getInstance()
-            cal.set(
-                year,
-                if (month in 1..12) month - 1 else 0,
-                day.coerceIn(1, 31),
-                hour.coerceIn(0, 23),
-                minute.coerceIn(0, 59),
-                second.coerceIn(0, 59)
-            )
+            val hasValidDate = (month in 1..12) && (day in 1..31) && (year in 2020..2040)
+            val timestamp = if (hasValidDate) {
+                val cal = java.util.Calendar.getInstance()
+                cal.set(
+                    year,
+                    month - 1,
+                    day,
+                    hour.coerceIn(0, 23),
+                    minute.coerceIn(0, 59),
+                    second.coerceIn(0, 59)
+                )
+                cal.set(java.util.Calendar.MILLISECOND, 0)
+                cal.timeInMillis
+            } else {
+                0L // 0L 表示時間未知，杜絕假時間
+            }
 
             items.add(
                 MediaItem(
                     id = "DEV_$deviceIndex",
                     fileName = fileName,
                     sizeBytes = rawSize,
-                    durationSeconds = if (isVideo) 60 else 0,
-                    timestampMillis = cal.timeInMillis,
+                    durationSeconds = 0, // 取得真實時長前不顯示固定 60 秒假時長
+                    timestampMillis = timestamp,
                     isVideo = isVideo,
                     isEmergency = isEmergency,
                     isDownloaded = false,

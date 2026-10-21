@@ -14,6 +14,7 @@ import com.aladdin.dashcam.network.NetworkMonitor
 import com.aladdin.dashcam.network.TargetIdentity
 import com.aladdin.dashcam.network.TargetState
 import com.aladdin.dashcam.protocol.GPSocketProtocol
+import android.media.MediaMetadataRetriever
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +25,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.Calendar
+import java.util.regex.Pattern
 
 sealed class HostSwitchEvent {
     data class Success(val host: String, val epoch: Long) : HostSwitchEvent()
@@ -188,9 +191,21 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                     item
                 }
             }
+            // Sort by recording time descending, unknown time placed after known times
+            val sortedItems = mappedItems.sortedWith { a, b ->
+                if (a.timestampMillis > 0 && b.timestampMillis > 0) {
+                    b.timestampMillis.compareTo(a.timestampMillis)
+                } else if (a.timestampMillis > 0) {
+                    -1
+                } else if (b.timestampMillis > 0) {
+                    1
+                } else {
+                    b.deviceIndex.compareTo(a.deviceIndex)
+                }
+            }
             if (targetIdentity.value.epoch == currentEpoch) {
-                _deviceMediaList.value = mappedItems
-                _albumQueryState.value = AlbumQueryState.Success(mappedItems.size)
+                _deviceMediaList.value = sortedItems
+                _albumQueryState.value = AlbumQueryState.Success(sortedItems.size)
             }
         } else {
             if (targetIdentity.value.epoch == currentEpoch) {
@@ -203,9 +218,53 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * Downloads real media item from dashcam to local app storage (M4 / P-02)
+     * Cache directory for temporary viewing only. Does NOT mark item as downloaded or pollute local album.
      */
-    suspend fun downloadDeviceMedia(
+    fun getPreviewCacheFile(item: MediaItem): File {
+        val app = getApplication<Application>()
+        val cacheDir = File(app.cacheDir, "preview_cache")
+        if (!cacheDir.exists()) cacheDir.mkdirs()
+        return File(cacheDir, item.fileName)
+    }
+
+    /**
+     * Local storage directory for user-confirmed permanent downloads.
+     */
+    fun getLocalMediaFile(item: MediaItem): File? {
+        val moviesDir = getLocalMoviesDir()
+        val file = File(moviesDir, item.fileName)
+        return if (file.exists()) file else null
+    }
+
+    /**
+     * Fetches media file into temporary viewing cache. Does NOT mark as downloaded.
+     */
+    suspend fun fetchPreviewCache(
+        item: MediaItem,
+        onProgress: (bytesRead: Long) -> Unit = {}
+    ): Result<File> = withContext(Dispatchers.IO) {
+        val destFile = getPreviewCacheFile(item)
+        if (destFile.exists() && (item.sizeBytes <= 0 || destFile.length() == item.sizeBytes)) {
+            return@withContext Result.success(destFile)
+        }
+        val currentEpoch = targetIdentity.value.epoch
+        val res = client.downloadRawData(
+            deviceIndex = item.deviceIndex,
+            destinationFile = destFile,
+            expectedEpoch = currentEpoch,
+            onProgress = onProgress
+        )
+        if (res.isSuccess) {
+            Result.success(destFile)
+        } else {
+            Result.failure(res.exceptionOrNull() ?: Exception("下載預覽暫存失敗"))
+        }
+    }
+
+    /**
+     * Permanently saves media item to local album upon explicit user request.
+     */
+    suspend fun saveToPermanentStorage(
         item: MediaItem,
         onProgress: (bytesRead: Long) -> Unit = {}
     ): Result<File> = withContext(Dispatchers.IO) {
@@ -214,6 +273,21 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         if (!moviesDir.exists()) moviesDir.mkdirs()
         val destFile = File(moviesDir, item.fileName)
 
+        // If viewing cache already has the complete file, copy it directly
+        val cacheFile = getPreviewCacheFile(item)
+        if (cacheFile.exists() && (item.sizeBytes <= 0 || cacheFile.length() == item.sizeBytes)) {
+            try {
+                cacheFile.copyTo(destFile, overwrite = true)
+                _deviceMediaList.value = _deviceMediaList.value.map {
+                    if (it.fileName == item.fileName) it.copy(isDownloaded = true) else it
+                }
+                loadLocalMedia()
+                return@withContext Result.success(destFile)
+            } catch (e: Exception) {
+                // fallback to network download if copy fails
+            }
+        }
+
         val res = client.downloadRawData(
             deviceIndex = item.deviceIndex,
             destinationFile = destFile,
@@ -221,16 +295,23 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             onProgress = onProgress
         )
         if (res.isSuccess) {
-            // Update device list item status
             _deviceMediaList.value = _deviceMediaList.value.map {
-                if (it.deviceIndex == item.deviceIndex) it.copy(isDownloaded = true) else it
+                if (it.fileName == item.fileName) it.copy(isDownloaded = true) else it
             }
             loadLocalMedia()
             Result.success(destFile)
         } else {
-            Result.failure(res.exceptionOrNull() ?: Exception("下載失敗"))
+            Result.failure(res.exceptionOrNull() ?: Exception("永久儲存失敗"))
         }
     }
+
+    /**
+     * Downloads real media item from dashcam to local app storage (M4 / P-02)
+     */
+    suspend fun downloadDeviceMedia(
+        item: MediaItem,
+        onProgress: (bytesRead: Long) -> Unit = {}
+    ): Result<File> = saveToPermanentStorage(item, onProgress)
 
     fun loadLocalMedia() {
         viewModelScope.launch(Dispatchers.IO) {
@@ -244,19 +325,79 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             val items = validFiles.mapIndexed { idx, file ->
                 val isVideo = file.name.endsWith(".MP4", true)
                 val isEmergency = file.name.contains("EMG", true)
+                val parsedTimestamp = parseRecordingTimeFromFileName(file.name)
+                val duration = if (isVideo) extractMediaDurationSeconds(file) else 0
+
                 MediaItem(
                     id = "LOCAL_${file.name}",
                     fileName = file.name,
                     sizeBytes = file.length(),
-                    durationSeconds = if (isVideo) 60 else 0,
-                    timestampMillis = file.lastModified(),
+                    durationSeconds = duration, // 真實時長或 0（未知）
+                    timestampMillis = parsedTimestamp, // 嚴格採用真實錄製時間，不冒用 lastModified()
                     isVideo = isVideo,
                     isEmergency = isEmergency,
                     isDownloaded = true,
                     deviceIndex = idx + 1
                 )
-            }.sortedByDescending { it.timestampMillis }
+            }.sortedWith { a, b ->
+                if (a.timestampMillis > 0 && b.timestampMillis > 0) {
+                    b.timestampMillis.compareTo(a.timestampMillis)
+                } else if (a.timestampMillis > 0) {
+                    -1
+                } else if (b.timestampMillis > 0) {
+                    1
+                } else {
+                    b.fileName.compareTo(a.fileName)
+                }
+            }
             _localMediaList.value = items
+        }
+    }
+
+    /**
+     * Parses reliable recording timestamp from dashcam standard file names:
+     * e.g. REC_20261021_073925_0001.MP4, EMG_20261021_073925_0001.MP4, PIC_20261021_073925_0001.JPG
+     * Returns 0L if fileName does not match standard pattern or date is invalid.
+     */
+    private fun parseRecordingTimeFromFileName(fileName: String): Long {
+        val pattern = Pattern.compile("^[A-Z]{3}_(\\d{4})(\\d{2})(\\d{2})_(\\d{2})(\\d{2})(\\d{2})")
+        val matcher = pattern.matcher(fileName)
+        if (matcher.find()) {
+            val year = matcher.group(1)?.toIntOrNull() ?: return 0L
+            val month = matcher.group(2)?.toIntOrNull() ?: return 0L
+            val day = matcher.group(3)?.toIntOrNull() ?: return 0L
+            val hour = matcher.group(4)?.toIntOrNull() ?: return 0L
+            val minute = matcher.group(5)?.toIntOrNull() ?: return 0L
+            val second = matcher.group(6)?.toIntOrNull() ?: return 0L
+
+            if (year in 2020..2040 && month in 1..12 && day in 1..31 && hour in 0..23 && minute in 0..59 && second in 0..59) {
+                val cal = Calendar.getInstance()
+                cal.set(year, month - 1, day, hour, minute, second)
+                cal.set(Calendar.MILLISECOND, 0)
+                return cal.timeInMillis
+            }
+        }
+        return 0L // 無法驗證為可信錄製時間時返回 0L，代表時間未知
+    }
+
+    /**
+     * Extracts actual duration from local video file using MediaMetadataRetriever.
+     * Returns 0 if duration is unknown or file cannot be parsed.
+     */
+    private fun extractMediaDurationSeconds(file: File): Int {
+        var retriever: MediaMetadataRetriever? = null
+        return try {
+            retriever = MediaMetadataRetriever()
+            retriever.setDataSource(file.absolutePath)
+            val durStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+            val durMs = durStr?.toLongOrNull() ?: 0L
+            (durMs / 1000).toInt()
+        } catch (_: Exception) {
+            0
+        } finally {
+            try {
+                retriever?.release()
+            } catch (_: Exception) {}
         }
     }
 

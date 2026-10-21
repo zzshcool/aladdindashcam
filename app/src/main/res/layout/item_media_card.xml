@@ -25,19 +25,19 @@
                 android:contentDescription="媒體縮圖"
                 android:scaleType="centerCrop" />
 
-            <!-- Duration Badge -->
+            <!-- Duration Badge (Hidden by default, shown only when real duration is known) -->
             <TextView
                 android:id="@+id/tv_duration_badge"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|end"
                 android:layout_margin="6dp"
-                android:background="#B0000000"
+                android:background="#CC11161B"
                 android:paddingHorizontal="6dp"
                 android:paddingVertical="2dp"
-                android:text="01:00"
                 android:textColor="@color/text_primary"
-                android:textSize="11sp" />
+                android:textSize="11sp"
+                android:visibility="gone" />
 
             <!-- Downloaded Badge -->
             <TextView
@@ -63,21 +63,34 @@
             android:orientation="vertical"
             android:padding="8dp">
 
+            <!-- Primary: Record Time -->
+            <TextView
+                android:id="@+id/tv_record_time"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:text="14:32:05"
+                android:textColor="@color/text_primary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <!-- Secondary: File Name -->
             <TextView
                 android:id="@+id/tv_media_title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
                 android:ellipsize="middle"
                 android:singleLine="true"
-                android:text="2026-10-21_00-15-00.MP4"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp"
-                android:textStyle="bold" />
+                android:text="REC_20261021_143205_0001.MP4"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <TextView
@@ -93,7 +106,7 @@
                     android:id="@+id/tv_media_type"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="常規循環"
+                    android:text="常規錄影"
                     android:textColor="@color/accent_teal"
                     android:textSize="11sp" />
             </LinearLayout>
