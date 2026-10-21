@@ -60,6 +60,16 @@
     <string name="setting_format_sd">格式化記憶卡</string>
     <string name="setting_factory_reset">恢復原廠設定</string>
 
+    <!-- Battery Level Semantics (uiux-release-review 5.3) -->
+    <string name="battery_level_4">電量充足 (4/4)</string>
+    <string name="battery_level_3">電量良好 (3/4)</string>
+    <string name="battery_level_2">電量中等 (2/4)</string>
+    <string name="battery_level_1">電量偏低 (1/4)</string>
+    <string name="battery_level_0">電量極低 (0/4)</string>
+    <string name="battery_unknown">電量未知</string>
+    <string name="battery_charging_prefix">充電中 · </string>
+    <string name="downloads_guide">開啟相簿中的影片或照片，再選擇下載</string>
+
     <!-- Diagnostics -->
     <string name="diag_title">診斷資訊</string>
     <string name="diag_transport">傳輸通道：GPSOCKET TCP 8081</string>

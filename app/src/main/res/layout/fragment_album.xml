@@ -13,19 +13,19 @@
         android:layout_height="match_parent"
         android:orientation="vertical">
 
-        <!-- Source Selector: Device Album vs Local Storage -->
+        <!-- Source Selector: Device Album vs Local Storage (Touch target min 48dp) -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
+            android:layout_height="56dp"
             android:background="@color/surface_dark"
             android:gravity="center"
             android:paddingHorizontal="16dp"
-            android:paddingVertical="6dp">
+            android:paddingVertical="4dp">
 
             <com.google.android.material.button.MaterialButtonToggleGroup
                 android:id="@+id/toggle_album_source"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
+                android:layout_height="48dp"
                 app:checkedButton="@id/btn_source_device"
                 app:singleSelection="true">
 
@@ -34,6 +34,7 @@
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
+                    android:minHeight="48dp"
                     android:text="@string/album_source_device"
                     android:textColor="@color/text_primary"
                     android:textSize="13sp" />
@@ -43,16 +44,17 @@
                     style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
+                    android:minHeight="48dp"
                     android:text="@string/album_source_local"
                     android:textColor="@color/text_primary"
                     android:textSize="13sp" />
             </com.google.android.material.button.MaterialButtonToggleGroup>
         </LinearLayout>
 
-        <!-- Sub-category filters (All / Video / Photo / Emergency) -->
+        <!-- Sub-category filters (Touch target min 48dp) -->
         <HorizontalScrollView
             android:layout_width="match_parent"
-            android:layout_height="44dp"
+            android:layout_height="52dp"
             android:background="@color/surface_elevated"
             android:scrollbars="none">
 
@@ -67,11 +69,11 @@
                 <TextView
                     android:id="@+id/filter_all"
                     android:layout_width="wrap_content"
-                    android:layout_height="28dp"
+                    android:layout_height="48dp"
                     android:layout_marginEnd="8dp"
                     android:background="@drawable/bg_status_badge"
                     android:gravity="center"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="16dp"
                     android:text="@string/album_filter_all"
                     android:textColor="@color/accent_teal"
                     android:textSize="13sp" />
@@ -79,10 +81,10 @@
                 <TextView
                     android:id="@+id/filter_video"
                     android:layout_width="wrap_content"
-                    android:layout_height="28dp"
+                    android:layout_height="48dp"
                     android:layout_marginEnd="8dp"
                     android:gravity="center"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="16dp"
                     android:text="@string/album_filter_video"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
@@ -90,10 +92,10 @@
                 <TextView
                     android:id="@+id/filter_photo"
                     android:layout_width="wrap_content"
-                    android:layout_height="28dp"
+                    android:layout_height="48dp"
                     android:layout_marginEnd="8dp"
                     android:gravity="center"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="16dp"
                     android:text="@string/album_filter_photo"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
@@ -101,9 +103,9 @@
                 <TextView
                     android:id="@+id/filter_emergency"
                     android:layout_width="wrap_content"
-                    android:layout_height="28dp"
+                    android:layout_height="48dp"
                     android:gravity="center"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="16dp"
                     android:text="@string/album_filter_emergency"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
@@ -204,7 +206,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:contentDescription="照片檢視"
-            android:scaleType="fitCenter"
+            android:scaleType="matrix"
             android:visibility="gone" />
 
         <!-- Viewer Top Bar (Back button, File title, Recording time, Independent Download button) -->

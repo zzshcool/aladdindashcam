@@ -78,9 +78,10 @@
                 android:id="@+id/btn_retry_stream"
                 style="@style/Widget.MaterialComponents.Button"
                 android:layout_width="wrap_content"
-                android:layout_height="44dp"
+                android:layout_height="48dp"
                 android:layout_marginTop="12dp"
                 android:backgroundTint="@color/surface_elevated"
+                android:minHeight="48dp"
                 android:text="@string/btn_retry_connect"
                 android:textColor="@color/accent_teal"
                 app:cornerRadius="8dp" />
@@ -231,38 +232,11 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintBottom_toBottomOf="parent">
 
-        <!-- Main Ride Navigation PiP Mode Button (52dp target, high contrast) -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_pip_navigation"
-            style="@style/Widget.MaterialComponents.Button"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:backgroundTint="@color/accent_teal"
-            android:text="開始導航 (開啟子母畫面 PiP)"
-            android:textColor="@color/bg_dark"
-            android:textSize="15sp"
-            android:textStyle="bold"
-            app:cornerRadius="10dp" />
-
+        <!-- Primary Row: Recording Toggle & Photo Snapshot (52dp, UX-09) -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="48dp"
-            android:layout_marginTop="8dp"
+            android:layout_height="52dp"
             android:orientation="horizontal">
-
-            <!-- Snapshot Photo Button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btn_snapshot"
-                style="@style/Widget.MaterialComponents.Button"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_marginEnd="6dp"
-                android:layout_weight="1"
-                android:backgroundTint="@color/surface_elevated"
-                android:text="@string/btn_take_photo"
-                android:textColor="@color/text_primary"
-                android:textSize="14sp"
-                app:cornerRadius="10dp" />
 
             <!-- Ensure Recording Toggle Button -->
             <com.google.android.material.button.MaterialButton
@@ -270,14 +244,47 @@
                 style="@style/Widget.MaterialComponents.Button"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
+                android:layout_marginEnd="6dp"
+                android:layout_weight="1.2"
+                android:backgroundTint="@color/accent_teal"
+                android:minHeight="48dp"
+                android:text="開始錄影"
+                android:textColor="@color/bg_dark"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                app:cornerRadius="10dp" />
+
+            <!-- Snapshot Photo Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_snapshot"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
                 android:layout_marginStart="6dp"
                 android:layout_weight="1"
                 android:backgroundTint="@color/surface_elevated"
-                android:text="開始錄影"
-                android:textColor="@color/accent_teal"
+                android:minHeight="48dp"
+                android:text="@string/btn_take_photo"
+                android:textColor="@color/text_primary"
                 android:textSize="14sp"
                 app:cornerRadius="10dp" />
         </LinearLayout>
+
+        <!-- Secondary Row: Navigation PiP Mode Button (48dp, secondary style, UX-09) -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_pip_navigation"
+            style="@style/Widget.MaterialComponents.Button"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_marginTop="8dp"
+            android:backgroundTint="@color/surface_dark"
+            android:minHeight="48dp"
+            android:text="開啟導航浮窗 (PiP)"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            app:cornerRadius="10dp"
+            app:strokeColor="@color/border_subtle"
+            app:strokeWidth="1dp" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -66,9 +66,21 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="在相簿中點擊檔案即可下載至手機"
+                android:text="@string/downloads_guide"
                 android:textColor="@color/text_disabled"
                 android:textSize="13sp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_go_to_album"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="48dp"
+                android:layout_marginTop="16dp"
+                android:backgroundTint="@color/surface_elevated"
+                android:text="前往相簿"
+                android:textColor="@color/accent_teal"
+                android:textSize="14sp"
+                app:cornerRadius="8dp" />
         </LinearLayout>
     </FrameLayout>
 

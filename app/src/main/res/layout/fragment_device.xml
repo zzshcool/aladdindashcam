@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg_dark">
@@ -38,26 +39,19 @@
                     android:id="@+id/tv_device_info_title"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="已連線記錄器：B1-7bc74f"
+                    android:text="記錄器：檢查連線中"
+                    tools:text="已連線記錄器：Generalplus"
                     android:textColor="@color/accent_teal"
                     android:textSize="15sp"
                     android:textStyle="bold" />
-
-                <TextView
-                    android:id="@+id/tv_device_host"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="連線目標：192.168.25.1 (點擊可切換)"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp" />
 
                 <TextView
                     android:id="@+id/tv_device_firmware"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:text="韌體版本：20260513 V1.1.0 (Generalplus)"
+                    android:text="韌體版本：未讀取"
+                    tools:text="韌體版本：20260513 V1.1.0"
                     android:textColor="@color/text_secondary"
                     android:textSize="13sp" />
 
@@ -136,72 +130,126 @@
                 android:textSize="13sp" />
         </LinearLayout>
 
-        <!-- Audio record switch row -->
+        <!-- Audio record switch row (Productized / disabled explanation) -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="52dp"
+            android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:background="@color/surface_dark"
             android:gravity="center_vertical"
-            android:paddingHorizontal="16dp">
+            android:minHeight="52dp"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp">
 
-            <TextView
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/setting_audio"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp" />
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/setting_audio"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="機身預設開啟，暫不支援手機遠端切換"
+                    android:textColor="@color/text_disabled"
+                    android:textSize="11sp" />
+            </LinearLayout>
 
             <com.google.android.material.switchmaterial.SwitchMaterial
                 android:id="@+id/switch_audio_record"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
-                app:thumbTint="@color/accent_teal"
+                android:enabled="false"
+                app:thumbTint="@color/text_disabled"
                 app:trackTint="@color/surface_elevated" />
         </LinearLayout>
 
-        <!-- Watermark switch row -->
+        <!-- Watermark switch row (Productized / disabled explanation) -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="52dp"
+            android:layout_height="wrap_content"
             android:layout_marginTop="2dp"
             android:background="@color/surface_dark"
             android:gravity="center_vertical"
-            android:paddingHorizontal="16dp">
+            android:minHeight="52dp"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp">
 
-            <TextView
+            <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="@string/setting_watermark"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp" />
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/setting_watermark"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="機身預設開啟，暫不支援手機遠端切換"
+                    android:textColor="@color/text_disabled"
+                    android:textSize="11sp" />
+            </LinearLayout>
 
             <com.google.android.material.switchmaterial.SwitchMaterial
                 android:id="@+id/switch_watermark"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
-                app:thumbTint="@color/accent_teal"
+                android:enabled="false"
+                app:thumbTint="@color/text_disabled"
                 app:trackTint="@color/surface_elevated" />
         </LinearLayout>
 
-        <!-- Telemetry & Network Diagnostic Card -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+        <!-- Telemetry & Network Diagnostic Collapsible Group (UX-05) -->
+        <LinearLayout
+            android:id="@+id/btn_toggle_diagnostics"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
             android:layout_marginTop="20dp"
-            android:text="連線通道與診斷"
-            android:textColor="@color/text_secondary"
-            android:textSize="14sp"
-            android:textStyle="bold" />
+            android:background="@color/surface_elevated"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="14dp">
+
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="通訊與系統診斷"
+                android:textColor="@color/text_secondary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_diagnostics_arrow"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="點擊展開 ▼"
+                android:textColor="@color/accent_teal"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <androidx.cardview.widget.CardView
+            android:id="@+id/layout_diagnostics_content"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="4dp"
+            android:visibility="gone"
             app:cardBackgroundColor="@color/surface_dark"
             app:cardCornerRadius="10dp"
             app:cardElevation="0dp">
@@ -213,23 +261,34 @@
                 android:padding="14dp">
 
                 <TextView
+                    android:id="@+id/tv_device_host"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_status_badge"
+                    android:padding="8dp"
+                    android:text="連線目標：192.168.25.1 (點擊可切換 Host)"
+                    android:textColor="@color/accent_teal"
+                    android:textSize="12sp" />
+
+                <TextView
                     android:id="@+id/tv_telemetry_details"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
                     android:lineSpacingExtra="4dp"
                     android:text="控制通道：192.168.25.1:8081 (GPSOCKET TCP)\n串流端點：rtsp://192.168.25.1:8080/?action=stream\n通訊家族：Generalplus / GoPlus (B1樣機)\n網路路由：Wi-Fi 專屬 Process/Socket 綁定"
                     android:textColor="@color/text_secondary"
-                    android:textSize="13sp" />
+                    android:textSize="12sp" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
-        <!-- Dangerous Operations Zone -->
+        <!-- Device Maintenance Zone (UX-06: Non-destructive / Disabled with clear explanation) -->
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:text="@string/setting_danger_zone"
-            android:textColor="@color/error_red"
+            android:text="裝置維護"
+            android:textColor="@color/text_secondary"
             android:textSize="14sp"
             android:textStyle="bold" />
 
@@ -246,8 +305,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="48dp"
                 android:backgroundTint="@color/surface_elevated"
-                android:text="@string/setting_format_sd"
-                android:textColor="@color/error_red" />
+                android:enabled="false"
+                android:text="不支援遠端格式化 (請於機身操作)"
+                android:textColor="@color/text_disabled" />
 
             <Button
                 android:id="@+id/btn_factory_reset"
@@ -255,8 +315,17 @@
                 android:layout_height="48dp"
                 android:layout_marginTop="8dp"
                 android:backgroundTint="@color/surface_elevated"
-                android:text="@string/setting_factory_reset"
-                android:textColor="@color/error_red" />
+                android:enabled="false"
+                android:text="不支援遠端恢復原廠 (請於機身操作)"
+                android:textColor="@color/text_disabled" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="為保護行車錄影完整性與連線安全，此版本不支援手機遠端抹除 SD 卡或重設設備，高風險操作請使用機身實體按鍵執行。"
+                android:textColor="@color/text_disabled"
+                android:textSize="12sp" />
         </LinearLayout>
 
     </LinearLayout>

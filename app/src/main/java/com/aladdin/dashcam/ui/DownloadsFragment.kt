@@ -4,15 +4,24 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.aladdin.dashcam.R
 import com.aladdin.dashcam.databinding.FragmentDownloadsBinding
+import com.google.android.material.bottomnavigation.BottomNavigationView
+import kotlinx.coroutines.launch
 
 class DownloadsFragment : Fragment() {
     private var _binding: FragmentDownloadsBinding? = null
     private val binding get() = _binding!!
 
     private val viewModel: DashCamViewModel by activityViewModels()
+    private lateinit var adapter: DownloadTaskAdapter
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -25,9 +34,62 @@ class DownloadsFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        // Default empty state presentation
-        binding.layoutEmptyDownloads.visibility = View.VISIBLE
-        binding.rvDownloads.visibility = View.GONE
+
+        setupRecyclerView()
+        setupListeners()
+        observeViewModel()
+    }
+
+    private fun setupRecyclerView() {
+        adapter = DownloadTaskAdapter { task ->
+            when (task.status) {
+                DownloadStatus.COMPLETED -> {
+                    viewModel.requestOpenMedia(task.mediaItem)
+                    activity?.findViewById<BottomNavigationView>(R.id.bottom_nav)?.selectedItemId = R.id.nav_album
+                }
+                DownloadStatus.DOWNLOADING -> {
+                    viewModel.cancelDownload(task)
+                    Toast.makeText(requireContext(), "已取消下載", Toast.LENGTH_SHORT).show()
+                }
+                DownloadStatus.FAILED, DownloadStatus.CANCELLED -> {
+                    viewModel.retryDownload(task)
+                    Toast.makeText(requireContext(), "正在重新下載...", Toast.LENGTH_SHORT).show()
+                }
+                DownloadStatus.PENDING -> {
+                    // Waiting in queue
+                }
+            }
+        }
+        binding.rvDownloads.layoutManager = LinearLayoutManager(requireContext())
+        binding.rvDownloads.adapter = adapter
+    }
+
+    private fun setupListeners() {
+        binding.btnGoToAlbum.setOnClickListener {
+            activity?.findViewById<BottomNavigationView>(R.id.bottom_nav)?.selectedItemId = R.id.nav_album
+        }
+    }
+
+    private fun observeViewModel() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.downloadTasks.collect { tasks ->
+                    val activeCount = tasks.count {
+                        it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.PENDING
+                    }
+                    binding.tvActiveTaskCount.text = "$activeCount 項進行中"
+
+                    if (tasks.isEmpty()) {
+                        binding.layoutEmptyDownloads.visibility = View.VISIBLE
+                        binding.rvDownloads.visibility = View.GONE
+                    } else {
+                        binding.layoutEmptyDownloads.visibility = View.GONE
+                        binding.rvDownloads.visibility = View.VISIBLE
+                        adapter.submitList(tasks)
+                    }
+                }
+            }
+        }
     }
 
     override fun onDestroyView() {

@@ -341,19 +341,17 @@ object GPSocketProtocol {
                 ext
             )
 
-            val hasValidDate = (month in 1..12) && (day in 1..31) && (year in 2020..2040)
-            val timestamp = if (hasValidDate) {
-                val cal = java.util.Calendar.getInstance()
-                cal.set(
-                    year,
-                    month - 1,
-                    day,
-                    hour.coerceIn(0, 23),
-                    minute.coerceIn(0, 59),
-                    second.coerceIn(0, 59)
-                )
-                cal.set(java.util.Calendar.MILLISECOND, 0)
-                cal.timeInMillis
+            val timestamp = if (year in 2020..2040 && month in 1..12 && day in 1..31 &&
+                hour in 0..23 && minute in 0..59 && second in 0..59) {
+                try {
+                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).apply {
+                        isLenient = false
+                    }
+                    val dateStr = String.format(java.util.Locale.US, "%04d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, second)
+                    sdf.parse(dateStr)?.time ?: 0L
+                } catch (e: Exception) {
+                    0L
+                }
             } else {
                 0L // 0L 表示時間未知，杜絕假時間
             }

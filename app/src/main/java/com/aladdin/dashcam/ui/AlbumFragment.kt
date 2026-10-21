@@ -18,6 +18,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.media3.common.MediaItem as ExoMediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.GridLayoutManager
 import com.aladdin.dashcam.R
@@ -43,6 +45,8 @@ class AlbumFragment : Fragment() {
     // Media viewer & player state
     private var exoPlayer: ExoPlayer? = null
     private var currentViewingItem: MediaItem? = null
+    private var previewJob: Job? = null
+    private var previewRequestId = 0L
     private var downloadJob: Job? = null
 
     // Touch & zoom matrix for photo viewer
@@ -95,6 +99,21 @@ class AlbumFragment : Fragment() {
         binding.rvAlbum.adapter = adapter
     }
 
+    private fun triggerRemoteListRefresh() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            binding.layoutLoadingState.visibility = View.VISIBLE
+            binding.layoutEmptyState.visibility = View.GONE
+            val res = viewModel.fetchRemoteFileList()
+            binding.layoutLoadingState.visibility = View.GONE
+            res.onSuccess { list ->
+                Toast.makeText(requireContext(), "成功取得記錄器清單: ${list.size} 筆", Toast.LENGTH_SHORT).show()
+            }.onFailure { err ->
+                Toast.makeText(requireContext(), "取得影片清單失敗: ${err.message}", Toast.LENGTH_LONG).show()
+                applyFilters()
+            }
+        }
+    }
+
     private fun setupListeners() {
         binding.toggleAlbumSource.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
@@ -111,15 +130,8 @@ class AlbumFragment : Fragment() {
         binding.btnRefreshAlbum.setOnClickListener {
             if (!isDeviceSource) {
                 binding.toggleAlbumSource.check(R.id.btn_source_device)
-                return@setOnClickListener
-            }
-            viewLifecycleOwner.lifecycleScope.launch {
-                val res = viewModel.fetchRemoteFileList()
-                res.onSuccess { list ->
-                    Toast.makeText(requireContext(), "成功取得記錄器清單: ${list.size} 筆", Toast.LENGTH_SHORT).show()
-                }.onFailure { err ->
-                    Toast.makeText(requireContext(), "取得影片清單失敗: ${err.message}", Toast.LENGTH_LONG).show()
-                }
+            } else {
+                triggerRemoteListRefresh()
             }
         }
 
@@ -211,6 +223,7 @@ class AlbumFragment : Fragment() {
                             binding.tvAlbumEmpty.text = "記錄器記憶卡內無檔案"
                             binding.btnRefreshAlbum.text = "重新整理"
                             binding.btnRefreshAlbum.visibility = View.VISIBLE
+                            binding.btnRefreshAlbum.setOnClickListener { triggerRemoteListRefresh() }
                         } else {
                             binding.tvAlbumEmpty.text = "此分類尚無符合之媒體檔案"
                             binding.btnRefreshAlbum.text = "查看全部媒體"
@@ -222,11 +235,13 @@ class AlbumFragment : Fragment() {
                         binding.tvAlbumEmpty.text = "讀取記錄器清單失敗"
                         binding.btnRefreshAlbum.text = "重試讀取"
                         binding.btnRefreshAlbum.visibility = View.VISIBLE
+                        binding.btnRefreshAlbum.setOnClickListener { triggerRemoteListRefresh() }
                     }
                     else -> {
                         binding.tvAlbumEmpty.text = "已連接記錄器，尚未讀取影片清單"
                         binding.btnRefreshAlbum.text = "讀取記錄器影片清單"
                         binding.btnRefreshAlbum.visibility = View.VISIBLE
+                        binding.btnRefreshAlbum.setOnClickListener { triggerRemoteListRefresh() }
                     }
                 }
             } else {
@@ -259,13 +274,20 @@ class AlbumFragment : Fragment() {
         binding.layoutMediaViewer.visibility = View.VISIBLE
         backPressedCallback.isEnabled = true
 
+        // Monotonically increasing request token to invalidate any stale in-flight preview (R2)
+        val currentToken = ++previewRequestId
+        previewJob?.cancel()
+        previewJob = null
+        downloadJob?.cancel()
+        downloadJob = null
+
         binding.tvViewerTitle.text = item.fileName
         val timeStr = if (item.timestampMillis > 0L) {
             SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(item.timestampMillis))
         } else {
             "時間未知"
         }
-        binding.tvViewerTime.text = "錄製時間：$timeStr"
+        binding.tvViewerTime.text = if (item.isVideo) "錄製時間：$timeStr" else "拍攝時間：$timeStr"
 
         // Update independent download button state
         updateViewerDownloadButton(item)
@@ -293,22 +315,29 @@ class AlbumFragment : Fragment() {
 
         // Remote fetch into viewing cache
         binding.viewerLoadingLayout.visibility = View.VISIBLE
-        binding.tvViewerLoadingText.text = "正在載入預覽暫存..."
+        binding.tvViewerLoadingText.text = "正在準備觀看，需先讀取此檔案..."
 
-        viewLifecycleOwner.lifecycleScope.launch {
+        previewJob = viewLifecycleOwner.lifecycleScope.launch {
             val res = viewModel.fetchPreviewCache(item) { bytesRead ->
+                if (!isAdded || previewRequestId != currentToken || currentViewingItem?.fileName != item.fileName) return@fetchPreviewCache
                 val progress = if (item.sizeBytes > 0) {
                     ((bytesRead * 100) / item.sizeBytes).toInt().coerceIn(0, 100)
                 } else 0
-                binding.tvViewerLoadingText.text = if (progress > 0) "載入預覽暫存中: $progress%" else "載入預覽暫存中..."
+                binding.tvViewerLoadingText.text = if (progress > 0) "讀取中: $progress%" else "正在準備觀看..."
             }
+
+            if (!isAdded || previewRequestId != currentToken || currentViewingItem?.fileName != item.fileName) return@launch
 
             binding.viewerLoadingLayout.visibility = View.GONE
             res.onSuccess { file ->
-                displayMediaContent(item, file)
+                if (isAdded && previewRequestId == currentToken && currentViewingItem?.fileName == item.fileName) {
+                    displayMediaContent(item, file)
+                }
             }.onFailure { err ->
-                binding.viewerErrorLayout.visibility = View.VISIBLE
-                binding.tvViewerErrorMsg.text = "載入失敗：${err.message}"
+                if (isAdded && previewRequestId == currentToken && currentViewingItem?.fileName == item.fileName) {
+                    binding.viewerErrorLayout.visibility = View.VISIBLE
+                    binding.tvViewerErrorMsg.text = "載入失敗：${err.message}"
+                }
             }
         }
     }
@@ -329,6 +358,12 @@ class AlbumFragment : Fragment() {
         releasePlayer()
         val player = ExoPlayer.Builder(requireContext()).build()
         binding.playerView.player = player
+        player.addListener(object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                binding.viewerErrorLayout.visibility = View.VISIBLE
+                binding.tvViewerErrorMsg.text = "影片播放失敗：${error.message ?: "無法解碼影片"}"
+            }
+        })
         val mediaItem = ExoMediaItem.fromUri(Uri.fromFile(file))
         player.setMediaItem(mediaItem)
         player.prepare()
@@ -392,6 +427,7 @@ class AlbumFragment : Fragment() {
 
     /**
      * Starts user-confirmed permanent download to local storage.
+     * Delegates to DashCamViewModel's unified startPermanentDownload (F1 / Single Ownership).
      */
     private fun startPermanentDownload(item: MediaItem) {
         if (downloadJob?.isActive == true) return
@@ -399,25 +435,12 @@ class AlbumFragment : Fragment() {
         binding.btnViewerDownload.isEnabled = false
         binding.btnViewerDownload.text = "下載中..."
 
-        downloadJob = viewLifecycleOwner.lifecycleScope.launch {
-            val res = viewModel.saveToPermanentStorage(item) { bytesRead ->
-                val progress = if (item.sizeBytes > 0) {
-                    ((bytesRead * 100) / item.sizeBytes).toInt().coerceIn(0, 100)
-                } else 0
-                binding.btnViewerDownload.text = "下載中 $progress%"
-            }
-
-            res.onSuccess {
-                Toast.makeText(requireContext(), "已成功儲存至本機相簿", Toast.LENGTH_SHORT).show()
-                val updatedItem = item.copy(isDownloaded = true)
-                currentViewingItem = updatedItem
-                updateViewerDownloadButton(updatedItem)
-                applyFilters()
-            }.onFailure { err ->
-                Toast.makeText(requireContext(), "下載失敗: ${err.message}", Toast.LENGTH_LONG).show()
-                binding.btnViewerDownload.isEnabled = true
-                binding.btnViewerDownload.text = "下載到本機"
-            }
+        downloadJob = viewModel.startPermanentDownload(item) { bytesRead ->
+            if (!isAdded || currentViewingItem?.fileName != item.fileName) return@startPermanentDownload
+            val progress = if (item.sizeBytes > 0) {
+                ((bytesRead * 100) / item.sizeBytes).toInt().coerceIn(0, 100)
+            } else 0
+            binding.btnViewerDownload.text = if (progress > 0) "下載中 $progress%" else "下載中..."
         }
     }
 
@@ -436,9 +459,11 @@ class AlbumFragment : Fragment() {
     }
 
     private fun closeViewer() {
-        releasePlayer()
-        downloadJob?.cancel()
+        ++previewRequestId // Invalidate any in-flight preview requests (R2)
+        previewJob?.cancel()
+        previewJob = null
         downloadJob = null
+        releasePlayer()
         currentViewingItem = null
         binding.layoutMediaViewer.visibility = View.GONE
         backPressedCallback.isEnabled = false
@@ -462,6 +487,35 @@ class AlbumFragment : Fragment() {
                 launch {
                     viewModel.localMediaList.collect {
                         if (!isDeviceSource) applyFilters()
+                    }
+                }
+                launch {
+                    viewModel.downloadTasks.collect { tasks ->
+                        val current = currentViewingItem ?: return@collect
+                        val task = tasks.find { it.id == current.fileName } ?: return@collect
+                        when (task.status) {
+                            DownloadStatus.COMPLETED -> {
+                                val updated = current.copy(isDownloaded = true)
+                                currentViewingItem = updated
+                                updateViewerDownloadButton(updated)
+                            }
+                            DownloadStatus.FAILED, DownloadStatus.CANCELLED -> {
+                                binding.btnViewerDownload.isEnabled = true
+                                binding.btnViewerDownload.text = "下載到本機"
+                            }
+                            DownloadStatus.DOWNLOADING -> {
+                                binding.btnViewerDownload.isEnabled = false
+                            }
+                            DownloadStatus.PENDING -> {}
+                        }
+                    }
+                }
+                launch {
+                    viewModel.openMediaItemEvent.collect { item ->
+                        if (isDeviceSource) {
+                            binding.toggleAlbumSource.check(R.id.btn_source_local)
+                        }
+                        openViewer(item)
                     }
                 }
                 launch {
@@ -500,8 +554,11 @@ class AlbumFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        ++previewRequestId
+        previewJob?.cancel()
+        previewJob = null
+        downloadJob = null
         releasePlayer()
-        downloadJob?.cancel()
         _binding = null
     }
 }

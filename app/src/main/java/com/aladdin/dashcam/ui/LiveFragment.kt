@@ -159,6 +159,15 @@ class LiveFragment : Fragment() {
         binding.btnPipNavigation.setOnClickListener {
             launchNavigationAndPip()
         }
+
+        binding.hudContainer.setOnClickListener {
+            val context = requireContext()
+            val fineGranted = ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val coarseGranted = ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!fineGranted && !coarseGranted) {
+                (activity as? MainActivity)?.requestLocationPermission()
+            }
+        }
     }
 
     private fun launchNavigationAndPip() {
@@ -213,10 +222,10 @@ class LiveFragment : Fragment() {
                 launch {
                     viewModel.connectionStatus.collect { conn ->
                         val (text, colorRes) = when (conn) {
-                            ConnectionStatus.CONNECTED -> "裝置已連線" to R.color.accent_teal
-                            ConnectionStatus.CONNECTING -> "連線中..." to R.color.warning_yellow
-                            ConnectionStatus.STREAM_INTERRUPTED -> "串流中斷" to R.color.warning_yellow
-                            ConnectionStatus.DISCONNECTED -> "未連線" to R.color.text_secondary
+                            ConnectionStatus.CONNECTED -> getString(R.string.device_status_connected) to R.color.status_green
+                            ConnectionStatus.CONNECTING -> getString(R.string.device_status_connecting) to R.color.warning_yellow
+                            ConnectionStatus.STREAM_INTERRUPTED -> getString(R.string.device_status_stream_interrupted) to R.color.warning_yellow
+                            ConnectionStatus.DISCONNECTED -> getString(R.string.device_status_disconnected) to R.color.text_secondary
                         }
                         binding.tvTopConnectionStatus.text = text
                         binding.tvTopConnectionStatus.setTextColor(
@@ -278,14 +287,33 @@ class LiveFragment : Fragment() {
                             }
                         }
 
-                        // Battery
-                        val batteryStr = if (status.lastUpdatedTimestamp == 0L) {
-                            "電量: 未知"
+                        // Battery: Semantic level (0..4) and independent charging flag (UX-03 / F4)
+                        val rawBatteryLevel = status.batteryLevel
+                        val isBatteryValid = status.lastUpdatedTimestamp != 0L && rawBatteryLevel in 0..4
+                        val baseBatteryText = when {
+                            !isBatteryValid -> getString(R.string.battery_unknown)
+                            rawBatteryLevel == 4 -> getString(R.string.battery_level_4)
+                            rawBatteryLevel == 3 -> getString(R.string.battery_level_3)
+                            rawBatteryLevel == 2 -> getString(R.string.battery_level_2)
+                            rawBatteryLevel == 1 -> getString(R.string.battery_level_1)
+                            rawBatteryLevel == 0 -> getString(R.string.battery_level_0)
+                            else -> getString(R.string.battery_unknown)
+                        }
+                        val batteryStr = if (status.isCharging && isBatteryValid) {
+                            getString(R.string.battery_charging_prefix) + baseBatteryText
+                        } else if (status.isCharging) {
+                            getString(R.string.battery_charging_prefix) + getString(R.string.battery_unknown)
                         } else {
-                            "電量: 等級${status.batteryLevel}"
+                            baseBatteryText
                         }
                         binding.tvBatteryLevel.text = batteryStr
-                        binding.tvHudBatteryText.text = if (status.lastUpdatedTimestamp == 0L) "電量--" else "等級${status.batteryLevel}"
+
+                        // HUD / PiP simplified battery indicator (F4: strictly display unknown when out of range)
+                        binding.tvHudBatteryText.text = when {
+                            !isBatteryValid -> "電量--"
+                            status.isCharging -> "⚡$rawBatteryLevel/4"
+                            else -> "$rawBatteryLevel/4"
+                        }
 
                         // SD remaining
                         val minutes = status.remainingRecordingSeconds / 60

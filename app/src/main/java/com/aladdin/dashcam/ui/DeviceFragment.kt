@@ -12,6 +12,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.aladdin.dashcam.databinding.FragmentDeviceBinding
+import com.aladdin.dashcam.model.ConnectionStatus
 import kotlinx.coroutines.launch
 
 class DeviceFragment : Fragment() {
@@ -39,6 +40,16 @@ class DeviceFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
+                    viewModel.connectionStatus.collect { status ->
+                        binding.tvDeviceInfoTitle.text = when (status) {
+                            ConnectionStatus.CONNECTED -> "記錄器：已連線 (Generalplus)"
+                            ConnectionStatus.CONNECTING -> "記錄器：連線中..."
+                            ConnectionStatus.STREAM_INTERRUPTED -> "記錄器：已連線 (串流中斷)"
+                            ConnectionStatus.DISCONNECTED -> "記錄器：未連線"
+                        }
+                    }
+                }
+                launch {
                     viewModel.resolutionDisplay.collect { resText ->
                         binding.tvCurrentResolution.text = resText
                     }
@@ -54,7 +65,7 @@ class DeviceFragment : Fragment() {
                         binding.tvDeviceHost.text = if (isSwitching) {
                             "連線目標切換中... (${identity.requestedHost})"
                         } else {
-                            "連線目標：${identity.requestedHost} (點擊可切換)"
+                            "連線目標：${identity.requestedHost} (點擊可切換 Host)"
                         }
                         binding.rowResolution.isEnabled = !isSwitching
                         binding.rowLoopRecording.isEnabled = !isSwitching
@@ -78,6 +89,18 @@ class DeviceFragment : Fragment() {
     }
 
     private fun setupListeners() {
+        // Toggle diagnostics collapsible section (UX-05)
+        binding.btnToggleDiagnostics.setOnClickListener {
+            val isCurrentlyVisible = binding.layoutDiagnosticsContent.visibility == View.VISIBLE
+            if (isCurrentlyVisible) {
+                binding.layoutDiagnosticsContent.visibility = View.GONE
+                binding.tvDiagnosticsArrow.text = "點擊展開 ▼"
+            } else {
+                binding.layoutDiagnosticsContent.visibility = View.VISIBLE
+                binding.tvDiagnosticsArrow.text = "點擊收合 ▲"
+            }
+        }
+
         binding.tvDeviceHost.setOnClickListener {
             val input = android.widget.EditText(requireContext())
             input.setText(viewModel.deviceHost.value)
@@ -100,9 +123,9 @@ class DeviceFragment : Fragment() {
                 Toast.makeText(requireContext(), "正在同步手機時間至記錄器...", Toast.LENGTH_SHORT).show()
                 val res = viewModel.syncRtc()
                 res.onSuccess {
-                    Toast.makeText(requireContext(), "校時命令已接受，時間未驗證", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), "校時命令已接受，尚未回讀確認", Toast.LENGTH_SHORT).show()
                 }.onFailure { err ->
-                    Toast.makeText(requireContext(), "時間同步失敗：${err.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(requireContext(), "無法同步時間，請確認記錄器仍已連線", Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -117,13 +140,13 @@ class DeviceFragment : Fragment() {
             AlertDialog.Builder(requireContext())
                 .setTitle("選擇錄影解析度")
                 .setItems(resolutions) { _, which ->
-                    binding.tvCurrentResolution.text = "設定中..."
+                    binding.tvCurrentResolution.text = "已送出設定，等待裝置確認..."
                     viewLifecycleOwner.lifecycleScope.launch {
                         val res = viewModel.setResolution(which, resolutions[which])
                         res.onSuccess {
-                            Toast.makeText(requireContext(), "指令已送出並獲 ACK，待回讀生效: ${resolutions[which]}", Toast.LENGTH_SHORT).show()
-                        }.onFailure { err ->
-                            Toast.makeText(requireContext(), "硬體設定失敗: ${err.message}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(requireContext(), "已送出設定，等待裝置確認: ${resolutions[which]}", Toast.LENGTH_SHORT).show()
+                        }.onFailure { _ ->
+                            Toast.makeText(requireContext(), "無法套用設定，請確認記錄器仍已連線", Toast.LENGTH_LONG).show()
                         }
                     }
                 }
@@ -136,38 +159,16 @@ class DeviceFragment : Fragment() {
             AlertDialog.Builder(requireContext())
                 .setTitle("選擇循環片長")
                 .setItems(loops) { _, which ->
-                    binding.tvCurrentLoop.text = "設定中..."
+                    binding.tvCurrentLoop.text = "已送出設定，等待裝置確認..."
                     viewLifecycleOwner.lifecycleScope.launch {
                         val res = viewModel.setLoopDuration(minutes[which], loops[which])
                         res.onSuccess {
-                            Toast.makeText(requireContext(), "指令已送出並獲 ACK，待回讀生效: ${loops[which]}", Toast.LENGTH_SHORT).show()
-                        }.onFailure { err ->
-                            Toast.makeText(requireContext(), "硬體設定失敗: ${err.message}", Toast.LENGTH_LONG).show()
+                            Toast.makeText(requireContext(), "已送出設定，等待裝置確認: ${loops[which]}", Toast.LENGTH_SHORT).show()
+                        }.onFailure { _ ->
+                            Toast.makeText(requireContext(), "無法套用設定，請確認記錄器仍已連線", Toast.LENGTH_LONG).show()
                         }
                     }
                 }
-                .show()
-        }
-
-        binding.btnFormatSd.setOnClickListener {
-            AlertDialog.Builder(requireContext())
-                .setTitle("格式化記憶卡")
-                .setMessage("警告：格式化將永久抹除記憶卡內所有錄影與照片！依安全防護規範，此高風險操作需要進一步授權。")
-                .setPositiveButton("確認") { _, _ ->
-                    Toast.makeText(requireContext(), "安全限制：已阻擋硬體格式化指令發送", Toast.LENGTH_LONG).show()
-                }
-                .setNegativeButton("取消", null)
-                .show()
-        }
-
-        binding.btnFactoryReset.setOnClickListener {
-            AlertDialog.Builder(requireContext())
-                .setTitle("恢復原廠設定")
-                .setMessage("警告：此操作將重置記錄器所有設定！依安全防護規範，此高風險操作需要進一步授權。")
-                .setPositiveButton("確認") { _, _ ->
-                    Toast.makeText(requireContext(), "安全限制：已阻擋恢復原廠指令發送", Toast.LENGTH_LONG).show()
-                }
-                .setNegativeButton("取消", null)
                 .show()
         }
     }

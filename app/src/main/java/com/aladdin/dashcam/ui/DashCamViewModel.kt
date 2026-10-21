@@ -16,12 +16,15 @@ import com.aladdin.dashcam.network.TargetState
 import com.aladdin.dashcam.protocol.GPSocketProtocol
 import android.media.MediaMetadataRetriever
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -39,6 +42,24 @@ sealed class AlbumQueryState {
     data class Success(val count: Int) : AlbumQueryState()
     data class Error(val message: String) : AlbumQueryState()
 }
+
+enum class DownloadStatus {
+    PENDING,
+    DOWNLOADING,
+    COMPLETED,
+    FAILED,
+    CANCELLED
+}
+
+data class DownloadTask(
+    val id: String,
+    val mediaItem: MediaItem,
+    val status: DownloadStatus = DownloadStatus.PENDING,
+    val bytesRead: Long = 0L,
+    val totalBytes: Long = 0L,
+    val errorMessage: String? = null,
+    val localFile: File? = null
+)
 
 class DashCamViewModel(application: Application) : AndroidViewModel(application) {
     val client = DashCamClient(scope = viewModelScope)
@@ -61,6 +82,17 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
 
     private val _albumQueryState = MutableStateFlow<AlbumQueryState>(AlbumQueryState.Idle)
     val albumQueryState: StateFlow<AlbumQueryState> = _albumQueryState.asStateFlow()
+
+    private val _downloadTasks = MutableStateFlow<List<DownloadTask>>(emptyList())
+    val downloadTasks: StateFlow<List<DownloadTask>> = _downloadTasks.asStateFlow()
+    private val activeDownloadJobs = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
+
+    private val _openMediaItemEvent = MutableSharedFlow<MediaItem>(replay = 0, extraBufferCapacity = 1)
+    val openMediaItemEvent: SharedFlow<MediaItem> = _openMediaItemEvent.asSharedFlow()
+
+    fun requestOpenMedia(item: MediaItem) {
+        _openMediaItemEvent.tryEmit(item)
+    }
 
     val wifiNetwork = networkMonitor.wifiNetwork
     private val _deviceHost = MutableStateFlow("192.168.25.1")
@@ -238,10 +270,11 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
 
     /**
      * Fetches media file into temporary viewing cache. Does NOT mark as downloaded.
+     * Progress dispatch is safely marshaled to Main thread and respects job cancellation (R1).
      */
     suspend fun fetchPreviewCache(
         item: MediaItem,
-        onProgress: (bytesRead: Long) -> Unit = {}
+        onProgress: suspend (bytesRead: Long) -> Unit = {}
     ): Result<File> = withContext(Dispatchers.IO) {
         val destFile = getPreviewCacheFile(item)
         if (destFile.exists() && (item.sizeBytes <= 0 || destFile.length() == item.sizeBytes)) {
@@ -252,7 +285,15 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             deviceIndex = item.deviceIndex,
             destinationFile = destFile,
             expectedEpoch = currentEpoch,
-            onProgress = onProgress
+            onProgress = { bytesRead ->
+                if (coroutineContext.isActive) {
+                    kotlinx.coroutines.runBlocking(Dispatchers.Main) {
+                        if (coroutineContext.isActive) {
+                            onProgress(bytesRead)
+                        }
+                    }
+                }
+            }
         )
         if (res.isSuccess) {
             Result.success(destFile)
@@ -263,24 +304,45 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
 
     /**
      * Permanently saves media item to local album upon explicit user request.
+     * Uses atomic CAS StateFlow updates (F2) and dispatches UI progress to Main thread (R1).
      */
     suspend fun saveToPermanentStorage(
         item: MediaItem,
-        onProgress: (bytesRead: Long) -> Unit = {}
+        onProgress: suspend (bytesRead: Long) -> Unit = {}
     ): Result<File> = withContext(Dispatchers.IO) {
         val currentEpoch = targetIdentity.value.epoch
         val moviesDir = getLocalMoviesDir()
         if (!moviesDir.exists()) moviesDir.mkdirs()
         val destFile = File(moviesDir, item.fileName)
 
+        updateDownloadTask(
+            DownloadTask(
+                id = item.fileName,
+                mediaItem = item,
+                status = DownloadStatus.DOWNLOADING,
+                bytesRead = 0L,
+                totalBytes = item.sizeBytes
+            )
+        )
+
         // If viewing cache already has the complete file, copy it directly
         val cacheFile = getPreviewCacheFile(item)
         if (cacheFile.exists() && (item.sizeBytes <= 0 || cacheFile.length() == item.sizeBytes)) {
             try {
                 cacheFile.copyTo(destFile, overwrite = true)
-                _deviceMediaList.value = _deviceMediaList.value.map {
-                    if (it.fileName == item.fileName) it.copy(isDownloaded = true) else it
+                _deviceMediaList.update { list ->
+                    list.map { if (it.fileName == item.fileName) it.copy(isDownloaded = true) else it }
                 }
+                updateDownloadTask(
+                    DownloadTask(
+                        id = item.fileName,
+                        mediaItem = item,
+                        status = DownloadStatus.COMPLETED,
+                        bytesRead = destFile.length(),
+                        totalBytes = destFile.length(),
+                        localFile = destFile
+                    )
+                )
                 loadLocalMedia()
                 return@withContext Result.success(destFile)
             } catch (e: Exception) {
@@ -292,16 +354,120 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             deviceIndex = item.deviceIndex,
             destinationFile = destFile,
             expectedEpoch = currentEpoch,
-            onProgress = onProgress
+            onProgress = { bytesRead ->
+                if (coroutineContext.isActive) {
+                    updateDownloadTaskProgress(item.fileName, bytesRead)
+                    kotlinx.coroutines.runBlocking(Dispatchers.Main) {
+                        if (coroutineContext.isActive) {
+                            onProgress(bytesRead)
+                        }
+                    }
+                }
+            }
         )
         if (res.isSuccess) {
-            _deviceMediaList.value = _deviceMediaList.value.map {
-                if (it.fileName == item.fileName) it.copy(isDownloaded = true) else it
+            _deviceMediaList.update { list ->
+                list.map { if (it.fileName == item.fileName) it.copy(isDownloaded = true) else it }
+            }
+            _downloadTasks.update { tasks ->
+                tasks.map { existing ->
+                    if (existing.id == item.fileName && existing.status != DownloadStatus.CANCELLED) {
+                        existing.copy(
+                            status = DownloadStatus.COMPLETED,
+                            bytesRead = destFile.length(),
+                            totalBytes = destFile.length(),
+                            localFile = destFile
+                        )
+                    } else {
+                        existing
+                    }
+                }
             }
             loadLocalMedia()
             Result.success(destFile)
         } else {
-            Result.failure(res.exceptionOrNull() ?: Exception("永久儲存失敗"))
+            val errMsg = res.exceptionOrNull()?.message ?: "永久儲存失敗"
+            _downloadTasks.update { tasks ->
+                tasks.map { existing ->
+                    if (existing.id == item.fileName && existing.status != DownloadStatus.CANCELLED) {
+                        existing.copy(
+                            status = DownloadStatus.FAILED,
+                            errorMessage = errMsg,
+                            totalBytes = item.sizeBytes
+                        )
+                    } else {
+                        existing
+                    }
+                }
+            }
+            Result.failure(res.exceptionOrNull() ?: Exception(errMsg))
+        }
+    }
+
+    /**
+     * Unified entry point for starting permanent downloads (F1 / Single Ownership).
+     * Automatically registers and tracks Job in activeDownloadJobs.
+     */
+    fun startPermanentDownload(
+        item: MediaItem,
+        onProgress: (suspend (bytesRead: Long) -> Unit)? = null
+    ): Job {
+        activeDownloadJobs[item.fileName]?.let { existing ->
+            if (existing.isActive) return existing
+        }
+        val job = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                saveToPermanentStorage(item, onProgress = onProgress ?: {})
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) {
+                    _downloadTasks.update { tasks ->
+                        tasks.map { if (it.id == item.fileName) it.copy(status = DownloadStatus.CANCELLED) else it }
+                    }
+                }
+            } finally {
+                activeDownloadJobs.remove(item.fileName)
+            }
+        }
+        activeDownloadJobs[item.fileName] = job
+        return job
+    }
+
+    private fun updateDownloadTask(task: DownloadTask) {
+        _downloadTasks.update { tasks ->
+            val index = tasks.indexOfFirst { it.id == task.id }
+            if (index >= 0) {
+                tasks.toMutableList().apply { set(index, task) }
+            } else {
+                listOf(task) + tasks
+            }
+        }
+    }
+
+    private fun updateDownloadTaskProgress(taskId: String, bytesRead: Long) {
+        _downloadTasks.update { tasks ->
+            val index = tasks.indexOfFirst { it.id == taskId }
+            if (index >= 0) {
+                val existing = tasks[index]
+                if (existing.status == DownloadStatus.DOWNLOADING) {
+                    tasks.toMutableList().apply { set(index, existing.copy(bytesRead = bytesRead)) }
+                } else {
+                    tasks
+                }
+            } else {
+                tasks
+            }
+        }
+    }
+
+    fun retryDownload(task: DownloadTask) {
+        startPermanentDownload(task.mediaItem)
+    }
+
+    fun cancelDownload(task: DownloadTask) {
+        val job = activeDownloadJobs.remove(task.id)
+        job?.cancel()
+        _downloadTasks.update { tasks ->
+            tasks.map { if (it.id == task.id) it.copy(status = DownloadStatus.CANCELLED) else it }
         }
     }
 
@@ -310,7 +476,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
      */
     suspend fun downloadDeviceMedia(
         item: MediaItem,
-        onProgress: (bytesRead: Long) -> Unit = {}
+        onProgress: suspend (bytesRead: Long) -> Unit = {}
     ): Result<File> = saveToPermanentStorage(item, onProgress)
 
     fun loadLocalMedia() {
@@ -351,6 +517,23 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
             _localMediaList.value = items
+
+            // Atomic sync with download tasks (F2)
+            val localTasks = items.map { localItem ->
+                DownloadTask(
+                    id = localItem.fileName,
+                    mediaItem = localItem,
+                    status = DownloadStatus.COMPLETED,
+                    bytesRead = localItem.sizeBytes,
+                    totalBytes = localItem.sizeBytes,
+                    localFile = File(moviesDir, localItem.fileName)
+                )
+            }
+            _downloadTasks.update { existingTasks ->
+                val nonCompletedTasks = existingTasks.filter { it.status != DownloadStatus.COMPLETED }
+                val existingNonCompletedIds = nonCompletedTasks.map { it.id }.toSet()
+                nonCompletedTasks + localTasks.filter { !existingNonCompletedIds.contains(it.id) }
+            }
         }
     }
 
@@ -360,21 +543,24 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
      * Returns 0L if fileName does not match standard pattern or date is invalid.
      */
     private fun parseRecordingTimeFromFileName(fileName: String): Long {
-        val pattern = Pattern.compile("^[A-Z]{3}_(\\d{4})(\\d{2})(\\d{2})_(\\d{2})(\\d{2})(\\d{2})")
+        val pattern = Pattern.compile("^[A-Z]{3}_(\\d{8}_\\d{6})")
         val matcher = pattern.matcher(fileName)
         if (matcher.find()) {
-            val year = matcher.group(1)?.toIntOrNull() ?: return 0L
-            val month = matcher.group(2)?.toIntOrNull() ?: return 0L
-            val day = matcher.group(3)?.toIntOrNull() ?: return 0L
-            val hour = matcher.group(4)?.toIntOrNull() ?: return 0L
-            val minute = matcher.group(5)?.toIntOrNull() ?: return 0L
-            val second = matcher.group(6)?.toIntOrNull() ?: return 0L
-
-            if (year in 2020..2040 && month in 1..12 && day in 1..31 && hour in 0..23 && minute in 0..59 && second in 0..59) {
-                val cal = Calendar.getInstance()
-                cal.set(year, month - 1, day, hour, minute, second)
-                cal.set(Calendar.MILLISECOND, 0)
-                return cal.timeInMillis
+            val dateStr = matcher.group(1) ?: return 0L
+            return try {
+                val sdf = java.text.SimpleDateFormat("yyyyMMdd_HHmmss", java.util.Locale.US).apply {
+                    isLenient = false
+                }
+                val date = sdf.parse(dateStr) ?: return 0L
+                val cal = Calendar.getInstance().apply { time = date }
+                val year = cal.get(Calendar.YEAR)
+                if (year in 2020..2040) {
+                    date.time
+                } else {
+                    0L
+                }
+            } catch (_: Exception) {
+                0L
             }
         }
         return 0L // 無法驗證為可信錄製時間時返回 0L，代表時間未知

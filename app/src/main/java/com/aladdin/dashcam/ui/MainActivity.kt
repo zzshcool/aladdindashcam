@@ -53,7 +53,6 @@ class MainActivity : AppCompatActivity() {
 
         setupBottomNav()
         observeConnectionStatus()
-        requestPermissionsIfNeeded()
     }
 
     private fun setupFragments() {
@@ -138,10 +137,13 @@ class MainActivity : AppCompatActivity() {
                             binding.tvConnectionStatus.text = getString(R.string.device_status_connecting)
                             binding.tvConnectionStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.warning_yellow))
                         }
-                        ConnectionStatus.DISCONNECTED,
                         ConnectionStatus.STREAM_INTERRUPTED -> {
+                            binding.tvConnectionStatus.text = getString(R.string.device_status_stream_interrupted)
+                            binding.tvConnectionStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.warning_yellow))
+                        }
+                        ConnectionStatus.DISCONNECTED -> {
                             binding.tvConnectionStatus.text = getString(R.string.device_status_disconnected)
-                            binding.tvConnectionStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.error_red))
+                            binding.tvConnectionStatus.setTextColor(ContextCompat.getColor(this@MainActivity, R.color.text_secondary))
                         }
                     }
                 }
@@ -149,25 +151,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun requestPermissionsIfNeeded() {
-        val permissionsToRequest = mutableListOf<String>()
+    /**
+     * Context-aware permission request (UX-04 / Chapter 27)
+     * Permissions are requested gracefully without blocking core live/album features if denied.
+     */
+    fun requestLocationPermission() {
         val fineGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val coarseGranted = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
-        // C12: Request both FINE and COARSE together per Android guidelines
-        if (!fineGranted || !coarseGranted) {
-            permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
-            permissionsToRequest.add(Manifest.permission.ACCESS_COARSE_LOCATION)
+        if (fineGranted || coarseGranted) {
+            viewModel.gpsSpeedometer.startListening()
+            return
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VIDEO) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.READ_MEDIA_VIDEO)
-            }
-        }
-        if (permissionsToRequest.isNotEmpty()) {
-            permissionLauncher.launch(permissionsToRequest.toTypedArray())
-        }
+        // Request location permissions specifically for HUD speedometer
+        permissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
     }
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
