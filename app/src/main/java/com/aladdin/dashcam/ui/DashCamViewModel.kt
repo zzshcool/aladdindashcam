@@ -9,6 +9,7 @@ import com.aladdin.dashcam.model.ConnectionStatus
 import com.aladdin.dashcam.model.DashCamDeviceStatus
 import com.aladdin.dashcam.model.MediaItem
 import com.aladdin.dashcam.model.RecordingStatus
+import com.aladdin.dashcam.model.DashCamSettingMappings
 import com.aladdin.dashcam.network.DashCamClient
 import com.aladdin.dashcam.network.NetworkMonitor
 import com.aladdin.dashcam.network.TargetIdentity
@@ -24,7 +25,13 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -41,6 +48,14 @@ sealed class AlbumQueryState {
     object Loading : AlbumQueryState()
     data class Success(val count: Int) : AlbumQueryState()
     data class Error(val message: String) : AlbumQueryState()
+}
+
+sealed class ProbeStatus {
+    object Idle : ProbeStatus()
+    data class Probing(val host: String) : ProbeStatus()
+    data class Success(val host: String, val protocolHeader: String) : ProbeStatus()
+    data class NotDashCam(val host: String) : ProbeStatus()
+    data class Failed(val host: String, val reason: String?) : ProbeStatus()
 }
 
 enum class DownloadStatus {
@@ -98,6 +113,27 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     val deviceStatus: StateFlow<DashCamDeviceStatus> = client.deviceStatus
     val targetIdentity: StateFlow<TargetIdentity> = client.targetIdentity
     val gpsStatus = gpsSpeedometer.gpsStatus
+
+    val recordingTimerInterpolator = RecordingTimerInterpolator()
+    private val _timerTickTrigger = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 1).apply {
+        tryEmit(Unit)
+    }
+
+    val recordingTimerDisplay: StateFlow<RecordingTimerDisplay> = merge(
+        _timerTickTrigger,
+        flow {
+            while (true) {
+                delay(1000L)
+                emit(Unit)
+            }
+        }
+    ).map {
+        recordingTimerInterpolator.getCurrentDisplay()
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5000L),
+        initialValue = recordingTimerInterpolator.getCurrentDisplay()
+    )
 
     private val _hostSwitchEvent = MutableSharedFlow<HostSwitchEvent>(replay = 0, extraBufferCapacity = 1)
     val hostSwitchEvent: SharedFlow<HostSwitchEvent> = _hostSwitchEvent.asSharedFlow()
@@ -169,6 +205,14 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     private val _registeredDevices = MutableStateFlow<List<DashCamDeviceRecord>>(emptyList())
     val registeredDevices: StateFlow<List<DashCamDeviceRecord>> = _registeredDevices.asStateFlow()
 
+    val selectedDevice: StateFlow<DashCamDeviceRecord?> = _registeredDevices
+        .map { list -> list.firstOrNull { it.isSelected } ?: list.firstOrNull() }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    private var probeJob: Job? = null
+    private val _probeStatus = MutableStateFlow<ProbeStatus>(ProbeStatus.Idle)
+    val probeStatus: StateFlow<ProbeStatus> = _probeStatus.asStateFlow()
+
     private val _isRidingModeActive = MutableStateFlow(false)
     val isRidingModeActive: StateFlow<Boolean> = _isRidingModeActive.asStateFlow()
 
@@ -210,15 +254,41 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         networkMonitor.startMonitoring()
         viewModelScope.launch {
             networkMonitor.wifiNetwork.collect { network ->
+                probeJob?.cancel()
                 client.bindNetwork(network)
                 if (network != null) {
-                    val gwIp = networkMonitor.getWifiGatewayIp() ?: "192.168.25.1"
-                    autoMatchOrAddDeviceForHost(gwIp)
+                    probeJob = launch(Dispatchers.IO) {
+                        delay(350)
+                        val gwIp = networkMonitor.getWifiGatewayIp() ?: "192.168.25.1"
+                        _probeStatus.value = ProbeStatus.Probing(gwIp)
+                        val probeRes = client.probeDevice(gwIp, network)
+                        if (probeRes.isSuccess) {
+                            val isDashCam = probeRes.getOrNull() == true
+                            if (isDashCam) {
+                                _probeStatus.value = ProbeStatus.Success(gwIp, "GPSOCK")
+                                autoMatchOrAddDeviceForHost(gwIp, "GPSOCK")
+                            } else {
+                                _probeStatus.value = ProbeStatus.NotDashCam(gwIp)
+                            }
+                        } else {
+                            _probeStatus.value = ProbeStatus.Failed(gwIp, probeRes.exceptionOrNull()?.message)
+                        }
+                    }
+                } else {
+                    _probeStatus.value = ProbeStatus.Idle
                 }
             }
         }
         viewModelScope.launch {
+            client.connectionStatus.collect { status ->
+                recordingTimerInterpolator.onConnectionStatusChanged(status)
+                _timerTickTrigger.tryEmit(Unit)
+            }
+        }
+        viewModelScope.launch {
             client.targetIdentity.collect { identity ->
+                recordingTimerInterpolator.onDeviceSwitched(identity.epoch)
+                _timerTickTrigger.tryEmit(Unit)
                 if (identity.state == TargetState.READY && identity.sessionId > 0L) {
                     val session = identity.sessionId
                     if (session != lastSyncedSessionId) {
@@ -244,6 +314,8 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         }
         viewModelScope.launch {
             client.deviceStatus.collect { status ->
+                recordingTimerInterpolator.onDeviceStatus(status, targetIdentity.value.epoch)
+                _timerTickTrigger.tryEmit(Unit)
                 updateStorageEstimateFromStatus(status)
                 if (status.audioEnabled) {
                     _audioRecordingDisplay.value = "開啟"
@@ -259,7 +331,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
 
     private fun performAutoSyncRtc(epoch: Long) {
         viewModelScope.launch(Dispatchers.IO) {
-            val res = client.syncRtc()
+            val res = client.syncRtc(expectedEpoch = epoch)
             if (epoch != targetIdentity.value.epoch) {
                 return@launch
             }
@@ -274,8 +346,9 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun syncRtcManual() {
+        val epoch = targetIdentity.value.epoch
         viewModelScope.launch(Dispatchers.IO) {
-            val res = client.syncRtc()
+            val res = client.syncRtc(expectedEpoch = epoch)
             val now = System.currentTimeMillis()
             _rtcSyncState.value = RtcSyncState(
                 lastAttemptTime = now,
@@ -416,12 +489,12 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         return client.queryStatus()
     }
 
-    suspend fun setResolution(resIndex: Int, displayName: String): Result<Unit> {
+    suspend fun setResolution(resRawValue: Int, displayName: String): Result<Unit> {
         val currentIdentity = targetIdentity.value
         val epoch = currentIdentity.epoch
         val result = client.setParameter(
             GPSocketProtocol.PARAM_RESOLUTION,
-            byteArrayOf(resIndex.toByte()),
+            byteArrayOf(resRawValue.toByte()),
             expectedEpoch = epoch
         )
         if (result.isSuccess) {
@@ -430,11 +503,13 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                 viewModelScope.launch(Dispatchers.IO) {
                     kotlinx.coroutines.delay(250)
                     val check = client.getParameter(GPSocketProtocol.PARAM_RESOLUTION, expectedEpoch = epoch)
-                    if (check.isSuccess && targetIdentity.value.epoch == epoch) {
-                        val actual = check.getOrNull()?.firstOrNull()?.toInt()
-                        _resolutionDisplay.value = if (actual == resIndex) displayName else "回讀值: $actual"
-                    } else if (targetIdentity.value.epoch == epoch) {
-                        _resolutionDisplay.value = displayName
+                    if (targetIdentity.value.epoch == epoch) {
+                        if (check.isSuccess) {
+                            val actual = check.getOrNull()?.firstOrNull()?.toInt()
+                            _resolutionDisplay.value = if (actual == resRawValue) displayName else "回讀值不符: ${DashCamSettingMappings.getVideoResolutionName(actual ?: -1)}"
+                        } else {
+                            _resolutionDisplay.value = "$displayName (已送出，回讀失敗)"
+                        }
                     }
                 }
             }
@@ -446,19 +521,12 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         return result
     }
 
-    suspend fun setLoopDuration(minutes: Int, displayName: String): Result<Unit> {
+    suspend fun setLoopDuration(loopRawValue: Int, displayName: String): Result<Unit> {
         val currentIdentity = targetIdentity.value
         val epoch = currentIdentity.epoch
-        val rawValue = when (minutes) {
-            1 -> 1
-            2 -> 2
-            3 -> 3
-            5 -> 4
-            else -> minutes
-        }
         val result = client.setParameter(
             GPSocketProtocol.PARAM_LOOP_RECORDING,
-            byteArrayOf(rawValue.toByte()),
+            byteArrayOf(loopRawValue.toByte()),
             expectedEpoch = epoch
         )
         if (result.isSuccess) {
@@ -467,11 +535,13 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                 viewModelScope.launch(Dispatchers.IO) {
                     kotlinx.coroutines.delay(250)
                     val check = client.getParameter(GPSocketProtocol.PARAM_LOOP_RECORDING, expectedEpoch = epoch)
-                    if (check.isSuccess && targetIdentity.value.epoch == epoch) {
-                        val actual = check.getOrNull()?.firstOrNull()?.toInt()
-                        _loopDisplay.value = if (actual == rawValue) displayName else "回讀值: $actual"
-                    } else if (targetIdentity.value.epoch == epoch) {
-                        _loopDisplay.value = displayName
+                    if (targetIdentity.value.epoch == epoch) {
+                        if (check.isSuccess) {
+                            val actual = check.getOrNull()?.firstOrNull()?.toInt()
+                            _loopDisplay.value = if (actual == loopRawValue || (loopRawValue == 4 && actual == 5)) displayName else "回讀值不符: ${DashCamSettingMappings.getLoopRecordingName(actual ?: -1)}"
+                        } else {
+                            _loopDisplay.value = "$displayName (已送出，回讀失敗)"
+                        }
                     }
                 }
             }
@@ -483,33 +553,65 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         return result
     }
 
-    suspend fun setCaptureResolution(resIndex: Int, displayName: String): Result<Unit> {
+    suspend fun setCaptureResolution(resRawValue: Int, displayName: String): Result<Unit> {
         val currentIdentity = targetIdentity.value
         val epoch = currentIdentity.epoch
         val result = client.setParameter(
             GPSocketProtocol.PARAM_CAPTURE_RESOLUTION,
-            byteArrayOf(resIndex.toByte()),
+            byteArrayOf(resRawValue.toByte()),
             expectedEpoch = epoch
         )
         if (result.isSuccess) {
             if (targetIdentity.value.epoch == epoch) {
-                _captureResolutionDisplay.value = displayName
+                _captureResolutionDisplay.value = "$displayName (確認中...)"
+                viewModelScope.launch(Dispatchers.IO) {
+                    kotlinx.coroutines.delay(250)
+                    val check = client.getParameter(GPSocketProtocol.PARAM_CAPTURE_RESOLUTION, expectedEpoch = epoch)
+                    if (targetIdentity.value.epoch == epoch) {
+                        if (check.isSuccess) {
+                            val actual = check.getOrNull()?.firstOrNull()?.toInt()
+                            _captureResolutionDisplay.value = if (actual == resRawValue) displayName else "回讀值不符: ${DashCamSettingMappings.getCaptureResolutionName(actual ?: -1)}"
+                        } else {
+                            _captureResolutionDisplay.value = "$displayName (已送出，回讀失敗)"
+                        }
+                    }
+                }
+            }
+        } else {
+            if (targetIdentity.value.epoch == epoch) {
+                _captureResolutionDisplay.value = "設定失敗: ${result.exceptionOrNull()?.message}"
             }
         }
         return result
     }
 
-    suspend fun setCaptureQuality(qualityIndex: Int, displayName: String): Result<Unit> {
+    suspend fun setCaptureQuality(qualityRawValue: Int, displayName: String): Result<Unit> {
         val currentIdentity = targetIdentity.value
         val epoch = currentIdentity.epoch
         val result = client.setParameter(
             GPSocketProtocol.PARAM_CAPTURE_QUALITY,
-            byteArrayOf(qualityIndex.toByte()),
+            byteArrayOf(qualityRawValue.toByte()),
             expectedEpoch = epoch
         )
         if (result.isSuccess) {
             if (targetIdentity.value.epoch == epoch) {
-                _captureQualityDisplay.value = displayName
+                _captureQualityDisplay.value = "$displayName (確認中...)"
+                viewModelScope.launch(Dispatchers.IO) {
+                    kotlinx.coroutines.delay(250)
+                    val check = client.getParameter(GPSocketProtocol.PARAM_CAPTURE_QUALITY, expectedEpoch = epoch)
+                    if (targetIdentity.value.epoch == epoch) {
+                        if (check.isSuccess) {
+                            val actual = check.getOrNull()?.firstOrNull()?.toInt()
+                            _captureQualityDisplay.value = if (actual == qualityRawValue) displayName else "回讀值不符: ${DashCamSettingMappings.getCaptureQualityName(actual ?: -1)}"
+                        } else {
+                            _captureQualityDisplay.value = "$displayName (已送出，回讀失敗)"
+                        }
+                    }
+                }
+            }
+        } else {
+            if (targetIdentity.value.epoch == epoch) {
+                _captureQualityDisplay.value = "設定失敗: ${result.exceptionOrNull()?.message}"
             }
         }
         return result
@@ -524,27 +626,33 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             byteArrayOf(rawVal.toByte()),
             expectedEpoch = epoch
         )
+        val disp = String.format(java.util.Locale.US, "%+.1f", exposureVal)
         if (result.isSuccess) {
             if (targetIdentity.value.epoch == epoch) {
                 _exposureValue.value = exposureVal
-                val disp = String.format(java.util.Locale.US, "%+.1f", exposureVal)
                 _exposureDisplay.value = "$disp (確認中...)"
                 viewModelScope.launch(Dispatchers.IO) {
                     kotlinx.coroutines.delay(250)
                     val check = client.getParameter(GPSocketProtocol.PARAM_EXPOSURE, expectedEpoch = epoch)
-                    if (check.isSuccess && targetIdentity.value.epoch == epoch) {
-                        val actual = check.getOrNull()?.firstOrNull()?.toInt()
-                        _exposureDisplay.value = if (actual == rawVal) disp else "回讀值: $actual"
-                    } else if (targetIdentity.value.epoch == epoch) {
-                        _exposureDisplay.value = disp
+                    if (targetIdentity.value.epoch == epoch) {
+                        if (check.isSuccess) {
+                            val actual = check.getOrNull()?.firstOrNull()?.toInt()
+                            _exposureDisplay.value = if (actual == rawVal) disp else "回讀值: ${actual?.let { String.format(java.util.Locale.US, "%+.1f", it / 3.0f) } ?: actual}"
+                        } else {
+                            _exposureDisplay.value = "$disp (已送出，回讀失敗)"
+                        }
                     }
                 }
+            }
+        } else {
+            if (targetIdentity.value.epoch == epoch) {
+                _exposureDisplay.value = "設定失敗: ${result.exceptionOrNull()?.message}"
             }
         }
         return result
     }
 
-    suspend fun setWatermark(enabled: Boolean): Result<Unit> {
+    suspend fun setWatermark(enabled: Boolean, displayName: String = if (enabled) "開啟 (Date/Time)" else "關閉"): Result<Unit> {
         val currentIdentity = targetIdentity.value
         val epoch = currentIdentity.epoch
         val rawVal = if (enabled) 1 else 0
@@ -555,7 +663,23 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         )
         if (result.isSuccess) {
             if (targetIdentity.value.epoch == epoch) {
-                _watermarkDisplay.value = if (enabled) "開啟 (日期/時間)" else "關閉"
+                _watermarkDisplay.value = "$displayName (確認中...)"
+                viewModelScope.launch(Dispatchers.IO) {
+                    kotlinx.coroutines.delay(250)
+                    val check = client.getParameter(GPSocketProtocol.PARAM_WATERMARK, expectedEpoch = epoch)
+                    if (targetIdentity.value.epoch == epoch) {
+                        if (check.isSuccess) {
+                            val actual = check.getOrNull()?.firstOrNull()?.toInt()
+                            _watermarkDisplay.value = if (actual == rawVal) displayName else "回讀值不符: ${DashCamSettingMappings.getWatermarkName(actual ?: -1)}"
+                        } else {
+                            _watermarkDisplay.value = "$displayName (已送出，回讀失敗)"
+                        }
+                    }
+                }
+            }
+        } else {
+            if (targetIdentity.value.epoch == epoch) {
+                _watermarkDisplay.value = "設定失敗: ${result.exceptionOrNull()?.message}"
             }
         }
         return result
@@ -634,12 +758,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             val resResult = client.getParameter(GPSocketProtocol.PARAM_RESOLUTION, expectedEpoch = epoch)
             if (resResult.isSuccess && targetIdentity.value.epoch == epoch) {
                 val byteVal = resResult.getOrNull()?.firstOrNull()?.toInt() ?: -1
-                _resolutionDisplay.value = when (byteVal) {
-                    0 -> "1080P"
-                    1 -> "720P"
-                    2 -> "2K"
-                    else -> "未知 ($byteVal)"
-                }
+                _resolutionDisplay.value = DashCamSettingMappings.getVideoResolutionName(byteVal)
             } else if (targetIdentity.value.epoch == epoch) {
                 _resolutionDisplay.value = "讀取失敗"
             }
@@ -648,14 +767,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             val loopResult = client.getParameter(GPSocketProtocol.PARAM_LOOP_RECORDING, expectedEpoch = epoch)
             if (loopResult.isSuccess && targetIdentity.value.epoch == epoch) {
                 val byteVal = loopResult.getOrNull()?.firstOrNull()?.toInt() ?: -1
-                _loopDisplay.value = when (byteVal) {
-                    0 -> "關閉"
-                    1 -> "1 分鐘"
-                    2 -> "2 分鐘"
-                    3 -> "3 分鐘"
-                    4, 5 -> "5 分鐘"
-                    else -> "未知 ($byteVal)"
-                }
+                _loopDisplay.value = DashCamSettingMappings.getLoopRecordingName(byteVal)
             } else if (targetIdentity.value.epoch == epoch) {
                 _loopDisplay.value = "讀取失敗"
             }
@@ -675,7 +787,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             val wmResult = client.getParameter(GPSocketProtocol.PARAM_WATERMARK, expectedEpoch = epoch)
             if (wmResult.isSuccess && targetIdentity.value.epoch == epoch) {
                 val byteVal = wmResult.getOrNull()?.firstOrNull()?.toInt() ?: -1
-                _watermarkDisplay.value = if (byteVal == 1) "開啟 (日期/時間)" else if (byteVal == 0) "關閉" else "未知 ($byteVal)"
+                _watermarkDisplay.value = DashCamSettingMappings.getWatermarkName(byteVal)
             } else if (targetIdentity.value.epoch == epoch) {
                 _watermarkDisplay.value = "讀取失敗"
             }
@@ -684,17 +796,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             val capResResult = client.getParameter(GPSocketProtocol.PARAM_CAPTURE_RESOLUTION, expectedEpoch = epoch)
             if (capResResult.isSuccess && targetIdentity.value.epoch == epoch) {
                 val byteVal = capResResult.getOrNull()?.firstOrNull()?.toInt() ?: -1
-                _captureResolutionDisplay.value = when (byteVal) {
-                    0 -> "VGA (640x480)"
-                    1 -> "1.3M (1280x960)"
-                    2 -> "2M (1920x1080)"
-                    3 -> "3M (2048x1536)"
-                    4 -> "5M (2592x1944)"
-                    5 -> "8M (3264x2448)"
-                    6 -> "10M (3648x2736)"
-                    7 -> "12M (4032x3024)"
-                    else -> "解析度 ($byteVal)"
-                }
+                _captureResolutionDisplay.value = DashCamSettingMappings.getCaptureResolutionName(byteVal)
             } else if (targetIdentity.value.epoch == epoch) {
                 _captureResolutionDisplay.value = "讀取失敗"
             }
@@ -703,12 +805,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             val capQualResult = client.getParameter(GPSocketProtocol.PARAM_CAPTURE_QUALITY, expectedEpoch = epoch)
             if (capQualResult.isSuccess && targetIdentity.value.epoch == epoch) {
                 val byteVal = capQualResult.getOrNull()?.firstOrNull()?.toInt() ?: -1
-                _captureQualityDisplay.value = when (byteVal) {
-                    0 -> "優質 (Super Fine)"
-                    1 -> "標準 (Fine)"
-                    2 -> "經濟 (Normal)"
-                    else -> "品質 ($byteVal)"
-                }
+                _captureQualityDisplay.value = DashCamSettingMappings.getCaptureQualityName(byteVal)
             } else if (targetIdentity.value.epoch == epoch) {
                 _captureQualityDisplay.value = "讀取失敗"
             }
@@ -766,7 +863,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun autoMatchOrAddDeviceForHost(host: String) {
+    fun autoMatchOrAddDeviceForHost(host: String, protocolHeader: String = "GPSOCK") {
         val currentList = _registeredDevices.value
         val existing = currentList.find { it.host == host }
         if (existing != null) {
@@ -774,11 +871,12 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                 selectDevice(existing)
             }
         } else {
+            val devId = "Aladdin-${host.replace(".", "_")}-${System.currentTimeMillis() % 10000}"
             val newDev = DashCamDeviceRecord(
-                id = "Aladdin-${host.replace(".", "_")}",
+                id = devId,
                 name = "Aladdin DashCam ($host)",
                 host = host,
-                firmwareVersion = "讀取中...",
+                firmwareVersion = "未知",
                 lastConnectedTime = "",
                 isSelected = true
             )
@@ -792,8 +890,15 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     fun updateDeviceLastConnected(host: String) {
         val now = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
         _registeredDevices.update { list ->
+            val currentSelected = list.firstOrNull { it.isSelected }
+            val target = if (currentSelected != null && currentSelected.host == host) {
+                currentSelected
+            } else {
+                list.firstOrNull { it.host == host }
+            }
+            if (target == null) return@update list
             val updated = list.map { dev ->
-                if (dev.host == host) {
+                if (dev.id == target.id) {
                     dev.copy(lastConnectedTime = now, isSelected = true)
                 } else {
                     dev.copy(isSelected = false)
@@ -1226,10 +1331,21 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         val app = getApplication<Application>()
         val thumbDir = File(app.cacheDir, "thumbnails")
         if (!thumbDir.exists()) thumbDir.mkdirs()
-        val deviceKey = (targetIdentity.value.activeHost ?: targetIdentity.value.requestedHost).replace(".", "_")
-        val thumbFile = File(thumbDir, "thumb_${deviceKey}_${item.id}.jpg")
+        val currentDev = _registeredDevices.value.firstOrNull { it.isSelected }
+        val deviceKey = (currentDev?.id ?: (targetIdentity.value.activeHost ?: targetIdentity.value.requestedHost)).replace(Regex("[^a-zA-Z0-9_]"), "_")
+        val thumbFile = File(thumbDir, "thumb_${deviceKey}_${item.fileName}.jpg")
         if (thumbFile.exists() && thumbFile.length() > 0) {
             return@withContext thumbFile
+        }
+
+        // 本機已下載或 LOCAL_ 項目直接於背景線程解碼，不發送遠端 GET（R10 閉合）
+        if (item.isDownloaded || item.id.startsWith("LOCAL_")) {
+            val moviesDir = getLocalMoviesDir()
+            val localFile = File(moviesDir, item.fileName)
+            if (localFile.exists() && localFile.length() > 0) {
+                val ok = generateLocalThumbnail(localFile, thumbFile, item.isVideo)
+                if (ok) return@withContext thumbFile
+            }
         }
 
         val res = client.getThumbnail(item.deviceIndex, expectedEpoch = targetIdentity.value.epoch)
@@ -1243,6 +1359,34 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         null
+    }
+
+    private fun generateLocalThumbnail(sourceFile: File, destThumbFile: File, isVideo: Boolean): Boolean {
+        return try {
+            val bitmap: android.graphics.Bitmap? = if (isVideo) {
+                var retriever: MediaMetadataRetriever? = null
+                try {
+                    retriever = MediaMetadataRetriever()
+                    retriever.setDataSource(sourceFile.absolutePath)
+                    retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+                } finally {
+                    retriever?.release()
+                }
+            } else {
+                android.graphics.BitmapFactory.decodeFile(sourceFile.absolutePath)
+            }
+            if (bitmap != null) {
+                java.io.FileOutputStream(destThumbFile).use { out ->
+                    bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, out)
+                }
+                bitmap.recycle()
+                true
+            } else {
+                false
+            }
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /**

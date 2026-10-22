@@ -153,12 +153,14 @@ class DeviceFragment : Fragment() {
 
         // Photo Resolution dialog
         binding.rowCaptureResolution.setOnClickListener {
-            val options = arrayOf("5M (2592x1944)", "3M (2048x1536)", "2M (1920x1080)", "1M (1280x720)")
+            val options = com.aladdin.dashcam.model.DashCamSettingMappings.CAPTURE_RESOLUTIONS
+            val itemNames = options.map { it.displayName }.toTypedArray()
             AlertDialog.Builder(requireContext())
                 .setTitle("圖片解析度")
-                .setItems(options) { _, which ->
+                .setItems(itemNames) { _, which ->
+                    val selected = options[which]
                     viewLifecycleOwner.lifecycleScope.launch {
-                        viewModel.setCaptureResolution(which, options[which])
+                        viewModel.setCaptureResolution(selected.rawValue, selected.displayName)
                     }
                 }
                 .show()
@@ -166,12 +168,14 @@ class DeviceFragment : Fragment() {
 
         // Photo Quality dialog
         binding.rowCaptureQuality.setOnClickListener {
-            val options = arrayOf("優質", "標準", "經濟")
+            val options = com.aladdin.dashcam.model.DashCamSettingMappings.CAPTURE_QUALITIES
+            val itemNames = options.map { it.displayName }.toTypedArray()
             AlertDialog.Builder(requireContext())
                 .setTitle("圖片畫質")
-                .setItems(options) { _, which ->
+                .setItems(itemNames) { _, which ->
+                    val selected = options[which]
                     viewLifecycleOwner.lifecycleScope.launch {
-                        viewModel.setCaptureQuality(which, options[which])
+                        viewModel.setCaptureQuality(selected.rawValue, selected.displayName)
                     }
                 }
                 .show()
@@ -179,12 +183,14 @@ class DeviceFragment : Fragment() {
 
         // Video Resolution dialog
         binding.rowResolution.setOnClickListener {
-            val options = arrayOf("2K", "1080P", "720P")
+            val options = com.aladdin.dashcam.model.DashCamSettingMappings.VIDEO_RESOLUTIONS
+            val itemNames = options.map { it.displayName }.toTypedArray()
             AlertDialog.Builder(requireContext())
                 .setTitle("影像解析度")
-                .setItems(options) { _, which ->
+                .setItems(itemNames) { _, which ->
+                    val selected = options[which]
                     viewLifecycleOwner.lifecycleScope.launch {
-                        viewModel.setResolution(which, options[which])
+                        viewModel.setResolution(selected.rawValue, selected.displayName)
                     }
                 }
                 .show()
@@ -192,13 +198,14 @@ class DeviceFragment : Fragment() {
 
         // Loop Duration dialog
         binding.rowLoopRecording.setOnClickListener {
-            val options = arrayOf("1 分鐘", "3 分鐘", "5 分鐘")
-            val minutes = intArrayOf(1, 3, 5)
+            val options = com.aladdin.dashcam.model.DashCamSettingMappings.LOOP_RECORDINGS
+            val itemNames = options.map { it.displayName }.toTypedArray()
             AlertDialog.Builder(requireContext())
                 .setTitle("影片長度")
-                .setItems(options) { _, which ->
+                .setItems(itemNames) { _, which ->
+                    val selected = options[which]
                     viewLifecycleOwner.lifecycleScope.launch {
-                        viewModel.setLoopDuration(minutes[which], options[which])
+                        viewModel.setLoopDuration(selected.rawValue, selected.displayName)
                     }
                 }
                 .show()
@@ -226,13 +233,14 @@ class DeviceFragment : Fragment() {
 
         // Watermark dialog
         binding.rowWatermark.setOnClickListener {
-            val options = arrayOf("Date/Time", "關閉")
+            val options = com.aladdin.dashcam.model.DashCamSettingMappings.WATERMARKS
+            val itemNames = options.map { it.displayName }.toTypedArray()
             AlertDialog.Builder(requireContext())
                 .setTitle("時間浮水印")
-                .setItems(options) { _, which ->
-                    val enable = (which == 0)
+                .setItems(itemNames) { _, which ->
+                    val selected = options[which]
                     viewLifecycleOwner.lifecycleScope.launch {
-                        viewModel.setWatermark(enable)
+                        viewModel.setWatermark(selected.rawValue == 1, selected.displayName)
                     }
                 }
                 .show()

@@ -206,17 +206,61 @@ class MainActivity : AppCompatActivity() {
     private fun promptAddDevice() {
         val wifiNet = viewModel.networkMonitor.wifiNetwork.value
         val detectedGateway = viewModel.networkMonitor.getWifiGatewayIp() ?: "192.168.25.1"
+        val probe = viewModel.probeStatus.value
 
         if (wifiNet != null) {
-            androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("新增行車記錄器")
-                .setMessage("已偵測到當前連線之記錄器 Wi-Fi！\n設備閘道位址：$detectedGateway\n\n是否立即自動綁定並建立連線？")
-                .setPositiveButton("立即自動連線") { _, _ ->
-                    viewModel.autoMatchOrAddDeviceForHost(detectedGateway)
-                    android.widget.Toast.makeText(this, "正在連線至記錄器 ($detectedGateway)...", android.widget.Toast.LENGTH_SHORT).show()
+            when (probe) {
+                is ProbeStatus.Success -> {
+                    androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("新增行車記錄器")
+                        .setMessage("已偵測並成功驗證記錄器 Wi-Fi！\n設備閘道位址：$detectedGateway (${probe.protocolHeader})\n\n是否立即自動綁定並建立連線？")
+                        .setPositiveButton("立即自動連線") { _, _ ->
+                            viewModel.autoMatchOrAddDeviceForHost(detectedGateway, probe.protocolHeader)
+                            android.widget.Toast.makeText(this, "正在連線至記錄器 ($detectedGateway)...", android.widget.Toast.LENGTH_SHORT).show()
+                        }
+                        .setNegativeButton("取消", null)
+                        .show()
                 }
-                .setNegativeButton("取消", null)
-                .show()
+                is ProbeStatus.Probing -> {
+                    androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("正在辨識設備")
+                        .setMessage("已連線至 Wi-Fi，正在探測設備閘道 ($detectedGateway) 之記錄器通訊協定，請稍候片刻...")
+                        .setPositiveButton("確定", null)
+                        .show()
+                }
+                is ProbeStatus.NotDashCam -> {
+                    androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("非相容行車記錄器")
+                        .setMessage("當前連線之 Wi-Fi ($detectedGateway) 經安全協定探測非相容行車記錄器（非 GPSOCK 協定）。\n請確認已連線至記錄器 Wi-Fi AP（例如 B1-xxxxxx）。")
+                        .setPositiveButton("前往 Wi-Fi 設定") { _, _ ->
+                            try {
+                                startActivity(android.content.Intent(android.provider.Settings.ACTION_WIFI_SETTINGS))
+                            } catch (_: Exception) {}
+                        }
+                        .setNegativeButton("關閉", null)
+                        .show()
+                }
+                is ProbeStatus.Failed -> {
+                    androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("設備探測未完成")
+                        .setMessage("當前 Wi-Fi ($detectedGateway) 探測記錄器回應逾時或失敗：${probe.reason ?: "無回應"}\n若確認為記錄器，請稍候重試或重新連接 Wi-Fi。")
+                        .setPositiveButton("重試探測") { _, _ ->
+                            viewModel.networkMonitor.startMonitoring()
+                        }
+                        .setNegativeButton("關閉", null)
+                        .show()
+                }
+                is ProbeStatus.Idle -> {
+                    androidx.appcompat.app.AlertDialog.Builder(this)
+                        .setTitle("辨識行車記錄器")
+                        .setMessage("設備閘道：$detectedGateway\n尚未完成通訊協定握手，是否立即嘗試連線？")
+                        .setPositiveButton("嘗試連線") { _, _ ->
+                            viewModel.autoMatchOrAddDeviceForHost(detectedGateway)
+                        }
+                        .setNegativeButton("取消", null)
+                        .show()
+                }
+            }
         } else {
             androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("未連線至記錄器 Wi-Fi")

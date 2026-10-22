@@ -29,6 +29,14 @@ class NetworkMonitor(context: Context) {
             }
         }
 
+        override fun onLinkPropertiesChanged(network: Network, linkProperties: android.net.LinkProperties) {
+            val caps = connectivityManager.getNetworkCapabilities(network)
+            if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) {
+                Log.i(TAG, "Wi-Fi link properties updated for network: $network")
+                _wifiNetwork.value = network
+            }
+        }
+
         override fun onLost(network: Network) {
             if (_wifiNetwork.value == network) {
                 Log.w(TAG, "Wi-Fi network lost: $network")

@@ -225,22 +225,30 @@ class TimelineRulerView @JvmOverloads constructor(
         // 計算可見時間窗口 (毫秒)
         val cursorMinuteOffset = (currentCursorMillis - startOfDayMillis).toFloat() / 60_000f
 
-        // 1. 繪製影片區間色塊
+        // 1. 繪製影片區間色塊或未確認時長事件標記 (N06)
         for (item in mediaItems) {
             if (item.timestampMillis <= 0L) continue
             val startMin = (item.timestampMillis - startOfDayMillis).toFloat() / 60_000f
-            // 未知片長時呈現細窄標記條，不虛構 60 秒區間 (R12)
-            val durationMin = if (item.durationSeconds > 0) item.durationSeconds / 60f else 0.05f
-            val endMin = startMin + durationMin
 
-            val blockLeft = centerX + (startMin - cursorMinuteOffset) * pixelsPerMinute
-            val blockRight = centerX + (endMin - cursorMinuteOffset) * pixelsPerMinute
+            if (item.durationSeconds > 0) {
+                val durationMin = item.durationSeconds / 60f
+                val endMin = startMin + durationMin
+                val blockLeft = centerX + (startMin - cursorMinuteOffset) * pixelsPerMinute
+                val blockRight = centerX + (endMin - cursorMinuteOffset) * pixelsPerMinute
 
-            // 若在可見範圍內則繪製
-            if (blockRight >= 0 && blockLeft <= w) {
-                val blockPaint = if (item.isEmergency) emergencyBlockPaint else regularBlockPaint
-                val rect = RectF(blockLeft, rulerTop + 4f, blockRight.coerceAtLeast(blockLeft + 4f), rulerBottom - 4f)
-                canvas.drawRoundRect(rect, 4f, 4f, blockPaint)
+                if (blockRight >= 0 && blockLeft <= w) {
+                    val blockPaint = if (item.isEmergency) emergencyBlockPaint else regularBlockPaint
+                    val rect = RectF(blockLeft, rulerTop + 4f, blockRight.coerceAtLeast(blockLeft + 4f), rulerBottom - 4f)
+                    canvas.drawRoundRect(rect, 4f, 4f, blockPaint)
+                }
+            } else {
+                // 未知片長時呈現專用事件標記線與頂部圓點，不代表連續區間 (N06)
+                val markerX = centerX + (startMin - cursorMinuteOffset) * pixelsPerMinute
+                if (markerX in -10f..(w + 10f)) {
+                    val markerPaint = if (item.isEmergency) emergencyBlockPaint else regularBlockPaint
+                    canvas.drawLine(markerX, rulerTop + 2f, markerX, rulerBottom - 2f, markerPaint)
+                    canvas.drawCircle(markerX, rulerTop + 6f, 4f, markerPaint)
+                }
             }
         }
 
@@ -283,15 +291,22 @@ class TimelineRulerView @JvmOverloads constructor(
     }
 
     /**
-     * 尋找當前游標時間命中的 MediaItem，若無則回傳最近的後續片段
+     * 尋找當前游標時間命中的 MediaItem (N06: 區間採用半開區間，未知片長不虛構 60 秒可播放覆蓋)
      */
     fun findItemAtCursor(): MediaItem? {
         val cursor = currentCursorMillis
         for (item in mediaItems) {
             val start = item.timestampMillis
-            val end = start + (if (item.durationSeconds > 0) item.durationSeconds * 1000L else 60_000L)
-            if (cursor in start..end) {
-                return item
+            if (item.durationSeconds > 0) {
+                val end = start + (item.durationSeconds * 1000L)
+                if (cursor in start until end) {
+                    return item
+                }
+            } else {
+                // 未知片長僅以起點事件標記容差 1500ms 命中，不可視為長區間
+                if (Math.abs(cursor - start) <= 1500L) {
+                    return item
+                }
             }
         }
         return null

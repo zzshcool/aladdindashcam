@@ -314,4 +314,125 @@
             android:layout_weight="1" />
     </LinearLayout>
 
+    <!-- Google Maps Container in Landscape -->
+    <FrameLayout
+        android:id="@+id/map_container"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toStartOf="@id/side_controls_container">
+
+        <com.google.android.gms.maps.MapView
+            android:id="@+id/map_view"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+        <!-- Floating map header badge: Phone GPS status & Latency disclaimer -->
+        <LinearLayout
+            android:id="@+id/map_disclaimer_badge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|start"
+            android:layout_margin="10dp"
+            android:background="@drawable/bg_status_badge"
+            android:orientation="vertical"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="4dp">
+
+            <TextView
+                android:id="@+id/tv_map_gps_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="手機定位 (與影像非毫秒級對齊)"
+                android:textColor="@color/accent_teal"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/tv_map_speed_info"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="速度: -- km/h · 精度: -- m"
+                android:textColor="@color/text_secondary"
+                android:textSize="10sp" />
+        </LinearLayout>
+
+        <!-- Floating map controls: Re-center & Clear Trajectory & Quick Actions -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|end"
+            android:layout_margin="12dp"
+            android:orientation="vertical"
+            android:gravity="end">
+
+            <!-- Floating Record Action Button on Map -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fab_map_record"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:contentDescription="@string/btn_start_recording"
+                app:backgroundTint="@color/accent_teal"
+                app:fabSize="mini"
+                app:srcCompat="@drawable/ic_recording_dot"
+                app:tint="@color/bg_dark" />
+
+            <!-- Floating Snapshot Action Button on Map -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fab_map_snapshot"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp"
+                android:contentDescription="@string/btn_take_photo"
+                app:backgroundTint="@color/surface_elevated"
+                app:fabSize="mini"
+                app:srcCompat="@drawable/ic_camera_white"
+                app:tint="@color/text_primary" />
+
+            <!-- Floating Clear Trajectory Button -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_map_clear_trajectory"
+                style="@style/Widget.MaterialComponents.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="36dp"
+                android:layout_marginBottom="8dp"
+                android:backgroundTint="@color/surface_dark"
+                android:paddingHorizontal="10dp"
+                android:text="重設軌跡"
+                android:textColor="@color/text_secondary"
+                android:textSize="11sp"
+                app:cornerRadius="18dp"
+                app:strokeColor="@color/border_subtle"
+                app:strokeWidth="1dp" />
+
+            <!-- Floating Follow / Center Location Button -->
+            <com.google.android.material.floatingactionbutton.FloatingActionButton
+                android:id="@+id/fab_map_center"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="回到目前位置"
+                app:backgroundTint="@color/surface_elevated"
+                app:fabSize="normal"
+                app:srcCompat="@drawable/ic_my_location"
+                app:tint="@color/accent_teal" />
+        </LinearLayout>
+
+        <!-- Dual-Network Notice Banner -->
+        <TextView
+            android:id="@+id/tv_map_notice"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:background="#C0101418"
+            android:gravity="center"
+            android:paddingVertical="3dp"
+            android:text="記錄器走 Wi-Fi · 地圖走行動網路 · 離線不影響錄影"
+            android:textColor="@color/text_secondary"
+            android:textSize="10sp" />
+    </FrameLayout>
+
 </androidx.constraintlayout.widget.ConstraintLayout>

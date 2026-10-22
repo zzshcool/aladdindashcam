@@ -23,7 +23,17 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.sqrt
 
+data class LocationPoint(
+    val latitude: Double,
+    val longitude: Double,
+    val timestamp: Long = System.currentTimeMillis(),
+    val speedKmh: Int? = null
+)
+
 data class GpsStatus(
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val accuracyMeters: Float? = null,
     val speedKmh: Int? = null, // null means Unknown/Searching, rendered as "--"
     val isLocked: Boolean = false,
     val hasPermission: Boolean = false,
@@ -32,7 +42,8 @@ data class GpsStatus(
     val bearingDegrees: Float? = null,
     val accelerationG: Float? = null,
     val lastUpdateElapsedRealtime: Long = 0L,
-    val sourceName: String = "手機 GPS"
+    val sourceName: String = "手機 GPS",
+    val trajectory: List<LocationPoint> = emptyList()
 )
 
 class GpsSpeedometer(
@@ -53,6 +64,19 @@ class GpsSpeedometer(
     private var previousAltitude: Double? = null
     private var totalAscentMeters: Double = 0.0
     private var currentGForce: Float? = null
+    private val trajectoryPoints = mutableListOf<LocationPoint>()
+
+    fun resetTrip() {
+        totalAscentMeters = 0.0
+        previousAltitude = null
+        synchronized(trajectoryPoints) {
+            trajectoryPoints.clear()
+        }
+        _gpsStatus.value = _gpsStatus.value.copy(
+            accumulatedAscentMeters = 0.0,
+            trajectory = emptyList()
+        )
+    }
 
     @SuppressLint("MissingPermission")
     fun startListening() {
@@ -126,6 +150,8 @@ class GpsSpeedometer(
         val now = SystemClock.elapsedRealtime()
         val speedKmh = if (location.hasSpeed()) {
             (location.speed * 3.6f).toInt().coerceAtLeast(0)
+        } else if (location.hasAccuracy() && location.accuracy <= 20f) {
+            0
         } else {
             null
         }
@@ -142,17 +168,35 @@ class GpsSpeedometer(
         }
 
         val bearing = if (location.hasBearing()) location.bearing else null
+        val lat = location.latitude
+        val lng = location.longitude
+        val accuracy = if (location.hasAccuracy()) location.accuracy else null
+
+        val currentPoints = synchronized(trajectoryPoints) {
+            val last = trajectoryPoints.lastOrNull()
+            if (last == null || (Math.abs(last.latitude - lat) > 0.00002 || Math.abs(last.longitude - lng) > 0.00002)) {
+                trajectoryPoints.add(LocationPoint(lat, lng, System.currentTimeMillis(), speedKmh))
+                if (trajectoryPoints.size > 1000) {
+                    trajectoryPoints.removeAt(0)
+                }
+            }
+            trajectoryPoints.toList()
+        }
 
         _gpsStatus.value = GpsStatus(
+            latitude = lat,
+            longitude = lng,
+            accuracyMeters = accuracy,
             speedKmh = speedKmh,
-            isLocked = location.hasSpeed(),
+            isLocked = true,
             hasPermission = true,
             altitudeMeters = altitude,
             accumulatedAscentMeters = totalAscentMeters,
             bearingDegrees = bearing,
             accelerationG = currentGForce,
             lastUpdateElapsedRealtime = now,
-            sourceName = "手機 GPS"
+            sourceName = "手機 GPS",
+            trajectory = currentPoints
         )
     }
 

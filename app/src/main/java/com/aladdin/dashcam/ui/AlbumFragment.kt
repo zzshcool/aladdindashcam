@@ -250,7 +250,11 @@ class AlbumFragment : Fragment() {
                 binding.tvTimelineCursorInfo.text = "定位到影片：${hitItem.fileName} ($timeStr)"
                 binding.btnTimelineJumpNext.visibility = View.GONE
                 if (isFinished) {
-                    val inClipOffsetMs = (targetMillis - hitItem.timestampMillis).coerceAtLeast(0L)
+                    val inClipOffsetMs = if (hitItem.durationSeconds > 0) {
+                        (targetMillis - hitItem.timestampMillis).coerceIn(0L, hitItem.durationSeconds * 1000L)
+                    } else {
+                        0L
+                    }
                     openViewer(hitItem, startOffsetMs = inClipOffsetMs)
                 }
             } else {
@@ -605,29 +609,29 @@ class AlbumFragment : Fragment() {
                             val localPort = proxy.start()
                             sdpProxy = proxy
                             binding.viewerLoadingLayout.visibility = View.GONE
-                            setupExoPlayerStream("rtsp://127.0.0.1:$localPort/?action=stream", startOffsetMs)
+                            setupExoPlayerStream("rtsp://127.0.0.1:$localPort/?action=stream", startOffsetMs, item, currentToken)
                         } catch (e: Exception) {
                             binding.viewerLoadingLayout.visibility = View.GONE
-                            fetchPreviewFallback(item, currentToken)
+                            fetchPreviewFallback(item, currentToken, startOffsetMs)
                         }
                     } else {
                         binding.viewerLoadingLayout.visibility = View.GONE
-                        fetchPreviewFallback(item, currentToken)
+                        fetchPreviewFallback(item, currentToken, startOffsetMs)
                     }
                 }.onFailure { _ ->
                     binding.viewerLoadingLayout.visibility = View.GONE
                     // Fallback to preview cache download if stream handshake rejected
-                    fetchPreviewFallback(item, currentToken)
+                    fetchPreviewFallback(item, currentToken, startOffsetMs)
                 }
             }
             return
         }
 
         // Remote Photo fetch or fallback
-        fetchPreviewFallback(item, currentToken)
+        fetchPreviewFallback(item, currentToken, startOffsetMs)
     }
 
-    private fun fetchPreviewFallback(item: MediaItem, currentToken: Long) {
+    private fun fetchPreviewFallback(item: MediaItem, currentToken: Long, startOffsetMs: Long = 0L) {
         binding.viewerLoadingLayout.visibility = View.VISIBLE
         binding.tvViewerLoadingText.text = "正在讀取此檔案..."
 
@@ -645,7 +649,7 @@ class AlbumFragment : Fragment() {
             binding.viewerLoadingLayout.visibility = View.GONE
             res.onSuccess { file ->
                 if (isAdded && previewRequestId == currentToken && currentViewingItem?.fileName == item.fileName) {
-                    displayMediaContent(item, file)
+                    displayMediaContent(item, file, startOffsetMs)
                 }
             }.onFailure { err ->
                 if (isAdded && previewRequestId == currentToken && currentViewingItem?.fileName == item.fileName) {
@@ -656,8 +660,13 @@ class AlbumFragment : Fragment() {
         }
     }
 
-    private fun setupExoPlayerStream(streamUri: String, startOffsetMs: Long = 0L) {
-        releasePlayer()
+    private fun setupExoPlayerStream(streamUri: String, startOffsetMs: Long = 0L, item: MediaItem, currentToken: Long) {
+        // N01: Only release previous exoPlayer instance, do NOT kill active sdpProxy
+        exoPlayer?.stop()
+        exoPlayer?.release()
+        exoPlayer = null
+        binding.playerView.player = null
+
         val player = ExoPlayer.Builder(requireContext()).build()
         binding.playerView.player = player
         binding.playerView.visibility = View.VISIBLE
@@ -665,8 +674,14 @@ class AlbumFragment : Fragment() {
 
         player.addListener(object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
-                binding.viewerErrorLayout.visibility = View.VISIBLE
-                binding.tvViewerErrorMsg.text = "影片串流播放中斷：${error.message ?: "無法讀取串流"}"
+                android.util.Log.w("AlbumFragment", "RTSP stream playback failed: ${error.message}, falling back to preview download")
+                if (isAdded && previewRequestId == currentToken && currentViewingItem?.fileName == item.fileName) {
+                    releasePlayer()
+                    fetchPreviewFallback(item, currentToken, startOffsetMs)
+                } else {
+                    binding.viewerErrorLayout.visibility = View.VISIBLE
+                    binding.tvViewerErrorMsg.text = "影片串流播放中斷：${error.message ?: "無法讀取串流"}"
+                }
             }
         })
 

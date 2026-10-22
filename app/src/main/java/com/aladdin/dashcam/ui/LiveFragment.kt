@@ -29,6 +29,16 @@ import com.aladdin.dashcam.R
 import com.aladdin.dashcam.databinding.FragmentLiveBinding
 import com.aladdin.dashcam.model.ConnectionStatus
 import com.aladdin.dashcam.model.RecordingStatus
+import com.aladdin.dashcam.gps.GpsStatus
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.GoogleMap
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.Marker
+import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.gms.maps.model.Polyline
+import com.google.android.gms.maps.model.PolylineOptions
+import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -46,6 +56,11 @@ class LiveFragment : Fragment() {
     private var sdpProxy: com.aladdin.dashcam.network.RtspSdpProxy? = null
     private var streamJob: Job? = null
 
+    private var googleMap: GoogleMap? = null
+    private var phoneMarker: Marker? = null
+    private var trajectoryPolyline: Polyline? = null
+    private var isMapFollowEnabled = true
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -57,9 +72,44 @@ class LiveFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        try {
+            binding.mapView.onCreate(savedInstanceState)
+        } catch (e: Exception) {
+            android.util.Log.e("LiveFragment", "Error initializing MapView: ${e.message}")
+        }
         initPlayer()
+        initMap()
         setupListeners()
         observeViewModel()
+    }
+
+    private fun initMap() {
+        try {
+            binding.mapView.getMapAsync { map ->
+                this.googleMap = map
+                try {
+                    map.uiSettings.isZoomControlsEnabled = true
+                    map.uiSettings.isCompassEnabled = true
+                    map.uiSettings.isMyLocationButtonEnabled = false
+                } catch (_: Exception) {}
+
+                val polylineOptions = PolylineOptions()
+                    .color(ContextCompat.getColor(requireContext(), R.color.accent_teal))
+                    .width(10f)
+                    .geodesic(true)
+                trajectoryPolyline = map.addPolyline(polylineOptions)
+
+                map.setOnCameraMoveStartedListener { reason ->
+                    if (reason == GoogleMap.OnCameraMoveStartedListener.REASON_GESTURE) {
+                        isMapFollowEnabled = false
+                    }
+                }
+
+                updateMapLocation(viewModel.gpsStatus.value)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("LiveFragment", "getMapAsync exception: ${e.message}")
+        }
     }
 
     private fun initPlayer() {
@@ -335,13 +385,62 @@ class LiveFragment : Fragment() {
             }
         }
 
-        // Toggle Live Mode: Normal vs Ride Mode
+        // Toggle Live Mode: Normal vs Split vs Map vs Ride
         binding.toggleLiveMode?.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
-                val isRide = checkedId == R.id.btn_mode_ride
-                binding.layoutNormalControls?.visibility = if (isRide) View.GONE else View.VISIBLE
-                binding.layoutRideMode?.visibility = if (isRide) View.VISIBLE else View.GONE
+                when (checkedId) {
+                    R.id.btn_mode_normal -> {
+                        binding.previewContainer.visibility = View.VISIBLE
+                        binding.layoutNormalControls?.visibility = View.VISIBLE
+                        binding.mapContainer?.visibility = View.GONE
+                        binding.layoutRideMode?.visibility = View.GONE
+                    }
+                    R.id.btn_mode_split -> {
+                        binding.previewContainer.visibility = View.VISIBLE
+                        binding.layoutNormalControls?.visibility = View.GONE
+                        binding.mapContainer?.visibility = View.VISIBLE
+                        binding.layoutRideMode?.visibility = View.GONE
+                    }
+                    R.id.btn_mode_map -> {
+                        binding.previewContainer.visibility = View.GONE
+                        binding.layoutNormalControls?.visibility = View.GONE
+                        binding.mapContainer?.visibility = View.VISIBLE
+                        binding.layoutRideMode?.visibility = View.GONE
+                    }
+                    R.id.btn_mode_ride -> {
+                        binding.previewContainer.visibility = View.VISIBLE
+                        binding.layoutNormalControls?.visibility = View.GONE
+                        binding.mapContainer?.visibility = View.GONE
+                        binding.layoutRideMode?.visibility = View.VISIBLE
+                    }
+                }
             }
+        }
+
+        binding.fabMapCenter?.setOnClickListener {
+            isMapFollowEnabled = true
+            val gps = viewModel.gpsStatus.value
+            if (gps.latitude != null && gps.longitude != null) {
+                val latLng = LatLng(gps.latitude, gps.longitude)
+                googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 17f))
+                Toast.makeText(requireContext(), "已回到目前位置並開啟跟隨", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(requireContext(), "尚未取得手機定位座標", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        binding.btnMapClearTrajectory?.setOnClickListener {
+            viewModel.gpsSpeedometer.resetTrip()
+            trajectoryPolyline?.points = emptyList()
+            Toast.makeText(requireContext(), "已清除行駛軌跡", Toast.LENGTH_SHORT).show()
+        }
+
+        binding.fabMapRecord?.setOnClickListener {
+            binding.btnToggleRecording.performClick()
+        }
+
+        binding.fabMapSnapshot?.setOnClickListener {
+            binding.btnSnapshot.performClick()
         }
     }
 
@@ -465,35 +564,31 @@ class LiveFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 launch {
-                    viewModel.deviceStatus.collect { status ->
-                        // S5: Recording status and button state
-                        updateRecordingButton(status.recordingStatus)
-                        if (status.recordingStatus == RecordingStatus.RECORDING) {
-                            val seconds = status.rawRecordSeconds
-                            binding.tvRecordStatus.text = getString(
-                                R.string.recording_elapsed,
-                                seconds / 3600, (seconds / 60) % 60, seconds % 60
-                            )
-                        }
+                    viewModel.recordingTimerDisplay.collect { timer ->
+                        updateRecordingTimerUi(timer)
+                    }
+                }
 
+                launch {
+                    viewModel.deviceStatus.collect { status ->
                         // S3 / S4: Battery vector icons and accessibility texts
                         updateBatteryUi(status.batteryLevel, status.isCharging, status.lastUpdatedTimestamp != 0L)
 
-                        // SD Card status & estimate
                         val estimate = viewModel.storageEstimate.value
-                        if (estimate != null && estimate.freeBytes > 0) {
+                        // SD Card status: 總容量 / 已用 / 剩餘可用容量 (滿足驗收需求)
+                        if (estimate != null && estimate.totalBytes > 0) {
+                            val totalGb = estimate.totalBytes / (1024.0 * 1024.0 * 1024.0)
                             val freeGb = estimate.freeBytes / (1024.0 * 1024.0 * 1024.0)
-                            val estMinutes = estimate.minutesUntilOverwrite
-                            if (estMinutes > 0) {
-                                binding.tvSdStatus.text = String.format(java.util.Locale.getDefault(), "距覆寫約 %d 分鐘 (餘 %.1f GB)", estMinutes, freeGb)
-                            } else {
-                                binding.tvSdStatus.text = String.format(java.util.Locale.getDefault(), "循環錄影中 (餘 %.1f GB)", freeGb)
-                            }
+                            val usedGb = estimate.usedBytes / (1024.0 * 1024.0 * 1024.0)
+                            val overwriteStr = if (estimate.minutesUntilOverwrite > 0) " (約剩餘 ${estimate.minutesUntilOverwrite} 分)" else ""
+                            binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD: 餘 %.1fG/用 %.1fG/總 %.1fG%s", freeGb, usedGb, totalGb, overwriteStr)
                         } else if (status.sdTotalBytes > 0) {
+                            val totalGb = status.sdTotalBytes / (1024.0 * 1024.0 * 1024.0)
                             val freeGb = status.sdFreeBytes / (1024.0 * 1024.0 * 1024.0)
-                            binding.tvSdStatus.text = String.format(java.util.Locale.getDefault(), "SD 餘 %.1f GB", freeGb)
+                            val usedGb = (status.sdTotalBytes - status.sdFreeBytes).coerceAtLeast(0L) / (1024.0 * 1024.0 * 1024.0)
+                            binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD: 餘 %.1fG/用 %.1fG/總 %.1fG", freeGb, usedGb, totalGb)
                         } else {
-                            binding.tvSdStatus.text = getString(R.string.sd_remaining_unknown)
+                            binding.tvSdStatus.text = estimate?.statusText ?: getString(R.string.sd_remaining_unknown)
                         }
                     }
                 }
@@ -565,6 +660,8 @@ class LiveFragment : Fragment() {
                         } else {
                             "資料來源：${gps.sourceName} (衛星搜尋中...)"
                         }
+
+                        updateMapLocation(gps)
                     }
                 }
 
@@ -597,24 +694,25 @@ class LiveFragment : Fragment() {
         }
     }
 
-    private fun updateRecordingButton(status: RecordingStatus) {
+    private fun updateRecordingTimerUi(timer: RecordingTimerDisplay) {
         if (_binding == null) return
         val compact = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         binding.btnToggleRecording.isEnabled = true
-        when (status) {
+        when (timer.status) {
             RecordingStatus.RECORDING -> {
                 binding.ivRecordDot.visibility = View.VISIBLE
-                binding.tvRecordStatus.text = getString(R.string.recording_active)
+                binding.tvRecordStatus.text = timer.formattedText
                 binding.btnToggleRecording.text = getString(if (compact) R.string.btn_stop_recording_compact else R.string.btn_stop_recording)
                 binding.btnToggleRecording.backgroundTintList =
                     ContextCompat.getColorStateList(requireContext(), R.color.error_red)
 
                 // HUD / PiP indicator (C10)
                 binding.ivHudRecordDot.visibility = View.VISIBLE
-                binding.tvHudRecordText.text = "錄影中"
+                binding.tvHudRecordText.text = timer.formattedText
                 binding.tvHudRecordText.setTextColor(
                     ContextCompat.getColor(requireContext(), R.color.record_active_red)
                 )
+                binding.fabMapRecord?.backgroundTintList = ContextCompat.getColorStateList(requireContext(), R.color.error_red)
             }
             RecordingStatus.STOPPED -> {
                 binding.ivRecordDot.visibility = View.INVISIBLE
@@ -629,6 +727,7 @@ class LiveFragment : Fragment() {
                 binding.tvHudRecordText.setTextColor(
                     ContextCompat.getColor(requireContext(), R.color.text_secondary)
                 )
+                binding.fabMapRecord?.backgroundTintList = ContextCompat.getColorStateList(requireContext(), R.color.accent_teal)
             }
             RecordingStatus.UNKNOWN -> {
                 binding.ivRecordDot.visibility = View.INVISIBLE
@@ -643,8 +742,14 @@ class LiveFragment : Fragment() {
                 binding.tvHudRecordText.setTextColor(
                     ContextCompat.getColor(requireContext(), R.color.warning_yellow)
                 )
+                binding.fabMapRecord?.backgroundTintList = ContextCompat.getColorStateList(requireContext(), R.color.accent_teal)
             }
         }
+    }
+
+    private fun updateRecordingButton(status: RecordingStatus) {
+        val currentTimer = viewModel.recordingTimerDisplay.value
+        updateRecordingTimerUi(currentTimer)
     }
 
     private fun updateBatteryUi(rawBatteryLevel: Int, isCharging: Boolean, isStatusValid: Boolean) {
@@ -691,8 +796,63 @@ class LiveFragment : Fragment() {
         binding.ivHudBatteryIcon.contentDescription = cdText
     }
 
+    private fun updateMapLocation(gps: GpsStatus) {
+        val map = googleMap ?: return
+        if (gps.latitude != null && gps.longitude != null) {
+            val currentPos = LatLng(gps.latitude, gps.longitude)
+            if (phoneMarker == null) {
+                val markerOptions = MarkerOptions()
+                    .position(currentPos)
+                    .title("手機目前位置")
+                    .snippet("速度: ${gps.speedKmh ?: 0} km/h")
+                    .flat(true)
+                    .anchor(0.5f, 0.5f)
+                phoneMarker = map.addMarker(markerOptions)
+                map.moveCamera(CameraUpdateFactory.newLatLngZoom(currentPos, 16f))
+            } else {
+                phoneMarker?.position = currentPos
+                if (gps.bearingDegrees != null) {
+                    phoneMarker?.rotation = gps.bearingDegrees
+                }
+                phoneMarker?.snippet = "速度: ${gps.speedKmh ?: 0} km/h"
+            }
+
+            if (isMapFollowEnabled) {
+                map.animateCamera(CameraUpdateFactory.newLatLng(currentPos))
+            }
+
+            if (gps.trajectory.isNotEmpty()) {
+                val pts = gps.trajectory.map { LatLng(it.latitude, it.longitude) }
+                trajectoryPolyline?.points = pts
+            } else {
+                trajectoryPolyline?.points = emptyList()
+            }
+
+            binding.tvMapGpsInfo?.text = "手機定位 (與影像非毫秒級對齊)"
+            binding.tvMapSpeedInfo?.text = String.format(
+                Locale.getDefault(),
+                "速度: %s · 精度: ±%.0fm",
+                if (gps.speedKmh != null) "${gps.speedKmh} km/h" else "--",
+                gps.accuracyMeters
+            )
+        } else {
+            binding.tvMapGpsInfo?.text = if (!gps.hasPermission) "未取得定位權限 (即時錄影正常)" else "手機 GPS 搜尋中..."
+            binding.tvMapSpeedInfo?.text = "速度: -- km/h · 精度: 未知"
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        try {
+            binding.mapView.onStart()
+        } catch (_: Exception) {}
+    }
+
     override fun onResume() {
         super.onResume()
+        try {
+            binding.mapView.onResume()
+        } catch (_: Exception) {}
         if (viewModel.currentStreamOwner.value == DashCamViewModel.MediaStreamOwner.NONE) {
             viewModel.requestStreamOwner(DashCamViewModel.MediaStreamOwner.LIVE_PREVIEW)
         }
@@ -700,12 +860,28 @@ class LiveFragment : Fragment() {
 
     override fun onPause() {
         super.onPause()
+        try {
+            binding.mapView.onPause()
+        } catch (_: Exception) {}
         if (viewModel.currentStreamOwner.value == DashCamViewModel.MediaStreamOwner.LIVE_PREVIEW) {
             viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.LIVE_PREVIEW)
         }
     }
 
+    override fun onStop() {
+        super.onStop()
+        try {
+            binding.mapView.onStop()
+        } catch (_: Exception) {}
+    }
+
     override fun onDestroyView() {
+        try {
+            binding.mapView.onDestroy()
+        } catch (_: Exception) {}
+        googleMap = null
+        phoneMarker = null
+        trajectoryPolyline = null
         super.onDestroyView()
         if (viewModel.currentStreamOwner.value == DashCamViewModel.MediaStreamOwner.LIVE_PREVIEW) {
             viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.LIVE_PREVIEW)
@@ -717,5 +893,19 @@ class LiveFragment : Fragment() {
         player?.release()
         player = null
         _binding = null
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        try {
+            binding.mapView.onLowMemory()
+        } catch (_: Exception) {}
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        try {
+            _binding?.mapView?.onSaveInstanceState(outState)
+        } catch (_: Exception) {}
     }
 }

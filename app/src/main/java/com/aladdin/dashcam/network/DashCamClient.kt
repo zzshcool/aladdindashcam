@@ -114,17 +114,65 @@ class DashCamClient(
     val deviceStatus: StateFlow<DashCamDeviceStatus> = _deviceStatus.asStateFlow()
 
     /**
-     * Updates bound network and invalidates obsolete session if network changed (C04)
+     * Updates bound network and invalidates obsolete session if network changed (C04 / N03)
      */
     fun bindNetwork(network: Network?) {
         synchronized(commandLock) {
             if (this.boundNetwork != network) {
-                Log.i(TAG, "Network changed from ${this.boundNetwork} to $network, invalidating existing session")
+                val newEpoch = epochCounter.incrementAndGet()
+                targetEpoch = newEpoch
+                Log.i(TAG, "Network changed from ${this.boundNetwork} to $network, epoch: $newEpoch, invalidating existing session")
                 this.boundNetwork = network
-                if (socket != null && connectedNetwork != network) {
-                    disconnectInternal()
-                }
+                disconnectInternal()
+                _targetIdentity.value = TargetIdentity(
+                    requestedHost = currentHost,
+                    activeHost = null,
+                    epoch = newEpoch,
+                    state = TargetState.DISCONNECTED
+                )
             }
+        }
+    }
+
+    /**
+     * Safely probes candidate gateway to verify whether it is an actual GeneralPlus dashcam (N02)
+     */
+    suspend fun probeDevice(candidateHost: String, network: Network): Result<Boolean> = withContext(Dispatchers.IO) {
+        var testSocket: Socket? = null
+        try {
+            testSocket = Socket()
+            network.bindSocket(testSocket)
+            testSocket.connect(InetSocketAddress(candidateHost, port), 2000)
+            testSocket.soTimeout = 2500
+
+            val out = testSocket.getOutputStream()
+            val inStream = testSocket.getInputStream()
+
+            val packet = GPSocketProtocol.buildGetStatusPacket()
+            out.write(packet)
+            out.flush()
+
+            val header = ByteArray(12)
+            readFully(inStream, header)
+
+            val tagMatch = header[0] == 0x47.toByte() && // 'G'
+                    header[1] == 0x50.toByte() && // 'P'
+                    header[2] == 0x53.toByte() && // 'S'
+                    header[3] == 0x4F.toByte() && // 'O'
+                    header[4] == 0x43.toByte() && // 'C'
+                    header[5] == 0x4B.toByte()    // 'K'
+
+            if (tagMatch) {
+                Result.success(true)
+            } else {
+                Result.failure(IllegalStateException("Connected endpoint is not a GeneralPlus dashcam"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        } finally {
+            try {
+                testSocket?.close()
+            } catch (_: Exception) {}
         }
     }
 
@@ -464,9 +512,12 @@ class DashCamClient(
     /**
      * Synchronizes phone's local time to dashcam RTC via GPVENDOR packet (Chapter 25.9, C01)
      */
-    suspend fun syncRtc(): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun syncRtc(expectedEpoch: Long? = null): Result<Unit> = withContext(Dispatchers.IO) {
         synchronized(commandLock) {
             try {
+                if (expectedEpoch != null && targetEpoch != expectedEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch changed from $expectedEpoch to $targetEpoch"))
+                }
                 ensureConnected()
                 val cal = Calendar.getInstance()
                 val req = GPSocketProtocol.buildVendorTimePacket(
