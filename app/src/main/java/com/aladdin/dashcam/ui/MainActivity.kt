@@ -76,7 +76,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        if (!isFullscreen && !isInPictureInPictureMode) recreate()
+        ViewCompat.requestApplyInsets(binding.root)
     }
 
     private fun setupBackPressedHandler() {
@@ -112,9 +112,10 @@ class MainActivity : AppCompatActivity() {
         } else {
             requestedOrientation = orientationBeforeFullscreen
             systemBars.show(WindowInsetsCompat.Type.systemBars())
-            binding.topBar.visibility = View.VISIBLE
+            updateTopBarVisibility()
             binding.bottomNav.visibility = View.VISIBLE
-            recreate()
+            liveFragment?.updateFullscreenLayout(false)
+            ViewCompat.requestApplyInsets(binding.root)
         }
     }
 
@@ -455,7 +456,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-        ViewCompat.requestApplyInsets(binding.root)
         if (isInPictureInPictureMode) {
             binding.topBar.visibility = View.GONE
             binding.bottomNav.visibility = View.GONE
@@ -464,9 +464,10 @@ class MainActivity : AppCompatActivity() {
                 it.updatePipLayout(true)
             }
         } else {
-            binding.topBar.visibility = View.VISIBLE
-            binding.bottomNav.visibility = View.VISIBLE
+            updateTopBarVisibility()
+            binding.bottomNav.visibility = if (isFullscreen) View.GONE else View.VISIBLE
             liveFragment?.updatePipLayout(false)
         }
+        ViewCompat.requestApplyInsets(binding.root)
     }
 }

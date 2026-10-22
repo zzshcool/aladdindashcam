@@ -103,12 +103,20 @@ class AlbumFragment : Fragment() {
     private val thumbnailJobs = mutableMapOf<android.widget.ImageView, Job>()
 
     private fun loadThumbnail(item: MediaItem, imageView: android.widget.ImageView) {
+        val cached = viewModel.getCachedThumbnailBitmap(item)
+        if (cached != null) {
+            imageView.setImageBitmap(cached)
+            return
+        }
         thumbnailJobs.remove(imageView)?.cancel()
         thumbnailJobs[imageView] = viewLifecycleOwner.lifecycleScope.launch {
             val file = viewModel.getOrFetchThumbnail(item)
             if (file != null && imageView.tag == item.id) {
                 val bitmap = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(file.absolutePath) }
-                if (bitmap != null && imageView.tag == item.id) imageView.setImageBitmap(bitmap)
+                if (bitmap != null) {
+                    viewModel.putCachedThumbnailBitmap(item, bitmap)
+                    if (imageView.tag == item.id) imageView.setImageBitmap(bitmap)
+                }
             }
         }
     }

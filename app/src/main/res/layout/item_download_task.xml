@@ -58,7 +58,7 @@
                 android:text="開啟"
                 android:textColor="@color/accent_teal"
                 android:textSize="13sp"
-                app:cornerRadius="6dp" />
+                app:cornerRadius="@dimen/radius_button" />
         </LinearLayout>
 
         <!-- Progress bar for active downloads -->

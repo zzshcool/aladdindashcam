@@ -18,6 +18,8 @@ import com.aladdin.dashcam.protocol.GPSocketProtocol
 import com.aladdin.dashcam.driver.DriverRegistry
 import com.aladdin.dashcam.driver.DriverProbeResult
 import com.aladdin.dashcam.driver.RecorderProtocol
+import com.aladdin.dashcam.media.MediaCacheManager
+import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -127,6 +129,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     val client = DashCamClient(scope = viewModelScope)
     val networkMonitor = NetworkMonitor(application)
     val gpsSpeedometer = GpsSpeedometer(application)
+    val mediaCacheManager = MediaCacheManager()
 
     val connectionStatus: StateFlow<ConnectionStatus> = client.connectionStatus
     val deviceStatus: StateFlow<DashCamDeviceStatus> = client.deviceStatus
@@ -1119,7 +1122,9 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         val deviceKey = item.sourceDirectory.ifEmpty { "legacy" }
         val cacheDir = File(app.cacheDir, "preview_cache/$deviceKey")
         if (!cacheDir.exists()) cacheDir.mkdirs()
-        return File(cacheDir, File(item.fileName).name)
+        val file = File(cacheDir, File(item.fileName).name)
+        if (file.exists()) mediaCacheManager.touchFile(file)
+        return file
     }
 
     private fun currentMediaSourceId(): String =
@@ -1154,6 +1159,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         if (!isCurrentMediaSource(item)) return@withContext Result.failure(IllegalStateException("影片來源已切換，請重新開啟相簿"))
         val destFile = getPreviewCacheFile(item)
         if (destFile.exists() && (item.sizeBytes <= 0 || destFile.length() == item.sizeBytes)) {
+            mediaCacheManager.touchFile(destFile)
             return@withContext Result.success(destFile)
         }
         val currentEpoch = item.sourceEpoch
@@ -1174,6 +1180,14 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         ) } finally { progress.close() }
         progressJob.join()
         if (res.isSuccess) {
+            mediaCacheManager.touchFile(destFile)
+            destFile.parentFile?.parentFile?.let { basePreviewDir ->
+                mediaCacheManager.evictDirectoryIfExceeds(
+                    basePreviewDir,
+                    mediaCacheManager.previewQuotaBytes,
+                    mediaCacheManager.previewLowWatermarkBytes
+                )
+            }
             val realDuration = if (item.isVideo) extractMediaDurationSeconds(destFile) else 0
             if (realDuration > 0 && isCurrentMediaSource(item)) {
                 _deviceMediaList.update { list ->
@@ -1514,6 +1528,9 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
 
     private val thumbnailMutex = Mutex()
 
+    fun getCachedThumbnailBitmap(item: MediaItem): Bitmap? = mediaCacheManager.getBitmap(item.storageKey)
+    fun putCachedThumbnailBitmap(item: MediaItem, bitmap: Bitmap) = mediaCacheManager.putBitmap(item.storageKey, bitmap)
+
     suspend fun getOrFetchThumbnail(item: MediaItem): File? = withContext(Dispatchers.IO) {
         thumbnailMutex.withLock {
         val app = getApplication<Application>()
@@ -1523,6 +1540,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             .digest(item.storageKey.toByteArray()).joinToString("") { "%02x".format(it) }
         val thumbFile = File(thumbDir, "thumb_$cacheKey.jpg")
         if (thumbFile.exists() && thumbFile.length() > 0) {
+            mediaCacheManager.touchFile(thumbFile)
             return@withContext thumbFile
         }
 
@@ -1531,7 +1549,15 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             val localFile = getLocalMediaFile(item)
             if (localFile != null && localFile.length() > 0) {
                 val ok = generateLocalThumbnail(localFile, thumbFile, item.isVideo)
-                if (ok) return@withContext thumbFile
+                if (ok) {
+                    mediaCacheManager.touchFile(thumbFile)
+                    mediaCacheManager.evictDirectoryIfExceeds(
+                        thumbDir,
+                        mediaCacheManager.thumbnailQuotaBytes,
+                        mediaCacheManager.thumbnailLowWatermarkBytes
+                    )
+                    return@withContext thumbFile
+                }
             }
             return@withContext null
         }
@@ -1543,6 +1569,12 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             if (bytes != null && bytes.size > 4) {
                 try {
                     thumbFile.writeBytes(bytes)
+                    mediaCacheManager.touchFile(thumbFile)
+                    mediaCacheManager.evictDirectoryIfExceeds(
+                        thumbDir,
+                        mediaCacheManager.thumbnailQuotaBytes,
+                        mediaCacheManager.thumbnailLowWatermarkBytes
+                    )
                     return@withContext thumbFile
                 } catch (_: Exception) {}
             }

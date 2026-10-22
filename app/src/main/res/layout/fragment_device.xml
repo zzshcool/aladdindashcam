@@ -200,7 +200,7 @@
                     android:layout_marginTop="4dp"
                     android:text="每段影片的時長，記憶卡滿會自動從時間最早的影片開始覆蓋。"
                     android:textColor="@color/text_disabled"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/text_size_caption" />
             </LinearLayout>
 
             <View
@@ -462,7 +462,7 @@
                     android:layout_marginTop="4dp"
                     android:text="修改密碼後，需要到系統[Wi-Fi]設置，[修改密碼]重新輸入新密碼"
                     android:textColor="@color/text_disabled"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/text_size_caption" />
             </LinearLayout>
 
             <View
@@ -473,7 +473,8 @@
             <!-- Firmware Version -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
                 android:gravity="center_vertical"
                 android:paddingHorizontal="16dp">
 
@@ -510,7 +511,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             app:cardBackgroundColor="@color/surface_dark"
-            app:cardCornerRadius="8dp"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp">
 
             <LinearLayout
@@ -584,7 +585,7 @@
             android:layout_marginTop="4dp"
             android:visibility="gone"
             app:cardBackgroundColor="@color/surface_dark"
-            app:cardCornerRadius="10dp"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardElevation="0dp">
 
             <LinearLayout

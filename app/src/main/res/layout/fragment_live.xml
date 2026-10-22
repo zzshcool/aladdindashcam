@@ -64,7 +64,7 @@
                 android:minHeight="48dp"
                 android:text="@string/btn_retry_connect"
                 android:textColor="@color/accent_teal"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="@dimen/radius_button" />
         </LinearLayout>
 
         <!-- Speedometer HUD in top-left of video preview -->
@@ -110,7 +110,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/hud_gps_searching"
                 android:textColor="@color/accent_teal"
-                android:textSize="11sp" />
+                android:textSize="@dimen/text_size_caption" />
 
             <!-- PiP visible recording dot & battery status -->
             <LinearLayout
@@ -136,7 +136,7 @@
                     android:layout_marginStart="4dp"
                     android:text="未錄影"
                     android:textColor="@color/text_primary"
-                    android:textSize="10sp" />
+                    android:textSize="@dimen/text_size_caption" />
 
                 <ImageView
                     android:id="@+id/iv_hud_battery_icon"
@@ -338,7 +338,7 @@
                 android:textColor="@color/bg_dark"
                 android:textSize="13sp"
                 android:textStyle="bold"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="@dimen/radius_button" />
 
             <!-- 2. Snapshot Photo Button -->
             <com.google.android.material.button.MaterialButton
@@ -353,7 +353,7 @@
                 android:text="@string/btn_take_photo"
                 android:textColor="@color/text_primary"
                 android:textSize="13sp"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="@dimen/radius_button" />
 
             <!-- 3. More Actions Button (Opens PopupMenu: PiP, Fullscreen, etc.) -->
             <com.google.android.material.button.MaterialButton
@@ -370,7 +370,7 @@
                 android:text="@string/btn_more_options"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp"
-                app:cornerRadius="8dp"
+                app:cornerRadius="@dimen/radius_button"
                 app:strokeColor="@color/border_subtle"
                 app:strokeWidth="1dp" />
         </LinearLayout>
@@ -393,7 +393,7 @@
                 android:text="@string/live_expand"
                 android:textSize="13sp"
                 android:textColor="@color/accent_teal"
-                app:cornerRadius="12dp"
+                app:cornerRadius="@dimen/radius_button"
                 app:strokeColor="@color/border_subtle" />
 
             <com.google.android.material.button.MaterialButton
@@ -406,7 +406,7 @@
                 android:text="@string/live_pip"
                 android:textSize="13sp"
                 android:textColor="@color/text_secondary"
-                app:cornerRadius="12dp"
+                app:cornerRadius="@dimen/radius_button"
                 app:strokeColor="@color/border_subtle" />
         </LinearLayout>
     </LinearLayout>
@@ -443,7 +443,7 @@
                 android:layout_marginBottom="4dp"
                 android:text="資料來源：手機 GPS 定位"
                 android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
+                android:textSize="@dimen/text_size_caption" />
         </FrameLayout>
 
         <!-- Metric Cards: Altitude, Ascent, Bearing, G-Force -->
@@ -470,7 +470,7 @@
                     android:layout_height="wrap_content"
                     android:text="目前海拔"
                     android:textColor="@color/text_secondary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/text_size_caption" />
 
                 <TextView
                     android:id="@+id/tv_ride_altitude"
@@ -499,7 +499,7 @@
                     android:layout_height="wrap_content"
                     android:text="累積爬升"
                     android:textColor="@color/text_secondary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/text_size_caption" />
 
                 <TextView
                     android:id="@+id/tv_ride_ascent"
@@ -528,7 +528,7 @@
                     android:layout_height="wrap_content"
                     android:text="方位航向"
                     android:textColor="@color/text_secondary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/text_size_caption" />
 
                 <TextView
                     android:id="@+id/tv_ride_bearing"
@@ -557,7 +557,7 @@
                     android:layout_height="wrap_content"
                     android:text="總 G 值（含重力）"
                     android:textColor="@color/text_secondary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/text_size_caption" />
 
                 <TextView
                     android:id="@+id/tv_ride_gforce"
@@ -611,7 +611,7 @@
                 android:layout_height="wrap_content"
                 android:text="手機定位 (與影像非毫秒級對齊)"
                 android:textColor="@color/accent_teal"
-                android:textSize="11sp"
+                android:textSize="@dimen/text_size_caption"
                 android:textStyle="bold" />
 
             <TextView
@@ -620,7 +620,7 @@
                 android:layout_height="wrap_content"
                 android:text="速度: -- km/h · 精度: -- m"
                 android:textColor="@color/text_secondary"
-                android:textSize="10sp" />
+                android:textSize="@dimen/text_size_caption" />
         </LinearLayout>
 
         <!-- Floating map controls: Re-center & Clear Trajectory & Quick Actions -->
@@ -667,7 +667,7 @@
                 android:paddingHorizontal="10dp"
                 android:text="重設軌跡"
                 android:textColor="@color/text_secondary"
-                android:textSize="11sp"
+                android:textSize="@dimen/text_size_caption"
                 app:cornerRadius="18dp"
                 app:strokeColor="@color/border_subtle"
                 app:strokeWidth="1dp" />
@@ -695,7 +695,7 @@
             android:paddingVertical="3dp"
             android:text="記錄器走 Wi-Fi · 地圖走行動網路 · 離線不影響錄影"
             android:textColor="@color/text_secondary"
-            android:textSize="10sp" />
+            android:textSize="@dimen/text_size_caption" />
     </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

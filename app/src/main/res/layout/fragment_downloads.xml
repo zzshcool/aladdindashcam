@@ -80,7 +80,7 @@
                 android:text="前往相簿"
                 android:textColor="@color/accent_teal"
                 android:textSize="14sp"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="@dimen/radius_button" />
         </LinearLayout>
     </FrameLayout>
 

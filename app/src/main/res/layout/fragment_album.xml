@@ -322,40 +322,46 @@
                         android:text="此時段無影片，跳至下一段"
                         android:textColor="@color/accent_teal"
                         android:visibility="gone"
-                        app:cornerRadius="8dp" />
+                        app:cornerRadius="@dimen/radius_button" />
                 </LinearLayout>
             </LinearLayout>
 
             <!-- Empty / Unqueried State View -->
-            <LinearLayout
+            <androidx.core.widget.NestedScrollView
                 android:id="@+id/layout_empty_state"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:gravity="center"
-                android:orientation="vertical"
-                android:padding="24dp"
+                android:fillViewport="true"
                 android:visibility="gone">
 
-                <TextView
-                    android:id="@+id/tv_album_empty"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center"
-                    android:text="已連接記錄器，尚未讀取影片清單"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="15sp" />
+                    android:orientation="vertical"
+                    android:padding="12dp">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_refresh_album"
-                    style="@style/Widget.MaterialComponents.Button"
-                    android:layout_width="wrap_content"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="16dp"
-                    android:backgroundTint="@color/surface_elevated"
-                    android:text="讀取記錄器影片清單"
-                    android:textColor="@color/accent_teal"
-                    app:cornerRadius="8dp" />
-            </LinearLayout>
+                    <TextView
+                        android:id="@+id/tv_album_empty"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:gravity="center"
+                        android:text="已連接記錄器，尚未讀取影片清單"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="15sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_refresh_album"
+                        style="@style/Widget.MaterialComponents.Button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="10dp"
+                        android:backgroundTint="@color/surface_elevated"
+                        android:text="讀取記錄器影片清單"
+                        android:textColor="@color/accent_teal"
+                        app:cornerRadius="@dimen/radius_button" />
+                </LinearLayout>
+            </androidx.core.widget.NestedScrollView>
 
             <!-- Loading State View -->
             <LinearLayout
@@ -403,7 +409,7 @@
                 android:text="批次下載"
                 android:textColor="@color/bg_dark"
                 android:textSize="13sp"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="@dimen/radius_button" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_batch_delete"
@@ -416,7 +422,7 @@
                 android:text="刪除所選"
                 android:textColor="@color/text_primary"
                 android:textSize="13sp"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="@dimen/radius_button" />
         </LinearLayout>
     </LinearLayout>
 
@@ -465,7 +471,7 @@
                 android:layout_marginBottom="4dp"
                 android:text="相鄰錄影片段快速切換"
                 android:textColor="@color/text_secondary"
-                android:textSize="11sp" />
+                android:textSize="@dimen/text_size_caption" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rv_viewer_strip"
@@ -524,7 +530,7 @@
                     android:singleLine="true"
                     android:text="錄製時間：2026-10-21 14:32:05"
                     android:textColor="@color/text_secondary"
-                    android:textSize="11sp" />
+                    android:textSize="@dimen/text_size_caption" />
             </LinearLayout>
 
             <!-- Independent Download Button on Viewer Top Bar -->
@@ -537,7 +543,7 @@
                 android:text="下載到本機"
                 android:textColor="@color/bg_dark"
                 android:textSize="12sp"
-                app:cornerRadius="6dp" />
+                app:cornerRadius="@dimen/radius_button" />
         </LinearLayout>
 
         <!-- Loading Overlay (Presents preview loading / download progress) -->
@@ -597,7 +603,7 @@
                 android:backgroundTint="@color/surface_elevated"
                 android:text="重試載入"
                 android:textColor="@color/accent_teal"
-                app:cornerRadius="8dp" />
+                app:cornerRadius="@dimen/radius_button" />
         </LinearLayout>
     </FrameLayout>
 
