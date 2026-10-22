@@ -72,6 +72,10 @@ class RecordingTimerInterpolator(
     @Volatile
     private var currentDeviceStatus: DashCamDeviceStatus = DashCamDeviceStatus()
 
+    // 最近一次處理的狀態樣本時間戳 (防止重複送入舊狀態樣本刷新 TTL)
+    @Volatile
+    private var lastProcessedSampleTimestamp: Long = 0L
+
     // 最近一次收到狀態的單調時鐘時間戳 (完全避免依賴系統 Wall Clock，防範系統時間變更造成過期失效)
     @Volatile
     private var lastStatusMonotonicMs: Long? = null
@@ -106,10 +110,32 @@ class RecordingTimerInterpolator(
             currentEpoch = epoch
             resetAnchor()
         }
-        currentDeviceStatus = status
-        lastStatusMonotonicMs = nowMs
 
-        val isExpired = (nowMs - (lastStatusMonotonicMs ?: nowMs)) > 10000L
+        // A07: 舊樣本或無效樣本不得刷新 TTL (lastStatusMonotonicMs)
+        // 若為同一份完全相同的舊樣本（時間戳未前進且狀態與秒數完全相同），不得刷新 monotonic 新鮮度
+        val sampleTs = status.lastUpdatedTimestamp
+        val isDifferentContent = status.recordingStatus != currentDeviceStatus.recordingStatus ||
+                                 status.rawRecordSeconds != currentDeviceStatus.rawRecordSeconds
+        val isTimestampAdvanced = sampleTs > 0L && sampleTs > lastProcessedSampleTimestamp
+        val isNewSample = isTimestampAdvanced || (sampleTs > 0L && isDifferentContent)
+
+        if (isNewSample) {
+            if (sampleTs > lastProcessedSampleTimestamp) {
+                lastProcessedSampleTimestamp = sampleTs
+            }
+            lastStatusMonotonicMs = nowMs
+            currentDeviceStatus = status
+        } else if (lastStatusMonotonicMs == null && sampleTs > 0L) {
+            lastProcessedSampleTimestamp = sampleTs
+            lastStatusMonotonicMs = nowMs
+            currentDeviceStatus = status
+        } else {
+            // 重複推送完全相同的舊樣本快照，不刷新 monotonic TTL
+            currentDeviceStatus = status
+        }
+
+        val lastMs = lastStatusMonotonicMs
+        val isExpired = lastMs == null || (nowMs - lastMs) > 10000L
 
         if (currentConnectionStatus != ConnectionStatus.CONNECTED ||
             status.recordingStatus != RecordingStatus.RECORDING ||

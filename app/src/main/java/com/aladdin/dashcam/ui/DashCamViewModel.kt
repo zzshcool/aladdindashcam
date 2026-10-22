@@ -75,14 +75,16 @@ data class RtcSyncState(
 
 data class StorageEstimate(
     val hasSdCard: Boolean = false,
+    val canDeleteFile: Boolean = false,
     val isNormal: Boolean = false,
     val isCapacityFieldMissing: Boolean = false,
-    val totalBytes: Long = 0L,
-    val freeBytes: Long = 0L,
-    val usedBytes: Long = 0L,
+    val totalBytes: Long = -1L,
+    val freeBytes: Long = -1L,
+    val usedBytes: Long = -1L,
+    val listedMediaTotalBytes: Long = 0L,
     val avgBitrateBps: Long = 0L,
-    val minutesUntilOverwrite: Long = 0L,
-    val retentionHours: Double = 0.0,
+    val minutesUntilOverwrite: Long = -1L,
+    val retentionHours: Double = -1.0,
     val statusText: String = "未偵測到記憶卡"
 )
 
@@ -92,7 +94,7 @@ data class DashCamDeviceRecord(
     val host: String,
     val ssid: String = "",
     val bssid: String = "",
-    val firmwareVersion: String = "20260513 V1.1.0",
+    val firmwareVersion: String = "未知 (待讀取)",
     val lastConnectedTime: String = "",
     val isSelected: Boolean = false
 )
@@ -368,15 +370,17 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
 
     private fun updateStorageEstimateFromStatus(status: DashCamDeviceStatus) {
         if (status.lastUpdatedTimestamp == 0L) return
-        val hasCard = status.sdCardReady || status.sdCardState == 1
-        val isCardError = status.sdCardState in listOf(2, 3, 6, 7, 8, 9, 10, 12, 14)
+        val canDelete = status.sdCardReady
+        val sdCardState = status.sdCardState
+        val hasCard = sdCardState == 1 || (sdCardState == -1 && canDelete)
+        val isCardError = sdCardState in listOf(2, 3, 6, 7, 8, 9, 10, 12, 14)
         val isNormal = hasCard && !isCardError
         val total = status.sdTotalBytes
         val free = status.sdFreeBytes
 
         val loopRaw = _currentLoopSettingRaw.value
         val loopModePrefix = when (loopRaw) {
-            0 -> "單次連續錄影"
+            0 -> "單次連續錄影 (不循環)"
             1 -> "循環錄影 (1分)"
             2 -> "循環錄影 (2分)"
             3 -> "循環錄影 (3分)"
@@ -384,10 +388,14 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             else -> "錄影模式 (循環設定待確認)"
         }
 
-        if (!hasCard) {
+        val listedMediaBytes = _deviceMediaList.value.sumOf { it.sizeBytes }
+
+        if (sdCardState == 0) {
             _storageEstimate.value = StorageEstimate(
                 hasSdCard = false,
+                canDeleteFile = canDelete,
                 isNormal = false,
+                listedMediaTotalBytes = listedMediaBytes,
                 statusText = "未偵測到記憶卡"
             )
             return
@@ -396,13 +404,26 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         if (isCardError) {
             _storageEstimate.value = StorageEstimate(
                 hasSdCard = true,
+                canDeleteFile = canDelete,
                 isNormal = false,
-                statusText = "記憶卡異常或需格式化 (代碼 ${status.sdCardState})"
+                listedMediaTotalBytes = listedMediaBytes,
+                statusText = "記憶卡異常或需格式化 (代碼 $sdCardState)"
             )
             return
         }
 
-        // 估算平均寫入速率：以已載入影片計算真實樣本；無樣本時如實呈現估算中（R07）
+        if (!canDelete && sdCardState != 1) {
+            _storageEstimate.value = StorageEstimate(
+                hasSdCard = false,
+                canDeleteFile = false,
+                isNormal = false,
+                listedMediaTotalBytes = listedMediaBytes,
+                statusText = "記憶卡未就緒或無卡"
+            )
+            return
+        }
+
+        // 估算平均寫入速率：以已載入影片計算真實樣本
         val items = _deviceMediaList.value.filter { it.isVideo && it.sizeBytes > 0 && it.durationSeconds > 0 }
         val avgBitrateBps: Long = if (items.isNotEmpty()) {
             val totalBytesSum = items.sumOf { it.sizeBytes }
@@ -414,27 +435,32 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
 
         if (total <= 0L || free < 0L) {
             // 實機韌體狀態封包長度為 14 bytes，缺少容量擴充欄位 (bytes 16..23)
-            val mediaBytes = _deviceMediaList.value.sumOf { it.sizeBytes }
-            val desc = if (mediaBytes > 0L) {
-                val mediaMb = mediaBytes / (1024.0 * 1024.0)
+            val desc = if (listedMediaBytes > 0L) {
+                val mediaMb = listedMediaBytes / (1024.0 * 1024.0)
                 String.format(
                     java.util.Locale.TAIWAN,
-                    "%s · 記憶卡正常在位 · 相簿已用 %.1f MB (總容量韌體未回報)",
+                    "%s · 記憶卡可操作 · 已列舉媒體大小: %.1f MB (總容量韌體未回報)",
                     loopModePrefix,
                     mediaMb
                 )
             } else {
                 String.format(
                     java.util.Locale.TAIWAN,
-                    "%s · 記憶卡正常在位 (容量 bytes 韌體未提供)",
+                    "%s · 記憶卡可操作 (容量 bytes 韌體未回報)",
                     loopModePrefix
                 )
             }
             _storageEstimate.value = StorageEstimate(
                 hasSdCard = true,
+                canDeleteFile = canDelete,
                 isNormal = true,
                 isCapacityFieldMissing = true,
-                usedBytes = mediaBytes,
+                totalBytes = -1L,
+                freeBytes = -1L,
+                usedBytes = -1L,
+                listedMediaTotalBytes = listedMediaBytes,
+                minutesUntilOverwrite = -1L,
+                retentionHours = -1.0,
                 statusText = desc
             )
             return
@@ -443,11 +469,11 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         val used = (total - free).coerceAtLeast(0L)
         val minutesUntilOverwrite = if (avgBitrateBps > 0) {
             free / avgBitrateBps / 60
-        } else 0L
+        } else -1L
 
         val retentionHours = if (avgBitrateBps > 0) {
             (total.toDouble() / avgBitrateBps.toDouble()) / 3600.0
-        } else 0.0
+        } else -1.0
 
         val desc = if (items.isEmpty() || avgBitrateBps <= 0L) {
             String.format(
@@ -456,37 +482,32 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                 loopModePrefix,
                 free / (1024.0 * 1024.0 * 1024.0)
             )
-        } else if (free <= 0L) {
+        } else if (loopRaw != null && loopRaw > 0) {
             String.format(
                 java.util.Locale.TAIWAN,
-                "%s · 容量已滿持續覆寫 · 總保留約 %.1f 小時",
+                "%s · 距循環覆蓋約 %d 分鐘 · 總保存約 %.1f 小時",
                 loopModePrefix,
-                retentionHours
-            )
-        } else if (minutesUntilOverwrite < 1L) {
-            String.format(
-                java.util.Locale.TAIWAN,
-                "%s · 剩餘不足 1 分鐘即將覆寫 · 總保留約 %.1f 小時",
-                loopModePrefix,
+                minutesUntilOverwrite,
                 retentionHours
             )
         } else {
             String.format(
                 java.util.Locale.TAIWAN,
-                "%s · 距覆寫約 %d 分鐘 · 總保留約 %.1f 小時",
+                "%s · 剩餘可錄約 %d 分鐘",
                 loopModePrefix,
-                minutesUntilOverwrite,
-                retentionHours
+                minutesUntilOverwrite
             )
         }
 
         _storageEstimate.value = StorageEstimate(
             hasSdCard = true,
+            canDeleteFile = canDelete,
             isNormal = isNormal,
             isCapacityFieldMissing = false,
             totalBytes = total,
             freeBytes = free,
             usedBytes = used,
+            listedMediaTotalBytes = listedMediaBytes,
             avgBitrateBps = avgBitrateBps,
             minutesUntilOverwrite = minutesUntilOverwrite,
             retentionHours = retentionHours,
@@ -503,6 +524,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             try {
                 _resolutionDisplay.value = "未讀取"
                 _loopDisplay.value = "未讀取"
+                _currentLoopSettingRaw.value = -1
                 _deviceMediaList.value = emptyList()
                 _albumQueryState.value = AlbumQueryState.Idle
                 val newEpoch = client.updateHost(newHost)
@@ -1125,6 +1147,14 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             }
         )
         if (res.isSuccess) {
+            val realDuration = if (item.isVideo) extractMediaDurationSeconds(destFile) else 0
+            if (realDuration > 0) {
+                _deviceMediaList.update { list ->
+                    list.map {
+                        if (it.fileName == item.fileName) it.copy(durationSeconds = realDuration) else it
+                    }
+                }
+            }
             Result.success(destFile)
         } else {
             Result.failure(res.exceptionOrNull() ?: Exception("下載預覽暫存失敗"))
@@ -1159,9 +1189,17 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         if (cacheFile.exists() && (item.sizeBytes <= 0 || cacheFile.length() == item.sizeBytes)) {
             try {
                 cacheFile.copyTo(destFile, overwrite = true)
+                val realDuration = if (item.isVideo) extractMediaDurationSeconds(destFile) else 0
                 if (generation == 0L || downloadGenerations[item.fileName] == generation) {
                     _deviceMediaList.update { list ->
-                        list.map { if (it.fileName == item.fileName) it.copy(isDownloaded = true) else it }
+                        list.map {
+                            if (it.fileName == item.fileName) {
+                                it.copy(
+                                    isDownloaded = true,
+                                    durationSeconds = if (realDuration > 0) realDuration else it.durationSeconds
+                                )
+                            } else it
+                        }
                     }
                     updateDownloadTask(
                         DownloadTask(
@@ -1192,9 +1230,17 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             }
         )
         if (res.isSuccess) {
+            val realDuration = if (item.isVideo) extractMediaDurationSeconds(destFile) else 0
             if (generation == 0L || downloadGenerations[item.fileName] == generation) {
                 _deviceMediaList.update { list ->
-                    list.map { if (it.fileName == item.fileName) it.copy(isDownloaded = true) else it }
+                    list.map {
+                        if (it.fileName == item.fileName) {
+                            it.copy(
+                                isDownloaded = true,
+                                durationSeconds = if (realDuration > 0) realDuration else it.durationSeconds
+                            )
+                        } else it
+                    }
                 }
                 _downloadTasks.update { tasks ->
                     tasks.map { existing ->

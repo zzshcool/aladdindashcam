@@ -299,7 +299,7 @@ object GPSocketProtocol {
         val batteryLevel = byte2 and 0x7F // level 0~4
 
         val byte3 = payload[3].toInt() and 0xFF
-        // VR-07: byte 3 bit 7 為裝置回報之 SD 檔案刪除/管理支援旗標，不等於 SD 卡完整寫入健康
+        // A02: byte 3 bit 7 為裝置回報之 SD 檔案刪除/管理支援旗標 (canDeleteFile)，不等於完整卡片健康或容量就緒
         val sdCardReady = (byte3 and 0x80) != 0
         val isCharging = (byte3 and 0x01) != 0
 
@@ -312,7 +312,8 @@ object GPSocketProtocol {
         val captureResolutionIndex = payload[9].toInt() and 0xFF
         val availablePhotos = buffer.getInt(10).toLong() and 0xFFFFFFFFL
 
-        var sdCardState = if (sdCardReady) 1 else 0
+        // A02: 依據原廠 o6/b.java:56，短狀態封包 (長度 < 16) 韌體未回報 SD 卡在位與健康狀態
+        var sdCardState = -1 // -1: 韌體未回報詳細狀態
         var sdFreeBytes = -1L
         var sdTotalBytes = -1L
 
@@ -358,8 +359,39 @@ object GPSocketProtocol {
         )
     }
 
+    data class FileTypeMapping(
+        val prefix: String,
+        val ext: String,
+        val isVideo: Boolean,
+        val isEmergency: Boolean
+    )
+
+    fun resolveFileType(typeChar: Char): FileTypeMapping {
+        return when (typeChar) {
+            'A' -> FileTypeMapping("MOVI", "mov", isVideo = true, isEmergency = false)
+            'L' -> FileTypeMapping("LOCK", "mov", isVideo = true, isEmergency = true)
+            'm' -> FileTypeMapping("MOVI", "mp4", isVideo = true, isEmergency = false)
+            'l' -> FileTypeMapping("LOCK", "mp4", isVideo = true, isEmergency = true)
+            's' -> FileTypeMapping("SOSO", "mp4", isVideo = true, isEmergency = false)
+            'J' -> FileTypeMapping("PICT", "jpg", isVideo = false, isEmergency = false)
+            'V' -> FileTypeMapping("MOVI", "avi", isVideo = true, isEmergency = false)
+            'K' -> FileTypeMapping("LOCK", "avi", isVideo = true, isEmergency = true)
+            'O' -> FileTypeMapping("SOSO", "avi", isVideo = true, isEmergency = false)
+            'T' -> FileTypeMapping("LAPS", "mov", isVideo = true, isEmergency = false)
+            't' -> FileTypeMapping("LAPS", "mp4", isVideo = true, isEmergency = false)
+            'P' -> FileTypeMapping("PIR", "mov", isVideo = true, isEmergency = false)
+            'C' -> FileTypeMapping("COMP", "mov", isVideo = true, isEmergency = false)
+            else -> when (typeChar.code) {
+                1 -> FileTypeMapping("MOVI", "mp4", isVideo = true, isEmergency = false)
+                2 -> FileTypeMapping("PICT", "jpg", isVideo = false, isEmergency = false)
+                3 -> FileTypeMapping("LOCK", "mp4", isVideo = true, isEmergency = true)
+                else -> FileTypeMapping("MOVI", "mp4", isVideo = true, isEmergency = false)
+            }
+        }
+    }
+
     /**
-     * Parses real media items list from GetNameList ACK payload per Specification 25.8 (VR-08)
+     * Parses real media items list from GetNameList ACK payload per Specification 25.8 & OEM CamWrapper.GP22_DEFAULT_MAPPING_STR
      */
     fun parseFileList(payload: ByteArray): List<MediaItem> {
         val items = mutableListOf<MediaItem>()
@@ -380,59 +412,58 @@ object GPSocketProtocol {
 
         while (offset + 13 <= payload.size) {
             buf.position(offset)
-            val type = buf.get().toInt() and 0xFF
+            val typeByte = buf.get()
+            val typeChar = typeByte.toInt().toChar()
+            val mapping = resolveFileType(typeChar)
             val deviceIndex = buf.short.toInt() and 0xFFFF
-            val yearOffset = buf.get().toInt() and 0xFF
+            val yearByte = buf.get().toInt() and 0xFF
             val month = buf.get().toInt() and 0xFF
             val day = buf.get().toInt() and 0xFF
             val hour = buf.get().toInt() and 0xFF
             val minute = buf.get().toInt() and 0xFF
             val second = buf.get().toInt() and 0xFF
-            val rawSize = buf.int.toLong() and 0xFFFFFFFFL
+            val rawSizeKb = buf.int.toLong() and 0xFFFFFFFFL
 
-            val year = 2000 + yearOffset
-            val isVideo = (type != 2) // type 2 is photo
-            val isEmergency = (type == 3)
-            val ext = if (isVideo) "MP4" else "JPG"
-            val prefix = if (isEmergency) "EMG" else if (isVideo) "REC" else "PIC"
-            val fileName = String.format(
-                java.util.Locale.US,
-                "%s_%04d%02d%02d_%02d%02d%02d_%04d.%s",
-                prefix,
-                year,
-                month.coerceIn(1, 12),
-                day.coerceIn(1, 31),
-                hour.coerceIn(0, 23),
-                minute.coerceIn(0, 59),
-                second.coerceIn(0, 59),
-                deviceIndex,
-                ext
-            )
+            val year = if (yearByte < 100) 2000 + yearByte else 1900 + yearByte
 
-            val timestamp = if (year in 2020..2040 && month in 1..12 && day in 1..31 &&
-                hour in 0..23 && minute in 0..59 && second in 0..59) {
+            val hasValidDate = (year in 2020..2040 && month in 1..12 && day in 1..31 &&
+                    hour in 0..23 && minute in 0..59 && second in 0..59)
+
+            val dateStr = if (hasValidDate) {
+                String.format(java.util.Locale.US, "%04d%02d%02d%02d%02d%02d", year, month, day, hour, minute, second)
+            } else {
+                ""
+            }
+
+            val timestamp = if (hasValidDate) {
                 try {
-                    val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US).apply {
+                    val sdf = java.text.SimpleDateFormat("yyyyMMddHHmmss", java.util.Locale.US).apply {
                         isLenient = false
                     }
-                    val dateStr = String.format(java.util.Locale.US, "%04d-%02d-%02d %02d:%02d:%02d", year, month, day, hour, minute, second)
                     sdf.parse(dateStr)?.time ?: 0L
                 } catch (e: Exception) {
                     0L
                 }
             } else {
-                0L // 0L 表示時間未知，杜絕假時間
+                0L
             }
+
+            // Vidure 標準檔名命名格式: yyyyMMddHHmmss_PREFIX0001.EXT (或無時間時 PREFIX0001.EXT)
+            val baseName = String.format(java.util.Locale.US, "%s%04d.%s", mapping.prefix, deviceIndex, mapping.ext)
+            val fileName = if (dateStr.isNotEmpty()) "${dateStr}_${baseName}" else baseName
+
+            // AM01 / 原廠 c.java:268: 硬體回傳 rawSize 單位為 KB，真實二進位 bytes 為 rawSize * 1024
+            val sizeBytes = rawSizeKb * 1024L
 
             items.add(
                 MediaItem(
                     id = "DEV_$deviceIndex",
                     fileName = fileName,
-                    sizeBytes = rawSize,
-                    durationSeconds = 0, // 取得真實時長前不顯示固定 60 秒假時長
+                    sizeBytes = sizeBytes,
+                    durationSeconds = 0,
                     timestampMillis = timestamp,
-                    isVideo = isVideo,
-                    isEmergency = isEmergency,
+                    isVideo = mapping.isVideo,
+                    isEmergency = mapping.isEmergency,
                     isDownloaded = false,
                     deviceIndex = deviceIndex
                 )
