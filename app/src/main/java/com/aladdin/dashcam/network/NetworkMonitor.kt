@@ -16,6 +16,9 @@ class NetworkMonitor(private val context: Context) {
 
     private val _wifiNetwork = MutableStateFlow<Network?>(null)
     val wifiNetwork: StateFlow<Network?> = _wifiNetwork.asStateFlow()
+    private val _wifiLinkRevision = MutableStateFlow(0L)
+    val wifiLinkRevision: StateFlow<Long> = _wifiLinkRevision.asStateFlow()
+    private var lastGatewayIp: String? = null
 
     private val _cellularAvailable = MutableStateFlow(false)
     val cellularAvailable: StateFlow<Boolean> = _cellularAvailable.asStateFlow()
@@ -34,6 +37,11 @@ class NetworkMonitor(private val context: Context) {
             if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) {
                 Log.i(TAG, "Wi-Fi link properties updated for network: $network")
                 _wifiNetwork.value = network
+                val gateway = ipv4Gateway(linkProperties)
+                if (gateway != lastGatewayIp) {
+                    lastGatewayIp = gateway
+                    _wifiLinkRevision.value += 1
+                }
             }
         }
 
@@ -41,6 +49,7 @@ class NetworkMonitor(private val context: Context) {
             if (_wifiNetwork.value == network) {
                 Log.w(TAG, "Wi-Fi network lost: $network")
                 _wifiNetwork.value = null
+                lastGatewayIp = null
             }
         }
     }
@@ -86,13 +95,13 @@ class NetworkMonitor(private val context: Context) {
     fun getWifiGatewayIp(): String? {
         val net = _wifiNetwork.value ?: return null
         val linkProps = connectivityManager.getLinkProperties(net) ?: return null
-        for (route in linkProps.routes) {
-            if (route.isDefaultRoute && route.gateway != null) {
-                return route.gateway?.hostAddress
-            }
-        }
-        return null
+        return ipv4Gateway(linkProps)
     }
+
+    private fun ipv4Gateway(linkProps: android.net.LinkProperties): String? =
+        linkProps.routes.firstOrNull {
+            it.isDefaultRoute && it.gateway is java.net.Inet4Address
+        }?.gateway?.hostAddress
 
     fun getWifiSsid(): String? {
         val net = _wifiNetwork.value ?: return null

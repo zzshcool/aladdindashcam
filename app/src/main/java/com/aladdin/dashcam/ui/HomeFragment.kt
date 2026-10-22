@@ -43,13 +43,12 @@ class HomeFragment : Fragment() {
         binding.btnHomeMap.setOnClickListener {
             (activity as? MainActivity)?.openLive(R.id.btn_mode_map)
         }
+        // D07: Explicit local album routing
         binding.btnHomeLocalAlbum.setOnClickListener {
-            (activity as? MainActivity)?.findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottom_nav)
-                ?.selectedItemId = R.id.nav_album
+            (activity as? MainActivity)?.openLocalAlbum()
         }
         binding.btnHomeDownloads.setOnClickListener {
-            (activity as? MainActivity)?.findViewById<com.google.android.material.bottomnavigation.BottomNavigationView>(R.id.bottom_nav)
-                ?.selectedItemId = R.id.nav_downloads
+            (activity as? MainActivity)?.openDownloads()
         }
         binding.btnHomeConnect.setOnClickListener {
             if (viewModel.connectionStatus.value == ConnectionStatus.CONNECTED) {
@@ -61,69 +60,59 @@ class HomeFragment : Fragment() {
     }
 
     private fun observeDashboardState() {
-        // Observe Devices, Connection Status, and Device Telemetry
+        // Observe Registered Devices & Real Connection Status (D08: Decoupled from stream player)
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 combine(
                     viewModel.registeredDevices,
-                    viewModel.connectionStatus,
-                    viewModel.deviceStatus
-                ) { devices: List<DashCamDeviceRecord>, status: ConnectionStatus, devStatus: DashCamDeviceStatus ->
-                    val selectedDevice = devices.firstOrNull { it.isSelected } ?: devices.firstOrNull()
-                    Triple(selectedDevice, status, devStatus)
-                }.collect { (device, status, devStatus) ->
+                    viewModel.connectionStatus
+                ) { devices, status ->
+                    val selected = devices.firstOrNull { it.isSelected } ?: devices.firstOrNull()
+                    Pair(selected, status)
+                }.collect { (device, status) ->
                     val isConnected = status == ConnectionStatus.CONNECTED && device != null
 
-                    // Device name display
-                    binding.tvHomeDevice.text = device?.name ?: getString(R.string.home_device_none)
-
-                    // Connection status semantics (UX01: Never overclaim stream readiness without first frame / rtsp confirmation)
-                    binding.tvHomeConnection.text = when {
-                        isConnected -> getString(R.string.home_status_connected)
-                        status == ConnectionStatus.CONNECTING -> getString(R.string.device_status_connecting)
-                        status == ConnectionStatus.STREAM_INTERRUPTED -> getString(R.string.device_status_stream_interrupted)
-                        device != null -> getString(R.string.home_status_disconnected)
-                        else -> getString(R.string.home_device_none_desc)
-                    }
-
-                    // Stream badge on card
-                    if (isConnected) {
-                        binding.tvHomeStreamBadge.visibility = View.VISIBLE
-                        if (devStatus.rtspFlag) {
-                            binding.tvHomeStreamBadge.text = getString(R.string.home_status_stream_ready)
-                            binding.tvHomeStreamBadge.setTextColor(ContextCompat.getColor(requireContext(), R.color.accent_teal))
-                        } else {
-                            binding.tvHomeStreamBadge.text = getString(R.string.home_status_stream_loading)
-                            binding.tvHomeStreamBadge.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary))
-                        }
-                    } else {
-                        binding.tvHomeStreamBadge.visibility = View.GONE
-                    }
-
-                    // Main Action CTA
-                    binding.btnHomeConnect.text = when {
-                        isConnected -> getString(R.string.home_action_open_live)
-                        device != null -> getString(R.string.home_action_connect)
-                        else -> getString(R.string.home_action_add)
-                    }
-
-                    // Hero layout responsiveness (UX02: Prioritize selected device card when devices exist)
                     if (device != null) {
-                        binding.layoutHeroBanner.visibility = View.GONE
-                        binding.cardHomeDevice.strokeColor = if (isConnected) {
-                            ContextCompat.getColor(requireContext(), R.color.accent_teal)
+                        binding.layoutEmptyGuidance.visibility = View.GONE
+                        binding.cardHomeDevice.visibility = View.VISIBLE
+                        binding.tvHomeDevice.text = device.name
+
+                        // Connection status semantics (D08: Truthful device status, no misleading stream loading)
+                        binding.tvHomeConnection.text = when {
+                            isConnected -> "● 已連線 · 通用記錄器就緒"
+                            status == ConnectionStatus.CONNECTING -> getString(R.string.device_status_connecting)
+                            status == ConnectionStatus.STREAM_INTERRUPTED -> getString(R.string.device_status_stream_interrupted)
+                            else -> "○ 未連線 · 請確認記錄器 Wi-Fi"
+                        }
+                        binding.tvHomeConnection.setTextColor(
+                            ContextCompat.getColor(
+                                requireContext(),
+                                if (isConnected) R.color.status_green else R.color.text_secondary
+                            )
+                        )
+
+                        // Card outline focus highlight
+                        binding.cardHomeDevice.strokeColor = ContextCompat.getColor(
+                            requireContext(),
+                            if (isConnected) R.color.card_stroke_focused else R.color.border_subtle
+                        )
+
+                        // Main Action CTA
+                        binding.btnHomeConnect.text = if (isConnected) {
+                            getString(R.string.home_action_open_live)
                         } else {
-                            ContextCompat.getColor(requireContext(), R.color.border_subtle)
+                            getString(R.string.home_action_connect)
                         }
                     } else {
-                        binding.layoutHeroBanner.visibility = View.VISIBLE
-                        binding.cardHomeDevice.strokeColor = ContextCompat.getColor(requireContext(), R.color.border_subtle)
+                        // Empty device state: show guidance
+                        binding.layoutEmptyGuidance.visibility = View.VISIBLE
+                        binding.cardHomeDevice.visibility = View.GONE
                     }
                 }
             }
         }
 
-        // Observe telemetry data for selected device (Battery & SD, Review 3.3.2)
+        // Observe Telemetry data for selected device (D09: Truthful Battery & SD Capacity)
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
                 combine(
@@ -136,28 +125,55 @@ class HomeFragment : Fragment() {
                     val isConnected = connStatus == ConnectionStatus.CONNECTED
                     if (isConnected) {
                         binding.layoutDeviceTelemetry.visibility = View.VISIBLE
-                        // Battery semantics with accessibility
+
+                        // Battery Level & Charging Icon
                         val batteryText = if (devStatus.isCharging) {
                             "${getString(R.string.battery_charging_prefix)}${devStatus.batteryLevel}/4"
                         } else {
                             "電量：${devStatus.batteryLevel}/4"
                         }
                         binding.tvHomeBattery.text = batteryText
+                        val batteryDrawable = if (devStatus.isCharging) {
+                            when (devStatus.batteryLevel) {
+                                4 -> R.drawable.ic_battery_charging_4
+                                3 -> R.drawable.ic_battery_charging_3
+                                2 -> R.drawable.ic_battery_charging_2
+                                1 -> R.drawable.ic_battery_charging_1
+                                else -> R.drawable.ic_battery_charging_0
+                            }
+                        } else {
+                            when (devStatus.batteryLevel) {
+                                4 -> R.drawable.ic_battery_4
+                                3 -> R.drawable.ic_battery_3
+                                2 -> R.drawable.ic_battery_2
+                                1 -> R.drawable.ic_battery_1
+                                else -> R.drawable.ic_battery_0
+                            }
+                        }
+                        binding.ivTelemetryBattery.setImageResource(batteryDrawable)
                         binding.tvHomeBattery.contentDescription = if (devStatus.isCharging) {
                             "${getString(R.string.battery_cd_charging_prefix)}${devStatus.batteryLevel}格"
                         } else {
                             "電量${devStatus.batteryLevel}格"
                         }
 
-                        // SD status / remaining recording time
+                        // SD Storage & Remaining Recording Duration
                         val mins = storageEst.minutesUntilOverwrite
-                        binding.tvHomeSd.text = if (mins > 0) {
-                            getString(R.string.sd_remaining_format, mins.toInt())
+                        val capacity = if (storageEst.freeBytes >= 0 && storageEst.totalBytes > 0) {
+                            val freeGb = storageEst.freeBytes / (1024.0 * 1024.0 * 1024.0)
+                            val totalGb = storageEst.totalBytes / (1024.0 * 1024.0 * 1024.0)
+                            String.format(java.util.Locale.US, "可用 %.1f/%.0f GB", freeGb, totalGb)
                         } else {
                             storageEst.statusText
                         }
+                        val estimate = if (mins >= 0) "\n${getString(R.string.sd_remaining_format, mins.toInt())}" else ""
+                        binding.tvHomeSd.text = "SD：$capacity$estimate"
                     } else {
-                        binding.layoutDeviceTelemetry.visibility = View.GONE
+                        // When offline, show graceful offline placeholder rather than blank
+                        binding.layoutDeviceTelemetry.visibility = View.VISIBLE
+                        binding.tvHomeBattery.text = "電量：未知"
+                        binding.ivTelemetryBattery.setImageResource(R.drawable.ic_battery_unknown)
+                        binding.tvHomeSd.text = "SD：離線待讀取"
                     }
                 }
             }

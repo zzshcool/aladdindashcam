@@ -41,7 +41,7 @@ class MediaAdapter(
             if (!enabled) {
                 selectedItems.clear()
             }
-            notifyDataSetChanged()
+            notifyItemRangeChanged(0, itemCount, SELECTION_PAYLOAD)
             notifySelectionStats()
         }
     }
@@ -52,7 +52,8 @@ class MediaAdapter(
         } else {
             selectedItems[item.id] = item
         }
-        notifyDataSetChanged()
+        val position = currentList.indexOfFirst { it is AlbumListItem.Media && it.item.id == item.id }
+        if (position >= 0) notifyItemChanged(position, SELECTION_PAYLOAD)
         notifySelectionStats()
     }
 
@@ -61,13 +62,13 @@ class MediaAdapter(
         for (item in allItems) {
             selectedItems[item.id] = item
         }
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, itemCount, SELECTION_PAYLOAD)
         notifySelectionStats()
     }
 
     fun clearSelection() {
         selectedItems.clear()
-        notifyDataSetChanged()
+        notifyItemRangeChanged(0, itemCount, SELECTION_PAYLOAD)
         notifySelectionStats()
     }
 
@@ -82,6 +83,7 @@ class MediaAdapter(
     companion object {
         const val TYPE_HEADER = 0
         const val TYPE_MEDIA = 1
+        private const val SELECTION_PAYLOAD = "selection"
 
         private val TIME_FORMAT = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
@@ -134,6 +136,15 @@ class MediaAdapter(
             )
             MediaViewHolder(binding)
         }
+    }
+
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int, payloads: MutableList<Any>) {
+        if (payloads.isNotEmpty() && payloads.all { it == SELECTION_PAYLOAD }) {
+            val media = (getItem(position) as? AlbumListItem.Media)?.item ?: return
+            val binding = (holder as? MediaViewHolder)?.binding ?: return
+            binding.cbSelect.visibility = if (isSelectionMode) View.VISIBLE else View.GONE
+            binding.cbSelect.isChecked = selectedItems.containsKey(media.id)
+        } else super.onBindViewHolder(holder, position, payloads)
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {

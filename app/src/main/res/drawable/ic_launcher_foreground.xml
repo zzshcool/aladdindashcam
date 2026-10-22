@@ -4,51 +4,43 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Mounting Bracket / Clip -->
+    <!-- Top Mounting Clip -->
     <path
-        android:fillColor="#34434D"
-        android:pathData="M46,31h16a3,3 0,0 1,3 3v4h-22v-4a3,3 0,0 1,3 -3z" />
+        android:fillColor="#3A4654"
+        android:pathData="M46,30h16a3,3 0,0 1,3 3v5h-22v-5a3,3 0,0 1,3 -3z" />
 
-    <!-- DashCam Main Body (Compact Rounded Body) -->
+    <!-- DashCam Main Body (Clean Horizontal Contour, High Contrast against Dark/Light Wallpapers) -->
     <path
-        android:fillColor="#1F2A33"
-        android:pathData="M26,38h56a8,8 0,0 1,8 8v24a8,8 0,0 1,-8 8h-56a8,8 0,0 1,-8 -8v-24a8,8 0,0 1,8 -8z" />
+        android:fillColor="#242B35"
+        android:pathData="M25,37h58a8,8 0,0 1,8 8v26a8,8 0,0 1,-8 8h-58a8,8 0,0 1,-8 -8v-26a8,8 0,0 1,8 -8z" />
 
-    <!-- Subtle Inner Bezel / Housing Frame -->
+    <!-- Subtle Inner Bezel Framing -->
     <path
-        android:fillColor="#151D24"
-        android:pathData="M27,40h54a6,6 0,0 1,6 6v20a6,6 0,0 1,-6 6h-54a6,6 0,0 1,-6 -6v-20a6,6 0,0 1,6 -6z" />
+        android:fillColor="#181D24"
+        android:pathData="M27,39h54a6,6 0,0 1,6 6v22a6,6 0,0 1,-6 6h-54a6,6 0,0 1,-6 -6v-22a6,6 0,0 1,6 -6z" />
 
-    <!-- Mic / Status LED details on the left -->
+    <!-- Distinct Primary Lens Outer Barrel (Right-Offset) -->
     <path
-        android:fillColor="#FF5252"
-        android:pathData="M34,46a2.5,2.5 0,1 0,0 5a2.5,2.5 0,1 0,0 -5" />
-    <path
-        android:fillColor="#54C5B5"
-        android:pathData="M34,57a2,2 0,1 0,0 4a2,2 0,1 0,0 -4" />
+        android:fillColor="#323C4A"
+        android:pathData="M66,38a16,16 0,1 0,0 32a16,16 0,1 0,0 -32" />
 
-    <!-- Speaker / Ventilation slots -->
+    <!-- Signature Cool Blue Accent Ring -->
     <path
-        android:fillColor="#2A3742"
-        android:pathData="M41,47h3v14h-3z M47,47h3v14h-3z" />
-
-    <!-- Offset Lens Housing Outer Ring -->
-    <path
-        android:fillColor="#2B3A45"
-        android:pathData="M66,39a15,15 0,1 0,0 30a15,15 0,1 0,0 -30" />
-
-    <!-- Distinct Teal Accent Ring -->
-    <path
-        android:fillColor="#54C5B5"
-        android:pathData="M66,42a12,12 0,1 0,0 24a12,12 0,1 0,0 -24" />
+        android:fillColor="#7AA7FF"
+        android:pathData="M66,41a13,13 0,1 0,0 26a13,13 0,1 0,0 -26" />
 
     <!-- Deep Optical Lens Element -->
     <path
-        android:fillColor="#0D161F"
-        android:pathData="M66,45a9,9 0,1 0,0 18a9,9 0,1 0,0 -18" />
+        android:fillColor="#0D131B"
+        android:pathData="M66,44a10,10 0,1 0,0 20a10,10 0,1 0,0 -20" />
 
-    <!-- Optical Reflection Highlight -->
+    <!-- Precision Reflection Glint -->
     <path
-        android:fillColor="#87DFD3"
-        android:pathData="M63,47a3.5,3.5 0,1 0,0 7a3.5,3.5 0,1 0,0 -7" />
+        android:fillColor="#DCE8FF"
+        android:pathData="M63,46a3.5,3.5 0,1 0,0 7a3.5,3.5 0,1 0,0 -7" />
+
+    <!-- Status Rec Indicator (Minimal dot on the left) -->
+    <path
+        android:fillColor="#FC8181"
+        android:pathData="M35,46a3,3 0,1 0,0 6a3,3 0,1 0,0 -6" />
 </vector>

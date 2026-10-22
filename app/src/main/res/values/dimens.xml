@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Radius Tokens (D02: Unified radii) -->
+    <dimen name="radius_card">12dp</dimen>
+    <dimen name="radius_button">10dp</dimen>
+    <dimen name="radius_chip">16dp</dimen>
+
+    <!-- Spacing Tokens -->
+    <dimen name="space_4">4dp</dimen>
+    <dimen name="space_8">8dp</dimen>
+    <dimen name="space_12">12dp</dimen>
+    <dimen name="space_16">16dp</dimen>
+    <dimen name="space_20">20dp</dimen>
+    <dimen name="space_24">24dp</dimen>
+    <dimen name="space_32">32dp</dimen>
+
+    <!-- Touch Target Accessibility -->
+    <dimen name="touch_target_min">48dp</dimen>
+    <dimen name="button_height_primary">50dp</dimen>
+    <dimen name="header_height_compact">54dp</dimen>
+
+    <!-- Typography Hierarchy (D05: Eliminate sub-12sp noise) -->
+    <dimen name="text_size_h1">22sp</dimen>
+    <dimen name="text_size_h2">17sp</dimen>
+    <dimen name="text_size_body">15sp</dimen>
+    <dimen name="text_size_sub">13sp</dimen>
+    <dimen name="text_size_caption">12sp</dimen>
+</resources>

@@ -1,4 +1,7 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="@color/bg_dark" />
-    <item android:width="120dp" android:height="100dp" android:gravity="center" android:drawable="@drawable/ic_recorder_hero" />
+    <item android:width="220dp" android:height="220dp" android:gravity="center">
+        <bitmap android:src="@drawable/brand_rider_pixel_splash" android:gravity="fill" android:filter="false" />
+    </item>
+    <item android:width="200dp" android:height="80dp" android:gravity="bottom|center_horizontal" android:bottom="48dp" android:drawable="@drawable/splash_brand_wordmark" />
 </layer-list>

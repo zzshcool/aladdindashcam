@@ -10,23 +10,24 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:paddingHorizontal="@dimen/space_20"
+        android:paddingTop="@dimen/space_12"
+        android:paddingBottom="@dimen/space_24">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="記錄器設定"
-            android:textColor="@color/text_primary"
-            android:textSize="20sp"
-            android:textStyle="bold" />
-
-        <!-- Group 1: Camera & Recording Settings (OEM 1:1) -->
-        <LinearLayout
+        <!-- Group 1: Camera & Recording Settings (OEM 1:1, D02) -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:background="@color/surface_dark"
-            android:orientation="vertical">
+            android:layout_marginTop="@dimen/space_8"
+            app:cardCornerRadius="@dimen/radius_card"
+            app:cardBackgroundColor="@color/surface_dark"
+            app:strokeWidth="1dp"
+            app:strokeColor="@color/border_subtle">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
 
             <!-- Photo Resolution -->
             <LinearLayout
@@ -269,6 +270,8 @@
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- Group 2: Image & Audio Settings -->
         <TextView
@@ -657,6 +660,5 @@
                 android:textColor="@color/text_disabled"
                 android:textSize="12sp" />
         </LinearLayout>
-
     </LinearLayout>
 </ScrollView>

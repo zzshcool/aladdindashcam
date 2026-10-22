@@ -11,24 +11,24 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="20dp"
-        android:paddingBottom="24dp">
+        android:paddingHorizontal="@dimen/space_20"
+        android:paddingBottom="@dimen/space_24">
 
-        <!-- 48-56dp Compact Top Header (Review 3.3.1) -->
+        <!-- 54dp Compact Header (D02 / D05 / D11) -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="@dimen/header_height_compact"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
             <TextView
                 android:id="@+id/btn_manage_recorders"
                 android:layout_width="0dp"
-                android:layout_height="48dp"
+                android:layout_height="@dimen/touch_target_min"
                 android:layout_weight="1"
                 android:gravity="center_vertical"
                 android:text="@string/home_title_my_dashcam"
-                android:textSize="20sp"
+                android:textSize="@dimen/text_size_h1"
                 android:textStyle="bold"
                 android:textColor="@color/text_primary"
                 android:background="?attr/selectableItemBackground"
@@ -39,60 +39,59 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_add_recorder"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:minWidth="48dp"
+                android:layout_width="@dimen/touch_target_min"
+                android:layout_height="@dimen/touch_target_min"
+                android:minWidth="@dimen/touch_target_min"
                 android:padding="0dp"
                 android:text="@string/home_action_add_recorder"
-                android:textSize="26sp"
-                android:textColor="@color/accent_teal"
+                android:textSize="24sp"
+                android:textColor="@color/accent_blue"
                 android:contentDescription="@string/home_action_add_recorder_desc" />
         </LinearLayout>
 
-        <!-- Adaptive Brand Hero Container (Review 3.3.2) -->
+        <!-- Empty Device Guidance State (Visible when no devices exist) -->
         <LinearLayout
-            android:id="@+id/layout_hero_banner"
+            android:id="@+id/layout_empty_guidance"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:paddingTop="12dp"
-            android:paddingBottom="12dp"
-            android:orientation="vertical">
+            android:paddingTop="@dimen/space_16"
+            android:paddingBottom="@dimen/space_20"
+            android:orientation="vertical"
+            android:visibility="gone"
+            tools:visibility="gone">
 
             <ImageView
-                android:id="@+id/iv_home_hero"
                 android:layout_width="140dp"
-                android:layout_height="100dp"
+                android:layout_height="110dp"
                 android:src="@drawable/ic_recorder_hero"
                 android:contentDescription="@string/home_hero_desc" />
 
             <TextView
-                android:id="@+id/tv_home_headline"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="@dimen/space_12"
                 android:text="@string/home_headline_ready"
-                android:textSize="17sp"
+                android:textSize="@dimen/text_size_h2"
                 android:textStyle="bold"
                 android:textColor="@color/text_primary" />
 
             <TextView
-                android:id="@+id/tv_home_subhead"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
+                android:layout_marginTop="@dimen/space_4"
                 android:text="@string/home_subhead_guide"
-                android:textSize="13sp"
+                android:textSize="@dimen/text_size_sub"
                 android:textColor="@color/text_secondary" />
         </LinearLayout>
 
-        <!-- Selected DashCam Card (Review 3.3.2 & UX01/UX02) -->
+        <!-- Primary Active DashCam Card (Review Section 4: Device Card) -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/card_home_device"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            app:cardCornerRadius="16dp"
+            android:layout_marginTop="@dimen/space_8"
+            app:cardCornerRadius="@dimen/radius_card"
             app:cardBackgroundColor="@color/surface_dark"
             app:strokeWidth="1dp"
             app:strokeColor="@color/border_subtle">
@@ -100,128 +99,175 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:padding="18dp"
+                android:padding="@dimen/space_16"
                 android:orientation="vertical">
 
+                <!-- Header Row: Small Device Silhouette + Name/Status -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/tv_home_device"
+                    <!-- Small Brand Silhouette Graphic (Review Section 4: Do not hide device illustration) -->
+                    <ImageView
+                        android:id="@+id/iv_card_device_icon"
+                        android:layout_width="48dp"
+                        android:layout_height="38dp"
+                        android:src="@drawable/ic_recorder_hero"
+                        android:contentDescription="@null" />
+
+                    <LinearLayout
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_12"
                         android:layout_weight="1"
-                        android:text="@string/home_device_none"
-                        android:textSize="16sp"
-                        android:maxLines="1"
-                        android:ellipsize="end"
-                        android:textStyle="bold"
-                        android:textColor="@color/text_primary" />
+                        android:orientation="vertical">
 
-                    <!-- Live stream state badge -->
-                    <TextView
-                        android:id="@+id/tv_home_stream_badge"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:textSize="12sp"
-                        android:textColor="@color/accent_teal"
-                        android:visibility="gone"
-                        tools:visibility="visible"
-                        tools:text="● 串流傳輸中" />
+                        <TextView
+                            android:id="@+id/tv_home_device"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/home_device_none"
+                            android:textSize="@dimen/text_size_h2"
+                            android:maxLines="1"
+                            android:ellipsize="end"
+                            android:textStyle="bold"
+                            android:textColor="@color/text_primary" />
+
+                        <TextView
+                            android:id="@+id/tv_home_connection"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:text="@string/home_device_none_desc"
+                            android:textSize="@dimen/text_size_sub"
+                            android:textColor="@color/text_secondary" />
+                    </LinearLayout>
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/tv_home_connection"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:text="@string/home_device_none_desc"
-                    android:textSize="13sp"
-                    android:textColor="@color/text_secondary" />
-
-                <!-- Hardware Status Info (Battery & SD, visible when device is connected) -->
+                <!-- Telemetry Row: Battery & SD Status (Review Section 4 & D09) -->
                 <LinearLayout
                     android:id="@+id/layout_device_telemetry"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="@dimen/space_16"
+                    android:background="@drawable/bg_status_badge"
+                    android:paddingHorizontal="@dimen/space_12"
+                    android:paddingVertical="@dimen/space_8"
                     android:gravity="center_vertical"
-                    android:orientation="horizontal"
-                    android:visibility="gone"
-                    tools:visibility="visible">
+                    android:orientation="vertical">
 
-                    <TextView
-                        android:id="@+id/tv_home_battery"
-                        android:layout_width="0dp"
+                    <!-- Battery info with clean text & accessibility (D09) -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:textSize="12sp"
-                        android:textColor="@color/text_secondary"
-                        tools:text="電量：3/4" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/tv_home_sd"
-                        android:layout_width="wrap_content"
+                        <ImageView
+                            android:id="@+id/iv_telemetry_battery"
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:src="@drawable/ic_battery_unknown"
+                            android:contentDescription="@null" />
+
+                        <TextView
+                            android:id="@+id/tv_home_battery"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_4"
+                            android:textSize="@dimen/text_size_sub"
+                            android:textColor="@color/text_primary"
+                            tools:text="電量 4/4" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginVertical="8dp"
+                        android:background="@color/border_subtle" />
+
+                    <!-- SD info with clean text & capacity (D09) -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:textSize="12sp"
-                        android:textColor="@color/text_secondary"
-                        tools:text="SD：可錄 120 分" />
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="18dp"
+                            android:layout_height="18dp"
+                            android:src="@drawable/ic_storage_normal"
+                            app:tint="@color/text_secondary"
+                            android:contentDescription="@null" />
+
+                        <TextView
+                            android:id="@+id/tv_home_sd"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_4"
+                            android:textSize="@dimen/text_size_sub"
+                            android:textColor="@color/text_primary"
+                            android:maxLines="4"
+                            tools:text="SD：可錄 120 分" />
+                    </LinearLayout>
                 </LinearLayout>
 
+                <!-- Primary Action CTA (Review Section 3: Solid Cool Blue Button) -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_home_connect"
                     android:layout_width="match_parent"
-                    android:layout_height="50dp"
-                    android:layout_marginTop="14dp"
+                    android:layout_height="@dimen/button_height_primary"
+                    android:layout_marginTop="@dimen/space_16"
                     android:text="@string/home_action_add"
                     android:textAllCaps="false"
-                    app:cornerRadius="25dp"
-                    android:backgroundTint="@color/accent_teal"
-                    android:textColor="@color/bg_dark" />
+                    android:textSize="@dimen/text_size_body"
+                    android:textStyle="bold"
+                    app:cornerRadius="@dimen/radius_button"
+                    android:backgroundTint="@color/accent_blue"
+                    android:textColor="@color/accent_blue_dark" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Riding Map Card (Always accessible offline, Review 3.3.4) -->
+        <!-- Riding Map Card (Review Section 4: Map Entry, Always accessible offline) -->
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/btn_home_map"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="@dimen/space_16"
             android:clickable="true"
             android:focusable="true"
-            app:cardCornerRadius="16dp"
-            app:cardBackgroundColor="@color/surface_elevated"
+            app:cardCornerRadius="@dimen/radius_card"
+            app:cardBackgroundColor="@color/surface_dark"
             app:strokeWidth="1dp"
             app:strokeColor="@color/border_subtle">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:padding="16dp"
+                android:padding="@dimen/space_16"
                 android:gravity="center_vertical">
 
                 <ImageView
-                    android:layout_width="32dp"
-                    android:layout_height="32dp"
+                    android:layout_width="28dp"
+                    android:layout_height="28dp"
                     android:src="@drawable/ic_my_location"
-                    app:tint="@color/accent_teal"
+                    app:tint="@color/accent_blue"
                     android:contentDescription="@null" />
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:layout_marginStart="14dp"
+                    android:layout_marginStart="@dimen/space_12"
                     android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/home_map_title"
-                        android:textSize="16sp"
+                        android:textSize="@dimen/text_size_h2"
                         android:textStyle="bold"
                         android:textColor="@color/text_primary" />
 
@@ -229,25 +275,26 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/home_map_desc"
-                        android:textSize="12sp"
+                        android:textSize="@dimen/text_size_caption"
                         android:layout_marginTop="2dp"
                         android:textColor="@color/text_secondary" />
                 </LinearLayout>
 
+                <!-- Neutral Chevron (D01: Neutral arrows, not accent) -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:text="›"
-                    android:textSize="26sp"
-                    android:textColor="@color/accent_teal" />
+                    android:textSize="22sp"
+                    android:textColor="@color/text_secondary" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Secondary Action Shortcuts (Album & Downloads, Review 3.3.4) -->
+        <!-- Quick Access Shortcuts (Review Section 4: Local Video & Downloads) -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
+            android:layout_marginTop="@dimen/space_12"
             android:orientation="horizontal">
 
             <com.google.android.material.card.MaterialCardView
@@ -255,23 +302,25 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginEnd="6dp"
+                android:layout_marginEnd="@dimen/space_4"
                 android:clickable="true"
                 android:focusable="true"
-                app:cardCornerRadius="14dp"
-                app:cardBackgroundColor="@color/surface_dark">
+                app:cardCornerRadius="@dimen/radius_card"
+                app:cardBackgroundColor="@color/surface_dark"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/border_subtle">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:padding="14dp"
+                    android:padding="@dimen/space_12"
                     android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/home_quick_album"
-                        android:textSize="14sp"
+                        android:textSize="@dimen/text_size_body"
                         android:textStyle="bold"
                         android:textColor="@color/text_primary" />
 
@@ -279,8 +328,8 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/home_quick_album_desc"
-                        android:textSize="11sp"
-                        android:layout_marginTop="4dp"
+                        android:textSize="@dimen/text_size_caption"
+                        android:layout_marginTop="2dp"
                         android:textColor="@color/text_secondary" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -290,23 +339,25 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="6dp"
+                android:layout_marginStart="@dimen/space_4"
                 android:clickable="true"
                 android:focusable="true"
-                app:cardCornerRadius="14dp"
-                app:cardBackgroundColor="@color/surface_dark">
+                app:cardCornerRadius="@dimen/radius_card"
+                app:cardBackgroundColor="@color/surface_dark"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/border_subtle">
 
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:padding="14dp"
+                    android:padding="@dimen/space_12"
                     android:orientation="vertical">
 
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/home_quick_downloads"
-                        android:textSize="14sp"
+                        android:textSize="@dimen/text_size_body"
                         android:textStyle="bold"
                         android:textColor="@color/text_primary" />
 
@@ -314,9 +365,9 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="@string/downloads_guide"
-                        android:textSize="11sp"
-                        android:layout_marginTop="4dp"
-                        android:maxLines="2"
+                        android:textSize="@dimen/text_size_caption"
+                        android:layout_marginTop="2dp"
+                        android:maxLines="1"
                         android:ellipsize="end"
                         android:textColor="@color/text_secondary" />
                 </LinearLayout>
@@ -327,10 +378,10 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
+            android:layout_marginTop="@dimen/space_24"
             android:text="@string/home_brand_footer"
             android:gravity="center"
-            android:textSize="11sp"
-            android:textColor="@color/text_secondary" />
+            android:textSize="@dimen/text_size_caption"
+            android:textColor="@color/text_disabled" />
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

@@ -5,7 +5,7 @@
     android:layout_height="wrap_content"
     android:layout_margin="4dp"
     app:cardBackgroundColor="@color/surface_dark"
-    app:cardCornerRadius="8dp"
+    app:cardCornerRadius="@dimen/radius_card"
     app:cardElevation="0dp">
 
     <LinearLayout
@@ -36,7 +36,7 @@
                 android:paddingHorizontal="6dp"
                 android:paddingVertical="2dp"
                 android:textColor="@color/text_primary"
-                android:textSize="11sp"
+                android:textSize="@dimen/text_size_caption"
                 android:visibility="gone" />
 
             <!-- Downloaded Badge -->
@@ -46,12 +46,12 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="top|start"
                 android:layout_margin="6dp"
-                android:background="@color/accent_teal"
+                android:background="@color/accent_blue"
                 android:paddingHorizontal="6dp"
                 android:paddingVertical="2dp"
                 android:text="已下載"
-                android:textColor="@color/bg_dark"
-                android:textSize="10sp"
+                android:textColor="@color/accent_blue_dark"
+                android:textSize="@dimen/text_size_caption"
                 android:textStyle="bold"
                 android:visibility="gone" />
 

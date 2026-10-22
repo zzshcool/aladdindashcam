@@ -26,6 +26,8 @@ import com.aladdin.dashcam.R
 import com.aladdin.dashcam.databinding.FragmentAlbumBinding
 import com.aladdin.dashcam.model.MediaItem
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
@@ -98,6 +100,19 @@ class AlbumFragment : Fragment() {
         observeViewModel()
     }
 
+    private val thumbnailJobs = mutableMapOf<android.widget.ImageView, Job>()
+
+    private fun loadThumbnail(item: MediaItem, imageView: android.widget.ImageView) {
+        thumbnailJobs.remove(imageView)?.cancel()
+        thumbnailJobs[imageView] = viewLifecycleOwner.lifecycleScope.launch {
+            val file = viewModel.getOrFetchThumbnail(item)
+            if (file != null && imageView.tag == item.id) {
+                val bitmap = withContext(Dispatchers.IO) { BitmapFactory.decodeFile(file.absolutePath) }
+                if (bitmap != null && imageView.tag == item.id) imageView.setImageBitmap(bitmap)
+            }
+        }
+    }
+
     private fun setupRecyclerView() {
         adapter = MediaAdapter(
             onItemClick = { item ->
@@ -107,15 +122,7 @@ class AlbumFragment : Fragment() {
                 enterBatchSelectionMode()
             },
             onFetchThumbnail = { item, imageView ->
-                viewLifecycleOwner.lifecycleScope.launch {
-                    val file = viewModel.getOrFetchThumbnail(item)
-                    if (file != null && imageView.tag == item.id) {
-                        val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                        if (bitmap != null && imageView.tag == item.id) {
-                            imageView.setImageBitmap(bitmap)
-                        }
-                    }
-                }
+                loadThumbnail(item, imageView)
             },
             onSelectionChanged = { count, bytes ->
                 val sizeMb = bytes / (1024 * 1024)
@@ -140,15 +147,7 @@ class AlbumFragment : Fragment() {
                 openViewer(clickedItem)
             },
             onFetchThumbnail = { item, imageView ->
-                viewLifecycleOwner.lifecycleScope.launch {
-                    val file = viewModel.getOrFetchThumbnail(item)
-                    if (file != null && imageView.tag == item.id) {
-                        val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                        if (bitmap != null && imageView.tag == item.id) {
-                            imageView.setImageBitmap(bitmap)
-                        }
-                    }
-                }
+                loadThumbnail(item, imageView)
             }
         )
         binding.rvViewerStrip.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(
@@ -889,7 +888,7 @@ class AlbumFragment : Fragment() {
                 launch {
                     viewModel.downloadTasks.collect { tasks ->
                         val current = currentViewingItem ?: return@collect
-                        val task = tasks.find { it.id == current.fileName } ?: return@collect
+                        val task = tasks.find { it.id == current.storageKey } ?: return@collect
                         when (task.status) {
                             DownloadStatus.COMPLETED -> {
                                 val updated = current.copy(isDownloaded = true)
@@ -961,6 +960,8 @@ class AlbumFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        thumbnailJobs.values.forEach { it.cancel() }
+        thumbnailJobs.clear()
         super.onDestroyView()
         if (viewModel.currentStreamOwner.value == DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK) {
             viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)

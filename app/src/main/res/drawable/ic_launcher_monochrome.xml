@@ -4,50 +4,29 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Top Mount -->
+    <!-- Mounting Bracket / Clip -->
     <path
         android:fillColor="#FFFFFF"
-        android:fillAlpha="0.7"
-        android:pathData="M46,31h16a3,3 0,0 1,3 3v4h-22v-4a3,3 0,0 1,3 -3z" />
+        android:fillAlpha="0.6"
+        android:pathData="M46,30h16a3,3 0,0 1,3 3v5h-22v-5a3,3 0,0 1,3 -3z" />
 
-    <!-- Main Body Contour -->
+    <!-- Compound Path using evenOdd fillType for authentic negative-space cutouts (D04) -->
+    <!-- Android themed icon engine uses alpha only; evenOdd creates real transparent holes -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M26,38h56a8,8 0,0 1,8 8v24a8,8 0,0 1,-8 8h-56a8,8 0,0 1,-8 -8v-24a8,8 0,0 1,8 -8z" />
+        android:fillType="evenOdd"
+        android:pathData="
+            M26,38 h56 a8,8 0,0 1,8 8 v24 a8,8 0,0 1,-8 8 h-56 a8,8 0,0 1,-8 -8 v-24 a8,8 0,0 1,8 -8 z
+            M29,42 h48 a5,5 0,0 1,5 5 v16 a5,5 0,0 1,-5 5 h-48 a5,5 0,0 1,-5 -5 v-16 a5,5 0,0 1,5 -5 z
+            M65,40 a14,14 0,1 0,0 28 a14,14 0,1 0,0 -28 z
+            M65,44 a10,10 0,1 0,0 20 a10,10 0,1 0,0 -20 z
+            M65,47 a7,7 0,1 0,0 14 a7,7 0,1 0,0 -14 z
+            M63,49 a2.5,2.5 0,1 0,0 5 a2.5,2.5 0,1 0,0 -5 z
+        " />
 
-    <!-- Cutout / Inner Cavity for contrast -->
-    <path
-        android:fillColor="#000000"
-        android:pathData="M29,42h50a4,4 0,0 1,4 4v16a4,4 0,0 1,-4 4h-50a4,4 0,0 1,-4 -4v-16a4,4 0,0 1,4 -4z" />
-
-    <!-- Status Indicator / Mic -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M34,46a2.5,2.5 0,1 0,0 5a2.5,2.5 0,1 0,0 -5 M34,57a2,2 0,1 0,0 4a2,2 0,1 0,0 -4" />
-
-    <!-- Speaker / Ventilation lines -->
+    <!-- Left Status indicator pill -->
     <path
         android:fillColor="#FFFFFF"
-        android:fillAlpha="0.5"
-        android:pathData="M41,48h2v12h-2z M46,48h2v12h-2z" />
-
-    <!-- Lens Outer Ring -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M66,39a15,15 0,1 0,0 30a15,15 0,1 0,0 -30" />
-
-    <!-- Lens Inner Ring Cutout -->
-    <path
-        android:fillColor="#000000"
-        android:pathData="M66,43a11,11 0,1 0,0 22a11,11 0,1 0,0 -22" />
-
-    <!-- Core Lens Element -->
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M66,46a8,8 0,1 0,0 16a8,8 0,1 0,0 -16" />
-
-    <!-- Highlight Cutout -->
-    <path
-        android:fillColor="#000000"
-        android:pathData="M64,48a3,3 0,1 0,0 6a3,3 0,1 0,0 -6" />
+        android:fillAlpha="0.85"
+        android:pathData="M34,51a3,3 0,1 0,0 6a3,3 0,1 0,0 -6" />
 </vector>

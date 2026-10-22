@@ -1,6 +1,7 @@
 <resources>
     <style name="Theme.AladdinDashCam.Launcher" parent="Theme.AladdinDashCam">
         <item name="android:windowSplashScreenBackground">@color/bg_dark</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_recorder_hero</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_rider_mark</item>
+        <item name="android:windowSplashScreenBrandingImage">@drawable/splash_brand_wordmark</item>
     </style>
 </resources>

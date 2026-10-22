@@ -26,14 +26,15 @@ object DriverRegistry {
     suspend fun probeAndIdentify(
         candidateHost: String,
         network: Network?,
-        preferredProtocol: RecorderProtocol? = null
+        preferredProtocol: RecorderProtocol? = null,
+        generalPlusProbe: (suspend (RecorderEndpoint) -> DriverProbeResult)? = null
     ): IdentificationResult? {
         val candidateDrivers = if (preferredProtocol != null) {
             val pref = drivers[preferredProtocol]
             if (pref != null) listOf(pref) + drivers.values.filter { it.protocol != preferredProtocol }
             else drivers.values.toList()
         } else {
-            drivers.values.toList()
+            drivers.values.filter { it.protocol != RecorderProtocol.NOVATEK_HTTP }
         }
 
         for (driver in candidateDrivers) {
@@ -53,7 +54,9 @@ object DriverRegistry {
                 else -> RecorderEndpoint(host = candidateHost)
             }
 
-            when (driver.probe(endpoint, network)) {
+            val result = if (driver.protocol == RecorderProtocol.GENERALPLUS_GPSOCKET && generalPlusProbe != null)
+                generalPlusProbe(endpoint) else driver.probe(endpoint, network)
+            when (result) {
                 is DriverProbeResult.Matched -> {
                     return driver.identify(endpoint, network)
                 }

@@ -19,6 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlin.math.sqrt
@@ -125,16 +126,14 @@ class GpsSpeedometer(
         watchdogJob = scope.launch {
             while (isActive) {
                 delay(1000)
-                val current = _gpsStatus.value
-                if (current.isLocked) {
+                _gpsStatus.update { current ->
                     val age = SystemClock.elapsedRealtime() - current.lastUpdateElapsedRealtime
-                    if (age > GPS_TTL_MILLIS) {
-                        Log.i(TAG, "GPS fix expired after ${age}ms, marking speed unknown")
-                        _gpsStatus.value = current.copy(
+                    if (current.isLocked && age > GPS_TTL_MILLIS) {
+                        current.copy(
                             speedKmh = null,
                             isLocked = false
                         )
-                    }
+                    } else current
                 }
             }
         }
@@ -154,23 +153,21 @@ class GpsSpeedometer(
 
     override fun onLocationChanged(location: Location) {
         val now = SystemClock.elapsedRealtime()
-        val speedKmh = if (location.hasSpeed()) {
-            (location.speed * 3.6f).toInt().coerceAtLeast(0)
-        } else if (location.hasAccuracy() && location.accuracy <= 20f) {
-            0
-        } else {
-            null
-        }
+        val fixTime = location.elapsedRealtimeNanos / 1_000_000L
+        if (!isFreshFix(now, fixTime, _gpsStatus.value.lastUpdateElapsedRealtime)) return
+        val speedKmh = speedFromFix(location.hasSpeed(), location.speed)
 
         val altitude = if (location.hasAltitude()) location.altitude else null
-        if (altitude != null) {
+        if (altitude != null && location.hasVerticalAccuracy() && location.verticalAccuracyMeters <= 10f) {
+            val threshold = maxOf(3.0, location.verticalAccuracyMeters * 2.0)
             previousAltitude?.let { prev ->
                 val diff = altitude - prev
-                if (diff > 1.0) { // filter out minor barometric/GPS jitter under 1 meter
+                if (diff > threshold) {
                     totalAscentMeters += diff
                 }
+                if (kotlin.math.abs(diff) > threshold) previousAltitude = altitude
             }
-            previousAltitude = altitude
+            if (previousAltitude == null) previousAltitude = altitude
         }
 
         val bearing = if (location.hasBearing()) location.bearing else null
@@ -181,7 +178,7 @@ class GpsSpeedometer(
         val currentPoints = synchronized(trajectoryPoints) {
             val last = trajectoryPoints.lastOrNull()
             if (last == null || (Math.abs(last.latitude - lat) > 0.00002 || Math.abs(last.longitude - lng) > 0.00002)) {
-                trajectoryPoints.add(LocationPoint(lat, lng, System.currentTimeMillis(), speedKmh))
+                trajectoryPoints.add(LocationPoint(lat, lng, location.time, speedKmh))
                 if (trajectoryPoints.size > 1000) {
                     trajectoryPoints.removeAt(0)
                 }
@@ -200,7 +197,7 @@ class GpsSpeedometer(
             accumulatedAscentMeters = totalAscentMeters,
             bearingDegrees = bearing,
             accelerationG = currentGForce,
-            lastUpdateElapsedRealtime = now,
+            lastUpdateElapsedRealtime = fixTime,
             sourceName = if (location.provider == LocationManager.GPS_PROVIDER) "手機 GPS" else "手機網路定位",
             trajectory = currentPoints
         )
@@ -215,7 +212,7 @@ class GpsSpeedometer(
             val magnitude = sqrt((ax * ax + ay * ay + az * az).toDouble()).toFloat()
             val g = magnitude / 9.80665f
             currentGForce = (Math.round(g * 100f) / 100f) // Round to 2 decimal places
-            _gpsStatus.value = _gpsStatus.value.copy(accelerationG = currentGForce)
+            _gpsStatus.update { it.copy(accelerationG = currentGForce) }
         }
     }
 
@@ -232,6 +229,12 @@ class GpsSpeedometer(
 
     companion object {
         private const val TAG = "GpsSpeedometer"
+        internal fun isFreshFix(now: Long, fixTime: Long, previous: Long): Boolean =
+            fixTime > 0 && fixTime > previous && now - fixTime in 0..3500L
+
+        internal fun speedFromFix(hasSpeed: Boolean, metersPerSecond: Float): Int? =
+            if (hasSpeed && metersPerSecond.isFinite() && metersPerSecond >= 0f)
+                (metersPerSecond * 3.6f).toInt() else null
         internal fun selectLocationProviders(fine: Boolean, coarse: Boolean, enabled: List<String>): List<String> =
             enabled.filter {
                 (it == LocationManager.GPS_PROVIDER && fine) ||

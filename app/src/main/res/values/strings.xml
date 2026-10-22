@@ -2,11 +2,11 @@
 <resources>
     <string name="app_name">AladdinDashCam</string>
 
-    <!-- Bottom Navigation Tabs (5.3) -->
-    <string name="tab_live">即時</string>
+    <!-- Bottom Navigation Tabs (5.3 & D06) -->
+    <string name="tab_live">記錄器</string>
     <string name="tab_album">相簿</string>
     <string name="tab_downloads">下載</string>
-    <string name="tab_device">裝置</string>
+    <string name="tab_device">設定</string>
 
     <!-- Live Preview (5.4) -->
     <string name="live_title">即時影像</string>

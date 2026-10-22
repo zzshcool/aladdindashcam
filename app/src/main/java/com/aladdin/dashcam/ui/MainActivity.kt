@@ -12,6 +12,7 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
@@ -50,6 +51,13 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+            val immersive = isFullscreen || isInPictureInPictureMode
+            view.setPadding(bars.left, if (immersive) 0 else bars.top, bars.right, if (immersive) 0 else bars.bottom)
+            WindowInsetsCompat.CONSUMED
+        }
+        ViewCompat.requestApplyInsets(binding.root)
 
         if (savedInstanceState == null) {
             setupFragments()
@@ -92,6 +100,7 @@ class MainActivity : AppCompatActivity() {
     fun setFullscreen(enabled: Boolean) {
         if (enabled == isFullscreen) return
         isFullscreen = enabled
+        ViewCompat.requestApplyInsets(binding.root)
         val systemBars = WindowCompat.getInsetsController(window, binding.root)
         if (enabled) {
             orientationBeforeFullscreen = requestedOrientation
@@ -212,6 +221,21 @@ class MainActivity : AppCompatActivity() {
         val live = liveFragment ?: return
         live.selectMode(modeId)
         switchFragment(live)
+    }
+
+    /**
+     * Explicitly navigates to the Album and guarantees local media source is shown (D07)
+     */
+    fun openLocalAlbum() {
+        binding.bottomNav.selectedItemId = R.id.nav_album
+        val album = albumFragment ?: return
+        album.showLocalMedia()
+        switchFragment(album)
+    }
+
+    fun openDownloads() {
+        binding.bottomNav.selectedItemId = R.id.nav_downloads
+        downloadsFragment?.let { switchFragment(it) }
     }
 
     fun showMyDashCamDialog() {
@@ -431,6 +455,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        ViewCompat.requestApplyInsets(binding.root)
         if (isInPictureInPictureMode) {
             binding.topBar.visibility = View.GONE
             binding.bottomNav.visibility = View.GONE

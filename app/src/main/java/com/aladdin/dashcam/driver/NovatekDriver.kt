@@ -1,12 +1,6 @@
 package com.aladdin.dashcam.driver
 
 import android.net.Network
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
 
 /**
  * Novatek HTTP CGI Driver (Draft Specification).
@@ -19,37 +13,8 @@ import java.net.URL
 class NovatekDriver : RecorderDriver {
     override val protocol: RecorderProtocol = RecorderProtocol.NOVATEK_HTTP
 
-    override suspend fun probe(endpoint: RecorderEndpoint, network: Network?): DriverProbeResult = withContext(Dispatchers.IO) {
-        var connection: HttpURLConnection? = null
-        try {
-            val probeUrl = URL("http://${endpoint.host}:${endpoint.controlPort}/?custom=1&cmd=3014")
-            connection = if (network != null) {
-                network.openConnection(probeUrl) as HttpURLConnection
-            } else {
-                probeUrl.openConnection() as HttpURLConnection
-            }
-            connection.connectTimeout = 2500
-            connection.readTimeout = 2500
-            connection.requestMethod = "GET"
-            connection.connect()
-
-            val responseCode = connection.responseCode
-            if (responseCode == 200) {
-                val body = BufferedReader(InputStreamReader(connection.inputStream)).use { it.readText() }
-                if (body.contains("0\n") || body.contains("CMD") || body.contains("Camera")) {
-                    DriverProbeResult.Matched(protocol, "Novatek HTTP CGI (Response: ${body.trim().take(30)})")
-                } else {
-                    DriverProbeResult.Mismatched("Unexpected HTTP response: ${body.take(40)}")
-                }
-            } else {
-                DriverProbeResult.Mismatched("HTTP status $responseCode")
-            }
-        } catch (e: Exception) {
-            DriverProbeResult.Error(e)
-        } finally {
-            connection?.disconnect()
-        }
-    }
+    override suspend fun probe(endpoint: RecorderEndpoint, network: Network?): DriverProbeResult =
+        DriverProbeResult.Mismatched("聯詠協定尚待型號與真實回應驗證，暫不自動識別")
 
     override suspend fun identify(endpoint: RecorderEndpoint, network: Network?): IdentificationResult {
         return IdentificationResult(
@@ -57,7 +22,7 @@ class NovatekDriver : RecorderDriver {
             brand = "Novatek (聯詠通用草案)",
             modelName = "聯詠通用機種 (待實機驗證)",
             firmwareVersion = "未知 (待實機驗證)",
-            deviceId = "NVT_${endpoint.host.replace('.', '_')}",
+            deviceId = "",
             capabilities = getCapabilities(),
             verifiedOnHardware = false, // Explicitly false: B1 is GP, Novatek not verified on physical hardware
             rawSignature = "NOVATEK_CGI_DRAFT"

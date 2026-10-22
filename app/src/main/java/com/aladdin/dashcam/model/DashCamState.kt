@@ -57,8 +57,21 @@ data class MediaItem(
     val isVideo: Boolean,
     val isEmergency: Boolean,
     val isDownloaded: Boolean = false,
-    val deviceIndex: Int = 0
-)
+    val deviceIndex: Int = 0,
+    val sourceDeviceId: String = "",
+    val sourceEpoch: Long = 0L,
+    val localPath: String? = null
+) {
+    val storageKey: String
+        get() = if (sourceDeviceId.isBlank()) id else
+            java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(
+                "$sourceDeviceId\u0000$fileName".toByteArray(Charsets.UTF_8)
+            )
+
+    val sourceDirectory: String
+        get() = java.util.Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(sourceDeviceId.toByteArray(Charsets.UTF_8))
+}
 
 data class DownloadTask(
     val taskId: String,

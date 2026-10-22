@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- SD Card Micro Outline -->
+    <path
+        android:fillColor="@color/text_secondary"
+        android:pathData="M18,2h-8L4,8v12a2,2 0,0 0,2 2h12a2,2 0,0 0,2 -2V4a2,2 0,0 0,-2 -2z M18,20H6V9l4,-4h8v15z" />
+    <path
+        android:fillColor="@color/text_secondary"
+        android:pathData="M9,7h2v3h-2z M12,7h2v3h-2z M15,7h2v3h-2z" />
+</vector>
