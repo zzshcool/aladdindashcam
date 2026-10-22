@@ -363,8 +363,11 @@ class DashCamClient(
             val req = GPSocketProtocol.buildGetStatusPacket()
             val resp = sendAndReceive(GPSocketProtocol.MODE_DEVICE, GPSocketProtocol.CMD_GET_STATUS, req)
             val status = if (resp is GPSocketResponse.Ack) {
+                val hexStr = resp.payload.joinToString("") { "%02X".format(it) }
+                Log.i("SD_RAW_PACKET", "GET_STATUS payload (len=${resp.payload.size}): $hexStr")
                 GPSocketProtocol.parseDeviceStatus(resp.payload)
             } else {
+                Log.w("SD_RAW_PACKET", "GET_STATUS response is not Ack: $resp")
                 null
             }
             return Pair(status, currentSessionId)

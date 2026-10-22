@@ -240,7 +240,7 @@ class DeviceFragment : Fragment() {
                 .setItems(itemNames) { _, which ->
                     val selected = options[which]
                     viewLifecycleOwner.lifecycleScope.launch {
-                        viewModel.setWatermark(selected.rawValue == 1, selected.displayName)
+                        viewModel.setWatermark(selected.rawValue, selected.displayName)
                     }
                 }
                 .show()

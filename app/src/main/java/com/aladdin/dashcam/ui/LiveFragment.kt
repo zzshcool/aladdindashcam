@@ -575,13 +575,20 @@ class LiveFragment : Fragment() {
                         updateBatteryUi(status.batteryLevel, status.isCharging, status.lastUpdatedTimestamp != 0L)
 
                         val estimate = viewModel.storageEstimate.value
-                        // SD Card status: 總容量 / 已用 / 剩餘可用容量 (滿足驗收需求)
+                        // SD Card status: 總容量 / 已用 / 剩餘可用容量 (滿足驗收需求，嚴格區分缺欄位與無卡)
                         if (estimate != null && estimate.totalBytes > 0) {
                             val totalGb = estimate.totalBytes / (1024.0 * 1024.0 * 1024.0)
                             val freeGb = estimate.freeBytes / (1024.0 * 1024.0 * 1024.0)
                             val usedGb = estimate.usedBytes / (1024.0 * 1024.0 * 1024.0)
                             val overwriteStr = if (estimate.minutesUntilOverwrite > 0) " (約剩餘 ${estimate.minutesUntilOverwrite} 分)" else ""
                             binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD: 餘 %.1fG/用 %.1fG/總 %.1fG%s", freeGb, usedGb, totalGb, overwriteStr)
+                        } else if (estimate != null && estimate.isCapacityFieldMissing) {
+                            if (estimate.usedBytes > 0L) {
+                                val usedMb = estimate.usedBytes / (1024.0 * 1024.0)
+                                binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD: 正常在位 (已載相簿 %.1fM, 總量韌體未報)", usedMb)
+                            } else {
+                                binding.tvSdStatus.text = "SD: 正常在位 (容量 bytes 韌體未提供)"
+                            }
                         } else if (status.sdTotalBytes > 0) {
                             val totalGb = status.sdTotalBytes / (1024.0 * 1024.0 * 1024.0)
                             val freeGb = status.sdFreeBytes / (1024.0 * 1024.0 * 1024.0)
@@ -589,6 +596,27 @@ class LiveFragment : Fragment() {
                             binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD: 餘 %.1fG/用 %.1fG/總 %.1fG", freeGb, usedGb, totalGb)
                         } else {
                             binding.tvSdStatus.text = estimate?.statusText ?: getString(R.string.sd_remaining_unknown)
+                        }
+                    }
+                }
+
+                launch {
+                    viewModel.storageEstimate.collect { estimate ->
+                        if (estimate.totalBytes > 0) {
+                            val totalGb = estimate.totalBytes / (1024.0 * 1024.0 * 1024.0)
+                            val freeGb = estimate.freeBytes / (1024.0 * 1024.0 * 1024.0)
+                            val usedGb = estimate.usedBytes / (1024.0 * 1024.0 * 1024.0)
+                            val overwriteStr = if (estimate.minutesUntilOverwrite > 0) " (約剩餘 ${estimate.minutesUntilOverwrite} 分)" else ""
+                            binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD: 餘 %.1fG/用 %.1fG/總 %.1fG%s", freeGb, usedGb, totalGb, overwriteStr)
+                        } else if (estimate.isCapacityFieldMissing) {
+                            if (estimate.usedBytes > 0L) {
+                                val usedMb = estimate.usedBytes / (1024.0 * 1024.0)
+                                binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD: 正常在位 (已載相簿 %.1fM, 總量韌體未報)", usedMb)
+                            } else {
+                                binding.tvSdStatus.text = "SD: 正常在位 (容量 bytes 韌體未提供)"
+                            }
+                        } else {
+                            binding.tvSdStatus.text = estimate.statusText
                         }
                     }
                 }

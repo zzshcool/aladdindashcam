@@ -52,6 +52,7 @@ class TimelineRulerView @JvmOverloads constructor(
     private val scroller = Scroller(context)
     private var isUserInteracting = false
     private var isFlinging = false
+    private var lastScrollerX = 0
 
     var onTimeSeekListener: ((targetMillis: Long, isFinished: Boolean) -> Unit)? = null
 
@@ -62,6 +63,7 @@ class TimelineRulerView @JvmOverloads constructor(
         override fun onDown(e: MotionEvent): Boolean {
             scroller.forceFinished(true)
             isFlinging = false
+            lastScrollerX = 0
             isUserInteracting = true
             return true
         }
@@ -83,8 +85,9 @@ class TimelineRulerView @JvmOverloads constructor(
             velocityX: Float,
             velocityY: Float
         ): Boolean {
-            // 水平慣性滑動
+            // 水平慣性滑動 (R11~R13: 嚴格使用逐幀差值計算)
             isFlinging = true
+            lastScrollerX = 0
             scroller.fling(
                 0, 0,
                 (-velocityX).toInt(), 0,
@@ -200,13 +203,15 @@ class TimelineRulerView @JvmOverloads constructor(
 
     override fun computeScroll() {
         if (scroller.computeScrollOffset()) {
-            val currX = scroller.currX.toFloat()
-            // 透過 scroller 進行慣性位移
-            val deltaMillis = (currX / pixelsPerMinute * 100).toLong()
+            val currX = scroller.currX
+            val diffX = currX - lastScrollerX
+            lastScrollerX = currX
+            val deltaMillis = (diffX / pixelsPerMinute * 60_000).toLong()
             setCursorMillisInternal(currentCursorMillis + deltaMillis, notify = true, isFinished = false)
             postInvalidateOnAnimation()
         } else if (isFlinging) {
             isFlinging = false
+            lastScrollerX = 0
             onTimeSeekListener?.invoke(currentCursorMillis, true)
         }
     }

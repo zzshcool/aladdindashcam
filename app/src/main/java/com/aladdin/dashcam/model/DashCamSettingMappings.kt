@@ -7,26 +7,33 @@ data class SettingOption(val rawValue: Int, val displayName: String)
  * Prevents index vs rawValue mismatch.
  */
 object DashCamSettingMappings {
+    // Menu.xml ID 0x00000000: Resolution
     val VIDEO_RESOLUTIONS = listOf(
-        SettingOption(2, "2K"),
-        SettingOption(0, "1080P"),
-        SettingOption(1, "720P")
+        SettingOption(0, "2K 2560x1440 30fps"),
+        SettingOption(1, "1080FHD 1920x1080 30fps"),
+        SettingOption(2, "1080P 1440x1080 30fps"),
+        SettingOption(3, "720P 1280x720 30fps")
     )
 
+    // Menu.xml ID 0x00000100: Resolution
     val CAPTURE_RESOLUTIONS = listOf(
-        SettingOption(4, "5M (2592x1944)"),
-        SettingOption(3, "3M (2048x1536)"),
-        SettingOption(2, "2M (1920x1080)"),
-        SettingOption(1, "1.3M (1280x960)"),
-        SettingOption(0, "VGA (640x480)")
+        SettingOption(0, "12M (4032x3024)"),
+        SettingOption(1, "10M (3648x2736)"),
+        SettingOption(2, "8M (3264x2448)"),
+        SettingOption(3, "5M (2592x1944)"),
+        SettingOption(4, "3M (2048x1536)"),
+        SettingOption(5, "2MHD (1920x1080)"),
+        SettingOption(6, "1.3M (1280x960)")
     )
 
+    // Menu.xml ID 0x00000102: Quality
     val CAPTURE_QUALITIES = listOf(
-        SettingOption(0, "優質 (Super Fine)"),
-        SettingOption(1, "標準 (Fine)"),
-        SettingOption(2, "經濟 (Normal)")
+        SettingOption(0, "精細 (Fine)"),
+        SettingOption(1, "一般 (Normal)"),
+        SettingOption(2, "經濟 (Economical)")
     )
 
+    // Menu.xml ID 0x00000003: Loop Recording
     val LOOP_RECORDINGS = listOf(
         SettingOption(1, "1 分鐘"),
         SettingOption(2, "2 分鐘"),
@@ -35,8 +42,10 @@ object DashCamSettingMappings {
         SettingOption(0, "關閉")
     )
 
+    // Menu.xml ID 0x00000107: Date/Time Stamp
     val WATERMARKS = listOf(
-        SettingOption(1, "開啟 (Date/Time)"),
+        SettingOption(2, "開啟 (日期與時間)"),
+        SettingOption(1, "僅日期 (Date)"),
         SettingOption(0, "關閉")
     )
 

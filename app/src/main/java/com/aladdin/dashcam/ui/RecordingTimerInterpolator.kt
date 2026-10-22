@@ -72,12 +72,17 @@ class RecordingTimerInterpolator(
     @Volatile
     private var currentDeviceStatus: DashCamDeviceStatus = DashCamDeviceStatus()
 
+    // 最近一次收到狀態的單調時鐘時間戳 (完全避免依賴系統 Wall Clock，防範系統時間變更造成過期失效)
+    @Volatile
+    private var lastStatusMonotonicMs: Long? = null
+
     fun onConnectionStatusChanged(status: ConnectionStatus) {
         val prev = currentConnectionStatus
         currentConnectionStatus = status
         if (status != ConnectionStatus.CONNECTED) {
             logger?.invoke("連線狀態變更 ($prev -> $status)，重置錄影時間錨點")
             resetAnchor()
+            lastStatusMonotonicMs = null
         }
     }
 
@@ -86,6 +91,7 @@ class RecordingTimerInterpolator(
             logger?.invoke("檢測到設備切換 (epoch: $currentEpoch -> $newEpoch)，重置狀態")
             currentEpoch = newEpoch
             resetAnchor()
+            lastStatusMonotonicMs = null
             currentDeviceStatus = DashCamDeviceStatus()
         }
     }
@@ -101,8 +107,9 @@ class RecordingTimerInterpolator(
             resetAnchor()
         }
         currentDeviceStatus = status
+        lastStatusMonotonicMs = nowMs
 
-        val isExpired = status.lastUpdatedTimestamp == 0L || (wallClockMs - status.lastUpdatedTimestamp) > 10000L
+        val isExpired = (nowMs - (lastStatusMonotonicMs ?: nowMs)) > 10000L
 
         if (currentConnectionStatus != ConnectionStatus.CONNECTED ||
             status.recordingStatus != RecordingStatus.RECORDING ||
@@ -128,8 +135,8 @@ class RecordingTimerInterpolator(
         } else {
             val currentProjectedSeconds = ((nowMs - currentStartTime).coerceAtLeast(0L)) / 1000L
 
-            // 判斷 1: 是否為重新開始錄影 (例如原本 120 秒，突然回報 0 或 1 秒)
-            val isRestart = (reportedSeconds < lastReportedSeconds - 3L) ||
+            // 判斷 1: 是否為重新開始錄影 (秒數歸零或大幅回退至片段開始 0~3 秒)
+            val isRestart = (reportedSeconds < lastReportedSeconds - 3L && reportedSeconds <= 3L) ||
                     (reportedSeconds <= 1L && currentProjectedSeconds > 5L)
 
             if (isRestart) {
@@ -150,10 +157,11 @@ class RecordingTimerInterpolator(
                 // 判斷 3: 設備回報秒數 <= currentProjectedSeconds
                 val lag = currentProjectedSeconds - reportedSeconds
                 if (lag > 5L) {
-                    logger?.invoke("檢測到時鐘漂移超過閾值: lag=${lag}s > 5s，強制校正對齊設備")
+                    // T01: 有界平滑收斂，更新錨點但嚴禁直接倒退 lastEmittedSeconds
+                    logger?.invoke("檢測到時鐘漂移超過閾值: lag=${lag}s > 5s，平滑校正錨點，維持單調性 (lastEmitted=$lastEmittedSeconds, reported=$reportedSeconds)")
                     virtualStartTimeMs = candidateStartTimeMs
                     lastReportedSeconds = reportedSeconds
-                    lastEmittedSeconds = reportedSeconds
+                    // lastEmittedSeconds 不倒退，推算秒數將等待至新錨點時間追上
                 } else {
                     // 正常輪詢延遲 (0~5 秒)：保持 virtualStartTimeMs，嚴格單調遞增不倒退
                     lastReportedSeconds = reportedSeconds
@@ -166,8 +174,8 @@ class RecordingTimerInterpolator(
         nowMs: Long = clock(),
         wallClockMs: Long = wallClock()
     ): RecordingTimerDisplay {
-        val isExpired = currentDeviceStatus.lastUpdatedTimestamp == 0L ||
-                (wallClockMs - currentDeviceStatus.lastUpdatedTimestamp) > 10000L
+        // T02: 完全依賴 monotonic age 檢查 TTL，不依賴 wallClockMs
+        val isExpired = lastStatusMonotonicMs == null || (nowMs - lastStatusMonotonicMs!!) > 10000L
 
         // 1. 斷線或狀態過期
         if (currentConnectionStatus != ConnectionStatus.CONNECTED || isExpired) {

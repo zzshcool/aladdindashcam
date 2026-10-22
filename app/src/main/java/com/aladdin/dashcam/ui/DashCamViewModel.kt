@@ -76,19 +76,22 @@ data class RtcSyncState(
 data class StorageEstimate(
     val hasSdCard: Boolean = false,
     val isNormal: Boolean = false,
+    val isCapacityFieldMissing: Boolean = false,
     val totalBytes: Long = 0L,
     val freeBytes: Long = 0L,
     val usedBytes: Long = 0L,
     val avgBitrateBps: Long = 0L,
     val minutesUntilOverwrite: Long = 0L,
     val retentionHours: Double = 0.0,
-    val statusText: String = "尚未取得 SD 容量"
+    val statusText: String = "未偵測到記憶卡"
 )
 
 data class DashCamDeviceRecord(
     val id: String,
     val name: String,
     val host: String,
+    val ssid: String = "",
+    val bssid: String = "",
     val firmwareVersion: String = "20260513 V1.1.0",
     val lastConnectedTime: String = "",
     val isSelected: Boolean = false
@@ -169,6 +172,10 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
 
     private val _loopDisplay = MutableStateFlow("未連線")
     val loopDisplay: StateFlow<String> = _loopDisplay.asStateFlow()
+
+    // 儲存真實回讀的循環錄影參數 (0=Off, 1=1m, 2=2m, 3=3m, 4=5m, -1=未確認)
+    private val _currentLoopSettingRaw = MutableStateFlow<Int?>(-1)
+    val currentLoopSettingRaw: StateFlow<Int?> = _currentLoopSettingRaw.asStateFlow()
 
     private val _captureResolutionDisplay = MutableStateFlow("未連線")
     val captureResolutionDisplay: StateFlow<String> = _captureResolutionDisplay.asStateFlow()
@@ -362,9 +369,20 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     private fun updateStorageEstimateFromStatus(status: DashCamDeviceStatus) {
         if (status.lastUpdatedTimestamp == 0L) return
         val hasCard = status.sdCardReady || status.sdCardState == 1
-        val isNormal = status.sdCardState == 1
+        val isCardError = status.sdCardState in listOf(2, 3, 6, 7, 8, 9, 10, 12, 14)
+        val isNormal = hasCard && !isCardError
         val total = status.sdTotalBytes
         val free = status.sdFreeBytes
+
+        val loopRaw = _currentLoopSettingRaw.value
+        val loopModePrefix = when (loopRaw) {
+            0 -> "單次連續錄影"
+            1 -> "循環錄影 (1分)"
+            2 -> "循環錄影 (2分)"
+            3 -> "循環錄影 (3分)"
+            4 -> "循環錄影 (5分)"
+            else -> "錄影模式 (循環設定待確認)"
+        }
 
         if (!hasCard) {
             _storageEstimate.value = StorageEstimate(
@@ -375,16 +393,15 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             return
         }
 
-        if (total <= 0L || free < 0L) {
+        if (isCardError) {
             _storageEstimate.value = StorageEstimate(
                 hasSdCard = true,
-                isNormal = isNormal,
-                statusText = "循環錄影中 (尚未取得 SD 容量)"
+                isNormal = false,
+                statusText = "記憶卡異常或需格式化 (代碼 ${status.sdCardState})"
             )
             return
         }
 
-        val used = (total - free).coerceAtLeast(0L)
         // 估算平均寫入速率：以已載入影片計算真實樣本；無樣本時如實呈現估算中（R07）
         val items = _deviceMediaList.value.filter { it.isVideo && it.sizeBytes > 0 && it.durationSeconds > 0 }
         val avgBitrateBps: Long = if (items.isNotEmpty()) {
@@ -395,6 +412,35 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             0L
         }
 
+        if (total <= 0L || free < 0L) {
+            // 實機韌體狀態封包長度為 14 bytes，缺少容量擴充欄位 (bytes 16..23)
+            val mediaBytes = _deviceMediaList.value.sumOf { it.sizeBytes }
+            val desc = if (mediaBytes > 0L) {
+                val mediaMb = mediaBytes / (1024.0 * 1024.0)
+                String.format(
+                    java.util.Locale.TAIWAN,
+                    "%s · 記憶卡正常在位 · 相簿已用 %.1f MB (總容量韌體未回報)",
+                    loopModePrefix,
+                    mediaMb
+                )
+            } else {
+                String.format(
+                    java.util.Locale.TAIWAN,
+                    "%s · 記憶卡正常在位 (容量 bytes 韌體未提供)",
+                    loopModePrefix
+                )
+            }
+            _storageEstimate.value = StorageEstimate(
+                hasSdCard = true,
+                isNormal = true,
+                isCapacityFieldMissing = true,
+                usedBytes = mediaBytes,
+                statusText = desc
+            )
+            return
+        }
+
+        val used = (total - free).coerceAtLeast(0L)
         val minutesUntilOverwrite = if (avgBitrateBps > 0) {
             free / avgBitrateBps / 60
         } else 0L
@@ -406,25 +452,29 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         val desc = if (items.isEmpty() || avgBitrateBps <= 0L) {
             String.format(
                 java.util.Locale.TAIWAN,
-                "循環錄影中 · 可用空間 %.1f GB (時間估算中)",
+                "%s · 可用空間 %.1f GB (時間估算中)",
+                loopModePrefix,
                 free / (1024.0 * 1024.0 * 1024.0)
             )
         } else if (free <= 0L) {
             String.format(
                 java.util.Locale.TAIWAN,
-                "循環錄影中 · 容量已滿持續覆寫 · 總保留約 %.1f 小時",
+                "%s · 容量已滿持續覆寫 · 總保留約 %.1f 小時",
+                loopModePrefix,
                 retentionHours
             )
         } else if (minutesUntilOverwrite < 1L) {
             String.format(
                 java.util.Locale.TAIWAN,
-                "循環錄影中 · 剩餘不足 1 分鐘即將覆寫 · 總保留約 %.1f 小時",
+                "%s · 剩餘不足 1 分鐘即將覆寫 · 總保留約 %.1f 小時",
+                loopModePrefix,
                 retentionHours
             )
         } else {
             String.format(
                 java.util.Locale.TAIWAN,
-                "循環錄影中 · 距覆寫約 %d 分鐘 · 總保留約 %.1f 小時",
+                "%s · 距覆寫約 %d 分鐘 · 總保留約 %.1f 小時",
+                loopModePrefix,
                 minutesUntilOverwrite,
                 retentionHours
             )
@@ -433,6 +483,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         _storageEstimate.value = StorageEstimate(
             hasSdCard = true,
             isNormal = isNormal,
+            isCapacityFieldMissing = false,
             totalBytes = total,
             freeBytes = free,
             usedBytes = used,
@@ -538,7 +589,13 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                     if (targetIdentity.value.epoch == epoch) {
                         if (check.isSuccess) {
                             val actual = check.getOrNull()?.firstOrNull()?.toInt()
-                            _loopDisplay.value = if (actual == loopRawValue || (loopRawValue == 4 && actual == 5)) displayName else "回讀值不符: ${DashCamSettingMappings.getLoopRecordingName(actual ?: -1)}"
+                            if (actual == loopRawValue || (loopRawValue == 4 && actual == 5)) {
+                                _loopDisplay.value = displayName
+                                _currentLoopSettingRaw.value = actual
+                                updateStorageEstimateFromStatus(client.deviceStatus.value)
+                            } else {
+                                _loopDisplay.value = "回讀值不符: ${DashCamSettingMappings.getLoopRecordingName(actual ?: -1)}"
+                            }
                         } else {
                             _loopDisplay.value = "$displayName (已送出，回讀失敗)"
                         }
@@ -652,10 +709,9 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         return result
     }
 
-    suspend fun setWatermark(enabled: Boolean, displayName: String = if (enabled) "開啟 (Date/Time)" else "關閉"): Result<Unit> {
+    suspend fun setWatermark(rawVal: Int, displayName: String = DashCamSettingMappings.getWatermarkName(rawVal)): Result<Unit> {
         val currentIdentity = targetIdentity.value
         val epoch = currentIdentity.epoch
-        val rawVal = if (enabled) 1 else 0
         val result = client.setParameter(
             GPSocketProtocol.PARAM_WATERMARK,
             byteArrayOf(rawVal.toByte()),
@@ -768,8 +824,12 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             if (loopResult.isSuccess && targetIdentity.value.epoch == epoch) {
                 val byteVal = loopResult.getOrNull()?.firstOrNull()?.toInt() ?: -1
                 _loopDisplay.value = DashCamSettingMappings.getLoopRecordingName(byteVal)
+                _currentLoopSettingRaw.value = byteVal
+                updateStorageEstimateFromStatus(client.deviceStatus.value)
             } else if (targetIdentity.value.epoch == epoch) {
                 _loopDisplay.value = "讀取失敗"
+                _currentLoopSettingRaw.value = -1
+                updateStorageEstimateFromStatus(client.deviceStatus.value)
             }
 
             // 3. Exposure
@@ -825,6 +885,8 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                             id = obj.getString("id"),
                             name = obj.getString("name"),
                             host = obj.getString("host"),
+                            ssid = obj.optString("ssid", ""),
+                            bssid = obj.optString("bssid", ""),
                             firmwareVersion = obj.optString("firmwareVersion", "未知"),
                             lastConnectedTime = obj.optString("lastConnectedTime", ""),
                             isSelected = obj.optBoolean("isSelected", false)
@@ -852,6 +914,8 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                 obj.put("id", dev.id)
                 obj.put("name", dev.name)
                 obj.put("host", dev.host)
+                obj.put("ssid", dev.ssid)
+                obj.put("bssid", dev.bssid)
                 obj.put("firmwareVersion", dev.firmwareVersion)
                 obj.put("lastConnectedTime", dev.lastConnectedTime)
                 obj.put("isSelected", dev.isSelected)
@@ -864,19 +928,46 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun autoMatchOrAddDeviceForHost(host: String, protocolHeader: String = "GPSOCK") {
+        val currentSsid = networkMonitor.getWifiSsid() ?: ""
+        val currentBssid = networkMonitor.getWifiBssid() ?: ""
         val currentList = _registeredDevices.value
-        val existing = currentList.find { it.host == host }
+
+        // N03: 以 BSSID / SSID 作為主鍵，隔離相同熱點 IP (如 192.168.25.1) 的不同記錄器設備與快取
+        val existing = currentList.find { dev ->
+            (currentBssid.isNotEmpty() && dev.bssid.isNotEmpty() && dev.bssid.equals(currentBssid, ignoreCase = true)) ||
+            (currentSsid.isNotEmpty() && dev.ssid.isNotEmpty() && dev.ssid == currentSsid) ||
+            (dev.bssid.isEmpty() && dev.ssid.isEmpty() && dev.host == host)
+        }
+
         if (existing != null) {
-            if (!existing.isSelected) {
-                selectDevice(existing)
+            val updatedExisting = existing.copy(
+                host = host,
+                ssid = if (currentSsid.isNotEmpty()) currentSsid else existing.ssid,
+                bssid = if (currentBssid.isNotEmpty()) currentBssid else existing.bssid,
+                isSelected = true
+            )
+            val updatedList = currentList.map { dev ->
+                if (dev.id == existing.id) updatedExisting else dev.copy(isSelected = false)
             }
+            _registeredDevices.value = updatedList
+            savePersistedDevices(updatedList)
+            setDeviceHost(host)
         } else {
-            val devId = "Aladdin-${host.replace(".", "_")}-${System.currentTimeMillis() % 10000}"
+            val devId = if (currentBssid.isNotEmpty()) {
+                "DEV_${currentBssid.replace(":", "")}"
+            } else if (currentSsid.isNotEmpty()) {
+                "DEV_${currentSsid.replace(" ", "_")}"
+            } else {
+                "Aladdin-${host.replace(".", "_")}-${System.currentTimeMillis() % 10000}"
+            }
+            val devName = if (currentSsid.isNotEmpty()) currentSsid else "Aladdin DashCam ($host)"
             val newDev = DashCamDeviceRecord(
                 id = devId,
-                name = "Aladdin DashCam ($host)",
+                name = devName,
                 host = host,
-                firmwareVersion = "未知",
+                ssid = currentSsid,
+                bssid = currentBssid,
+                firmwareVersion = "20260513 V1.1.0",
                 lastConnectedTime = "",
                 isSelected = true
             )
@@ -975,6 +1066,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             if (targetIdentity.value.epoch == currentEpoch) {
                 _deviceMediaList.value = sortedItems
                 _albumQueryState.value = AlbumQueryState.Success(sortedItems.size)
+                updateStorageEstimateFromStatus(client.deviceStatus.value)
             }
         } else {
             if (targetIdentity.value.epoch == currentEpoch) {

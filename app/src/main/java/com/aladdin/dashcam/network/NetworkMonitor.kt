@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-class NetworkMonitor(context: Context) {
+class NetworkMonitor(private val context: Context) {
     private val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
@@ -92,6 +92,35 @@ class NetworkMonitor(context: Context) {
             }
         }
         return null
+    }
+
+    fun getWifiSsid(): String? {
+        val net = _wifiNetwork.value ?: return null
+        val caps = connectivityManager.getNetworkCapabilities(net)
+        val wifiInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            caps?.transportInfo as? android.net.wifi.WifiInfo
+        } else null
+        val ssid = wifiInfo?.ssid?.trim('"')
+        if (!ssid.isNullOrEmpty() && ssid != "<unknown ssid>") {
+            return ssid
+        }
+        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+        val infoSsid = wifiManager?.connectionInfo?.ssid?.trim('"')
+        return if (!infoSsid.isNullOrEmpty() && infoSsid != "<unknown ssid>") infoSsid else null
+    }
+
+    fun getWifiBssid(): String? {
+        val net = _wifiNetwork.value ?: return null
+        val caps = connectivityManager.getNetworkCapabilities(net)
+        val wifiInfo = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            caps?.transportInfo as? android.net.wifi.WifiInfo
+        } else null
+        val bssid = wifiInfo?.bssid
+        if (!bssid.isNullOrEmpty() && bssid != "02:00:00:00:00:00") {
+            return bssid
+        }
+        val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+        return wifiManager?.connectionInfo?.bssid?.takeIf { it != "02:00:00:00:00:00" }
     }
 
     fun stopMonitoring() {

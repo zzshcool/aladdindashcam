@@ -96,9 +96,9 @@ object GPSocketProtocol {
     const val PARAM_RESOLUTION = 0x0000 // 錄影解析度
     const val PARAM_EXPOSURE = 0x0001   // 曝光補償
     const val PARAM_LOOP_RECORDING = 0x0003 // 循環錄影
-    const val PARAM_WATERMARK = 0x0004  // 時間浮水印
+    const val PARAM_WATERMARK = 0x0107  // 時間浮水印 (Menu.xml 0x00000107 Date/Time)
     const val PARAM_CAPTURE_RESOLUTION = 0x0100 // 圖片解析度 (256)
-    const val PARAM_CAPTURE_QUALITY = 0x0101   // 圖片畫質 (257)
+    const val PARAM_CAPTURE_QUALITY = 0x0102   // 圖片畫質 (258 per Menu.xml)
     const val PARAM_VERSION = 0x0209           // 韌體版本 (521)
 
     // Error Codes (Spec 25.10)
