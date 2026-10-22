@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Exclude sensitive Wi-Fi and dashcam device credentials/state from cloud backup -->
+    <exclude domain="sharedpref" path="dashcam_devices.xml" />
+    <exclude domain="database" path="dashcam.db" />
+</full-backup-content>

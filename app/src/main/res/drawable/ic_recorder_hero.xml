@@ -1,10 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="180dp" android:height="150dp" android:viewportWidth="180" android:viewportHeight="150">
-    <path android:fillColor="#29333C" android:pathData="M67,16h46a6,6 0,0 1,6 6v12H61V22a6,6 0,0 1,6 -6 M23,49h9v39h-9z" />
-    <path android:fillColor="#34434D" android:pathData="M48,30h88a18,18 0,0 1,18 18v68a18,18 0,0 1,-18 18H48a18,18 0,0 1,-18 -18V48a18,18 0,0 1,18 -18" />
-    <path android:fillColor="#19232C" android:pathData="M49,39h86a10,10 0,0 1,10 10v66a10,10 0,0 1,-10 10H49a10,10 0,0 1,-10 -10V49a10,10 0,0 1,10 -10" />
-    <path android:fillColor="#54C5B5" android:pathData="M92,47a35,35 0,1 0,0 70a35,35 0,1 0,0 -70" />
-    <path android:fillColor="#0B1119" android:pathData="M92,53a29,29 0,1 0,0 58a29,29 0,1 0,0 -58" />
-    <path android:fillColor="#223F54" android:pathData="M92,61a21,21 0,1 0,0 42a21,21 0,1 0,0 -42" />
-    <path android:fillColor="#87DFD3" android:pathData="M85,65a7,7 0,1 0,0 14a7,7 0,1 0,0 -14 M131,47a3,3 0,1 0,0 6a3,3 0,1 0,0 -6" />
+    android:width="180dp"
+    android:height="150dp"
+    android:viewportWidth="180"
+    android:viewportHeight="150">
+    <!-- Top Mounting Bracket / Suction base -->
+    <path
+        android:fillColor="#34434D"
+        android:pathData="M76,22h28a5,5 0,0 1,5 5v10H71V27a5,5 0,0 1,5 -5z" />
+    <path
+        android:fillColor="#222B32"
+        android:pathData="M84,14h12v9h-12z" />
+
+    <!-- Main DashCam Housing (Horizontal Compact Profile) -->
+    <path
+        android:fillColor="#1E2831"
+        android:pathData="M38,36h104a14,14 0,0 1,14 14v48a14,14 0,0 1,-14 14H38a14,14 0,0 1,-14 -14V50a14,14 0,0 1,14 -14z" />
+
+    <!-- Inner Front Panel Inset -->
+    <path
+        android:fillColor="#151D24"
+        android:pathData="M41,40h98a10,10 0,0 1,10 10v40a10,10 0,0 1,-10 10H41a10,10 0,0 1,-10 -10V50a10,10 0,0 1,10 -10z" />
+
+    <!-- Mic / Status LED details on the left -->
+    <path
+        android:fillColor="#FF5252"
+        android:pathData="M52,50a4,4 0,1 0,0 8a4,4 0,1 0,0 -8" />
+    <path
+        android:fillColor="#54C5B5"
+        android:pathData="M52,68a3,3 0,1 0,0 6a3,3 0,1 0,0 -6" />
+
+    <!-- Speaker / Ventilation slots -->
+    <path
+        android:fillColor="#2A3742"
+        android:pathData="M64,52h4v24h-4z M73,52h4v24h-4z" />
+
+    <!-- Lens Outer Stepped Barrel -->
+    <path
+        android:fillColor="#2A3742"
+        android:pathData="M112,41a27,27 0,1 0,0 54a27,27 0,1 0,0 -54" />
+
+    <!-- Signature Teal Accent Bezel Ring -->
+    <path
+        android:fillColor="#54C5B5"
+        android:pathData="M112,46a22,22 0,1 0,0 44a22,22 0,1 0,0 -44" />
+
+    <!-- Optical Dark Cavity -->
+    <path
+        android:fillColor="#0D161F"
+        android:pathData="M112,51a17,17 0,1 0,0 34a17,17 0,1 0,0 -34" />
+
+    <!-- Inner Coated Glass Element -->
+    <path
+        android:fillColor="#1B2E3D"
+        android:pathData="M112,56a12,12 0,1 0,0 24a12,12 0,1 0,0 -24" />
+
+    <!-- Clean Precision Reflection Highlight -->
+    <path
+        android:fillColor="#87DFD3"
+        android:pathData="M106,58a5,5 0,1 0,0 10a5,5 0,1 0,0 -10" />
 </vector>

@@ -138,10 +138,10 @@ class DeviceFragment : Fragment() {
             val input = android.widget.EditText(requireContext())
             input.setText(viewModel.deviceHost.value)
             AlertDialog.Builder(requireContext())
-                .setTitle("切換連線目標 Host")
-                .setMessage("請輸入記錄器 IP 位址（預設 192.168.25.1）：")
+                .setTitle("進階診斷：切換連線目標 Host")
+                .setMessage("【注意】此為進階通訊診斷功能。\n一般新增或切換設備，請至首頁以 Wi-Fi 自動辨識。\n手動指定 IP 將終止舊 Session，並重新對目標進行協定探測：")
                 .setView(input)
-                .setPositiveButton("確定") { _, _ ->
+                .setPositiveButton("確認切換") { _, _ ->
                     val newHost = input.text.toString().trim()
                     if (newHost.isNotEmpty()) {
                         viewModel.setDeviceHost(newHost)

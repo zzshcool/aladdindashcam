@@ -11,27 +11,52 @@ val secretsProperties = Properties()
 if (secretsPropertiesFile.exists()) {
     FileInputStream(secretsPropertiesFile).use { secretsProperties.load(it) }
 }
-val mapsApiKey: String = secretsProperties.getProperty("MAPS_API_KEY") ?: ""
+val mapsApiKey: String = System.getenv("MAPS_API_KEY")
+    ?: (if (secretsPropertiesFile.exists()) {
+        FileInputStream(secretsPropertiesFile).use { secretsProperties.load(it) }
+        secretsProperties.getProperty("MAPS_API_KEY") ?: ""
+    } else "")
 
 android {
     namespace = "com.aladdin.dashcam"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.aladdin.dashcam"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        targetSdk = 35
+        versionCode = 2
+        versionName = "1.0.1"
 
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    val releaseSigning = signingConfigs.create("release") {
+        val configuredStorePath = System.getenv("RELEASE_KEYSTORE_PATH")
+            ?: secretsProperties.getProperty("RELEASE_KEYSTORE_PATH")
+        val configuredStorePassword = System.getenv("RELEASE_KEYSTORE_PASSWORD")
+            ?: secretsProperties.getProperty("RELEASE_KEYSTORE_PASSWORD")
+        val configuredKeyAlias = System.getenv("RELEASE_KEY_ALIAS")
+            ?: secretsProperties.getProperty("RELEASE_KEY_ALIAS")
+        val configuredKeyPassword = System.getenv("RELEASE_KEY_PASSWORD")
+            ?: secretsProperties.getProperty("RELEASE_KEY_PASSWORD")
+
+        if (!configuredStorePath.isNullOrBlank() && file(configuredStorePath).exists()) {
+            storeFile = file(configuredStorePath)
+            storePassword = configuredStorePassword ?: ""
+            keyAlias = configuredKeyAlias ?: ""
+            keyPassword = configuredKeyPassword ?: ""
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (releaseSigning.storeFile != null) {
+                signingConfig = releaseSigning
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

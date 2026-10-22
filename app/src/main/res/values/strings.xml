@@ -106,4 +106,28 @@
     <string name="diag_rtsp">串流端點：rtsp://192.168.25.1:8080/?action=stream</string>
     <string name="diag_wifi_bound">Wi-Fi 網路專屬綁定狀態</string>
     <string name="diag_cellular_route">行動數據網際網路狀態</string>
+
+    <!-- Home Page UI/UX (UX01 - UX03) -->
+    <string name="home_title_my_dashcam">我的記錄器 ▾</string>
+    <string name="home_action_add_recorder">＋</string>
+    <string name="home_action_add_recorder_desc">新增行車記錄器</string>
+    <string name="home_hero_desc">通用行車記錄器識別</string>
+    <string name="home_headline_ready">準備好，記錄每段旅程</string>
+    <string name="home_subhead_guide">連上記錄器 Wi-Fi，即可自動辨識</string>
+    <string name="home_device_none">尚未新增記錄器</string>
+    <string name="home_device_none_desc">新增後即可查看設備與連線狀態</string>
+    <string name="home_status_connected">● 記錄器已連線</string>
+    <string name="home_status_stream_ready">● 串流傳輸中</string>
+    <string name="home_status_stream_loading">○ 影像載入中…</string>
+    <string name="home_status_stream_interrupted">▲ 影像中斷</string>
+    <string name="home_status_disconnected">○ 未連線 · 請開啟記錄器 Wi-Fi</string>
+    <string name="home_action_open_live">開啟即時影像</string>
+    <string name="home_action_connect">連接記錄器</string>
+    <string name="home_action_add">新增記錄器</string>
+    <string name="home_map_title">騎乘地圖</string>
+    <string name="home_map_desc">手機定位 · 騎乘軌跡</string>
+    <string name="home_quick_album">本機媒體相簿</string>
+    <string name="home_quick_album_desc">離線檢視已下載之影片與照片</string>
+    <string name="home_quick_downloads">下載管理</string>
+    <string name="home_brand_footer">Aladdin DashCam · 通用記錄器管理平台</string>
 </resources>

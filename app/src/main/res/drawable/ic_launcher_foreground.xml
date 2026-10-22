@@ -4,13 +4,51 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Mounting Bracket / Clip -->
+    <path
+        android:fillColor="#34434D"
+        android:pathData="M46,31h16a3,3 0,0 1,3 3v4h-22v-4a3,3 0,0 1,3 -3z" />
+
+    <!-- DashCam Main Body (Compact Rounded Body) -->
+    <path
+        android:fillColor="#1F2A33"
+        android:pathData="M26,38h56a8,8 0,0 1,8 8v24a8,8 0,0 1,-8 8h-56a8,8 0,0 1,-8 -8v-24a8,8 0,0 1,8 -8z" />
+
+    <!-- Subtle Inner Bezel / Housing Frame -->
+    <path
+        android:fillColor="#151D24"
+        android:pathData="M27,40h54a6,6 0,0 1,6 6v20a6,6 0,0 1,-6 6h-54a6,6 0,0 1,-6 -6v-20a6,6 0,0 1,6 -6z" />
+
+    <!-- Mic / Status LED details on the left -->
+    <path
+        android:fillColor="#FF5252"
+        android:pathData="M34,46a2.5,2.5 0,1 0,0 5a2.5,2.5 0,1 0,0 -5" />
     <path
         android:fillColor="#54C5B5"
-        android:pathData="M30,38h48v32h-48z M44,30h20v6h-20z" />
+        android:pathData="M34,57a2,2 0,1 0,0 4a2,2 0,1 0,0 -4" />
+
+    <!-- Speaker / Ventilation slots -->
     <path
-        android:fillColor="#101418"
-        android:pathData="M54,46a8,8 0 1,0 0,16 a8,8 0 1,0 0,-16" />
+        android:fillColor="#2A3742"
+        android:pathData="M41,47h3v14h-3z M47,47h3v14h-3z" />
+
+    <!-- Offset Lens Housing Outer Ring -->
     <path
-        android:fillColor="#FF4D4D"
-        android:pathData="M70,42a3,3 0 1,0 0,6 a3,3 0 1,0 0,-6" />
+        android:fillColor="#2B3A45"
+        android:pathData="M66,39a15,15 0,1 0,0 30a15,15 0,1 0,0 -30" />
+
+    <!-- Distinct Teal Accent Ring -->
+    <path
+        android:fillColor="#54C5B5"
+        android:pathData="M66,42a12,12 0,1 0,0 24a12,12 0,1 0,0 -24" />
+
+    <!-- Deep Optical Lens Element -->
+    <path
+        android:fillColor="#0D161F"
+        android:pathData="M66,45a9,9 0,1 0,0 18a9,9 0,1 0,0 -18" />
+
+    <!-- Optical Reflection Highlight -->
+    <path
+        android:fillColor="#87DFD3"
+        android:pathData="M63,47a3.5,3.5 0,1 0,0 7a3.5,3.5 0,1 0,0 -7" />
 </vector>
