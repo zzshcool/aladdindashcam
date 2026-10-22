@@ -204,23 +204,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun promptAddDevice() {
-        val input = android.widget.EditText(this).apply {
-            hint = "請輸入記錄器 IP (例如 192.168.25.1)"
-            setText("192.168.25.1")
-        }
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("新增行車記錄器")
-            .setView(input)
-            .setPositiveButton("新增") { _, _ ->
-                val host = input.text.toString().trim()
-                if (host.isNotEmpty()) {
-                    val name = "Aladdin B1-${host.takeLast(4)}"
-                    viewModel.addDevice(name, host)
-                    android.widget.Toast.makeText(this, "已新增記錄器 $name", android.widget.Toast.LENGTH_SHORT).show()
+        val wifiNet = viewModel.networkMonitor.wifiNetwork.value
+        val detectedGateway = viewModel.networkMonitor.getWifiGatewayIp() ?: "192.168.25.1"
+
+        if (wifiNet != null) {
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("新增行車記錄器")
+                .setMessage("已偵測到當前連線之記錄器 Wi-Fi！\n設備閘道位址：$detectedGateway\n\n是否立即自動綁定並建立連線？")
+                .setPositiveButton("立即自動連線") { _, _ ->
+                    viewModel.autoMatchOrAddDeviceForHost(detectedGateway)
+                    android.widget.Toast.makeText(this, "正在連線至記錄器 ($detectedGateway)...", android.widget.Toast.LENGTH_SHORT).show()
                 }
-            }
-            .setNegativeButton("取消", null)
-            .show()
+                .setNegativeButton("取消", null)
+                .show()
+        } else {
+            androidx.appcompat.app.AlertDialog.Builder(this)
+                .setTitle("未連線至記錄器 Wi-Fi")
+                .setMessage("新增設備無需手動輸入 IP。\n請先於手機「Wi-Fi 設定」中連線至記錄器 Wi-Fi AP（例如 B1-xxxxxx），連線後 App 將自動辨識並完成新增。")
+                .setPositiveButton("前往 Wi-Fi 設定") { _, _ ->
+                    try {
+                        startActivity(android.content.Intent(android.provider.Settings.ACTION_WIFI_SETTINGS))
+                    } catch (_: Exception) {}
+                }
+                .setNegativeButton("關閉", null)
+                .show()
+        }
     }
 
     private fun observeConnectionStatus() {

@@ -43,9 +43,12 @@ class AlbumFragment : Fragment() {
     private var isDeviceSource = true
     private var isTimelineMode = false
     private var currentFilter = FilterCategory.ALL
+    private var currentFilteredMediaList: List<MediaItem> = emptyList()
+    private var selectedTimelineDateStr: String? = null
 
     // Media viewer & player state
     private var exoPlayer: ExoPlayer? = null
+    private var sdpProxy: com.aladdin.dashcam.network.RtspSdpProxy? = null
     private var currentViewingItem: MediaItem? = null
     private var previewJob: Job? = null
     private var previewRequestId = 0L
@@ -100,9 +103,9 @@ class AlbumFragment : Fragment() {
             onFetchThumbnail = { item, imageView ->
                 viewLifecycleOwner.lifecycleScope.launch {
                     val file = viewModel.getOrFetchThumbnail(item)
-                    if (file != null && imageView.drawable == null) {
+                    if (file != null && imageView.tag == item.id) {
                         val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                        if (bitmap != null) {
+                        if (bitmap != null && imageView.tag == item.id) {
                             imageView.setImageBitmap(bitmap)
                         }
                     }
@@ -133,9 +136,9 @@ class AlbumFragment : Fragment() {
             onFetchThumbnail = { item, imageView ->
                 viewLifecycleOwner.lifecycleScope.launch {
                     val file = viewModel.getOrFetchThumbnail(item)
-                    if (file != null && imageView.drawable == null) {
+                    if (file != null && imageView.tag == item.id) {
                         val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                        if (bitmap != null) {
+                        if (bitmap != null && imageView.tag == item.id) {
                             imageView.setImageBitmap(bitmap)
                         }
                     }
@@ -184,6 +187,9 @@ class AlbumFragment : Fragment() {
     private fun setupListeners() {
         binding.toggleAlbumSource.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
+                if (adapter.isSelectionMode) {
+                    exitBatchSelectionMode()
+                }
                 isDeviceSource = (checkedId == R.id.btn_source_device)
                 applyFilters()
             }
@@ -191,6 +197,9 @@ class AlbumFragment : Fragment() {
 
         binding.toggleViewMode.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
+                if (adapter.isSelectionMode) {
+                    exitBatchSelectionMode()
+                }
                 isTimelineMode = (checkedId == R.id.btn_mode_timeline)
                 updateViewModeLayout()
             }
@@ -205,8 +214,7 @@ class AlbumFragment : Fragment() {
         }
 
         binding.btnBatchSelectAll.setOnClickListener {
-            val currentList = if (isDeviceSource) viewModel.deviceMediaList.value else viewModel.localMediaList.value
-            adapter.selectAll(currentList)
+            adapter.selectAll(currentFilteredMediaList)
         }
 
         binding.btnBatchDownload.setOnClickListener {
@@ -242,7 +250,8 @@ class AlbumFragment : Fragment() {
                 binding.tvTimelineCursorInfo.text = "定位到影片：${hitItem.fileName} ($timeStr)"
                 binding.btnTimelineJumpNext.visibility = View.GONE
                 if (isFinished) {
-                    openViewer(hitItem)
+                    val inClipOffsetMs = (targetMillis - hitItem.timestampMillis).coerceAtLeast(0L)
+                    openViewer(hitItem, startOffsetMs = inClipOffsetMs)
                 }
             } else {
                 binding.tvTimelineCursorInfo.text = "此時段無錄影片段 ($timeStr)"
@@ -251,7 +260,7 @@ class AlbumFragment : Fragment() {
                 binding.btnTimelineJumpNext.setOnClickListener {
                     nextItem?.let {
                         binding.timelineRuler.seekToTime(it.timestampMillis)
-                        openViewer(it)
+                        openViewer(it, startOffsetMs = 0L)
                     }
                 }
             }
@@ -323,6 +332,9 @@ class AlbumFragment : Fragment() {
     }
 
     private fun selectFilter(filter: FilterCategory) {
+        if (adapter.isSelectionMode) {
+            exitBatchSelectionMode()
+        }
         currentFilter = filter
         val context = requireContext()
         val defaultColor = ContextCompat.getColor(context, R.color.text_secondary)
@@ -372,10 +384,14 @@ class AlbumFragment : Fragment() {
         binding.containerTimelineDates.removeAllViews()
 
         val dates = dateMap.keys.sortedDescending()
-        var selectedDateStr = dates.firstOrNull() ?: return
+        val curDate = selectedTimelineDateStr
+        if (curDate == null || !dateMap.containsKey(curDate)) {
+            selectedTimelineDateStr = dates.firstOrNull()
+        }
+        val currentSelectedDate = selectedTimelineDateStr ?: return
 
         for (dateStr in dates) {
-            val isSelected = dateStr == selectedDateStr
+            val isSelected = dateStr == currentSelectedDate
             val chip = android.widget.TextView(requireContext()).apply {
                 text = dateStr
                 textSize = 13f
@@ -383,7 +399,7 @@ class AlbumFragment : Fragment() {
                 setTextColor(ContextCompat.getColor(context, if (isSelected) R.color.accent_teal else R.color.text_secondary))
                 setBackgroundResource(if (isSelected) R.drawable.bg_status_badge else 0)
                 setOnClickListener {
-                    selectedDateStr = dateStr
+                    selectedTimelineDateStr = dateStr
                     val items = dateMap[dateStr] ?: emptyList()
                     val targetTimestamp = items.firstOrNull()?.timestampMillis ?: System.currentTimeMillis()
                     binding.timelineRuler.setDayMedia(targetTimestamp, items)
@@ -395,7 +411,7 @@ class AlbumFragment : Fragment() {
             binding.containerTimelineDates.addView(chip)
         }
 
-        val itemsForDate = dateMap[selectedDateStr] ?: emptyList()
+        val itemsForDate = dateMap[currentSelectedDate] ?: emptyList()
         val targetTimestamp = itemsForDate.firstOrNull()?.timestampMillis ?: System.currentTimeMillis()
         binding.timelineRuler.setDayMedia(targetTimestamp, itemsForDate)
         val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(binding.timelineRuler.currentCursorMillis))
@@ -432,6 +448,7 @@ class AlbumFragment : Fragment() {
                 b.fileName.compareTo(a.fileName)
             }
         }
+        currentFilteredMediaList = sortedList
 
         // Group by recording date into AlbumListItem items (Today / Yesterday / YYYY-MM-DD / Unknown)
         val itemsWithHeaders = mutableListOf<AlbumListItem>()
@@ -505,7 +522,7 @@ class AlbumFragment : Fragment() {
     /**
      * Opens media viewer with fast RTSP playback on remote dashcam and offline local playback.
      */
-    private fun openViewer(item: MediaItem) {
+    private fun openViewer(item: MediaItem, startOffsetMs: Long = 0L) {
         currentViewingItem = item
         binding.layoutMediaViewer.visibility = View.VISIBLE
         backPressedCallback.isEnabled = true
@@ -550,14 +567,14 @@ class AlbumFragment : Fragment() {
         // Check if file is already on local device
         val localFile = viewModel.getLocalMediaFile(item)
         if (localFile != null && localFile.exists()) {
-            displayMediaContent(item, localFile)
+            displayMediaContent(item, localFile, startOffsetMs)
             return
         }
 
         // Check if temporary viewing cache already exists
         val cacheFile = viewModel.getPreviewCacheFile(item)
         if (cacheFile.exists() && (item.sizeBytes <= 0 || cacheFile.length() == item.sizeBytes)) {
-            displayMediaContent(item, cacheFile)
+            displayMediaContent(item, cacheFile, startOffsetMs)
             return
         }
 
@@ -567,14 +584,38 @@ class AlbumFragment : Fragment() {
             binding.tvViewerLoadingText.text = "正在啟動快速開片串流..."
 
             previewJob = viewLifecycleOwner.lifecycleScope.launch {
-                val streamResult = viewModel.startRemotePlayback(item)
-                if (!isAdded || previewRequestId != currentToken || currentViewingItem?.fileName != item.fileName) return@launch
+                // 先向 ViewModel 申請媒體所有權，使 LiveFragment 釋放 8080 RTSP 端口
+                viewModel.requestStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
+                kotlinx.coroutines.delay(200)
 
-                binding.viewerLoadingLayout.visibility = View.GONE
+                val streamResult = viewModel.startRemotePlayback(item)
+                if (!isAdded || previewRequestId != currentToken || currentViewingItem?.fileName != item.fileName) {
+                    viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
+                    return@launch
+                }
+
                 streamResult.onSuccess {
                     val host = viewModel.deviceHost.value
-                    setupExoPlayerStream("rtsp://$host:8080/?action=stream")
-                }.onFailure { err ->
+                    val network = viewModel.wifiNetwork.value
+                    if (network != null) {
+                        try {
+                            sdpProxy?.stop()
+                            val devId = "${host}@${viewModel.targetIdentity.value.epoch}"
+                            val proxy = com.aladdin.dashcam.network.RtspSdpProxy(host, 8080, network, deviceIdentifier = devId)
+                            val localPort = proxy.start()
+                            sdpProxy = proxy
+                            binding.viewerLoadingLayout.visibility = View.GONE
+                            setupExoPlayerStream("rtsp://127.0.0.1:$localPort/?action=stream", startOffsetMs)
+                        } catch (e: Exception) {
+                            binding.viewerLoadingLayout.visibility = View.GONE
+                            fetchPreviewFallback(item, currentToken)
+                        }
+                    } else {
+                        binding.viewerLoadingLayout.visibility = View.GONE
+                        fetchPreviewFallback(item, currentToken)
+                    }
+                }.onFailure { _ ->
+                    binding.viewerLoadingLayout.visibility = View.GONE
                     // Fallback to preview cache download if stream handshake rejected
                     fetchPreviewFallback(item, currentToken)
                 }
@@ -615,7 +656,7 @@ class AlbumFragment : Fragment() {
         }
     }
 
-    private fun setupExoPlayerStream(streamUri: String) {
+    private fun setupExoPlayerStream(streamUri: String, startOffsetMs: Long = 0L) {
         releasePlayer()
         val player = ExoPlayer.Builder(requireContext()).build()
         binding.playerView.player = player
@@ -633,16 +674,19 @@ class AlbumFragment : Fragment() {
             .setForceUseRtpTcp(true)
         val mediaSource = factory.createMediaSource(ExoMediaItem.fromUri(streamUri))
         player.setMediaSource(mediaSource)
+        if (startOffsetMs > 0L) {
+            player.seekTo(startOffsetMs)
+        }
         player.prepare()
         player.playWhenReady = true
         exoPlayer = player
     }
 
-    private fun displayMediaContent(item: MediaItem, file: File) {
+    private fun displayMediaContent(item: MediaItem, file: File, startOffsetMs: Long = 0L) {
         if (item.isVideo) {
             binding.playerView.visibility = View.VISIBLE
             binding.ivPhotoViewer.visibility = View.GONE
-            setupExoPlayer(file)
+            setupExoPlayer(file, startOffsetMs)
         } else {
             binding.playerView.visibility = View.GONE
             binding.ivPhotoViewer.visibility = View.VISIBLE
@@ -650,7 +694,7 @@ class AlbumFragment : Fragment() {
         }
     }
 
-    private fun setupExoPlayer(file: File) {
+    private fun setupExoPlayer(file: File, startOffsetMs: Long = 0L) {
         releasePlayer()
         val player = ExoPlayer.Builder(requireContext()).build()
         binding.playerView.player = player
@@ -662,6 +706,9 @@ class AlbumFragment : Fragment() {
         })
         val mediaItem = ExoMediaItem.fromUri(Uri.fromFile(file))
         player.setMediaItem(mediaItem)
+        if (startOffsetMs > 0L) {
+            player.seekTo(startOffsetMs)
+        }
         player.prepare()
         player.playWhenReady = true
         exoPlayer = player
@@ -791,11 +838,14 @@ class AlbumFragment : Fragment() {
         if (isDeviceSource) {
             viewLifecycleOwner.lifecycleScope.launch {
                 viewModel.stopRemotePlayback()
+                viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
             }
         }
     }
 
     private fun releasePlayer() {
+        sdpProxy?.stop()
+        sdpProxy = null
         exoPlayer?.stop()
         exoPlayer?.release()
         exoPlayer = null
@@ -891,6 +941,9 @@ class AlbumFragment : Fragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
+        if (viewModel.currentStreamOwner.value == DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK) {
+            viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
+        }
         ++previewRequestId
         previewJob?.cancel()
         previewJob = null

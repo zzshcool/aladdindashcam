@@ -195,6 +195,7 @@ class MediaAdapter(
 
                 // Fetch real thumbnail asynchronously if callback provided
                 binding.ivThumbnail.setImageDrawable(null)
+                binding.ivThumbnail.tag = media.id
                 onFetchThumbnail?.invoke(media, binding.ivThumbnail)
 
                 // Click and Long click handling

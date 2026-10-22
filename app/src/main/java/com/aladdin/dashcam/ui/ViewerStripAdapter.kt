@@ -66,6 +66,7 @@ class ViewerStripAdapter(
         }
 
         binding.ivStripThumbnail.setImageDrawable(null)
+        binding.ivStripThumbnail.tag = item.id
         onFetchThumbnail?.invoke(item, binding.ivStripThumbnail)
 
         binding.root.setOnClickListener {

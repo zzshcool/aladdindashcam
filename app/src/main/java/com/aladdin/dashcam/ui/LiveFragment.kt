@@ -225,7 +225,8 @@ class LiveFragment : Fragment() {
                 // 8081 命令確認成功後，給予設備管線 350ms 穩定時間，才啟動本機 Proxy 與 ExoPlayer prepare
                 kotlinx.coroutines.delay(350)
                 sdpProxy?.stop()
-                val proxy = com.aladdin.dashcam.network.RtspSdpProxy(host, 8080, network)
+                val devId = "${host}@${viewModel.targetIdentity.value.epoch}"
+                val proxy = com.aladdin.dashcam.network.RtspSdpProxy(host, 8080, network, deviceIdentifier = devId)
                 val localPort = proxy.start()
                 sdpProxy = proxy
 
@@ -393,15 +394,29 @@ class LiveFragment : Fragment() {
     }
 
     private fun updatePreviewGeometry(expanded: Boolean) {
-        val actions = binding.root.findViewById<View>(R.id.live_view_actions) ?: return
-        actions.visibility = if (expanded) View.GONE else View.VISIBLE
+        val actions = binding.root.findViewById<View>(R.id.live_view_actions)
+        actions?.visibility = if (expanded) View.GONE else View.VISIBLE
+
+        val sideControls = binding.root.findViewById<View>(R.id.side_controls_container)
+        sideControls?.visibility = if (expanded) View.GONE else View.VISIBLE
+
         val constraints = ConstraintSet()
         constraints.clone(binding.root)
-        constraints.setDimensionRatio(R.id.preview_container, if (expanded) null else "H,16:10")
-        if (expanded) {
-            constraints.connect(R.id.preview_container, ConstraintSet.BOTTOM, ConstraintSet.PARENT_ID, ConstraintSet.BOTTOM)
+        if (sideControls != null) {
+            // 橫向模式 (layout-land): 側邊欄控制
+            if (expanded) {
+                constraints.connect(R.id.preview_container, ConstraintSet.END, ConstraintSet.PARENT_ID, ConstraintSet.END)
+            } else {
+                constraints.connect(R.id.preview_container, ConstraintSet.END, R.id.side_controls_container, ConstraintSet.START)
+            }
         } else {
-            constraints.clear(R.id.preview_container, ConstraintSet.BOTTOM)
+            // 直向模式 (layout): 比例與高度約束
+            constraints.setDimensionRatio(R.id.preview_container, if (expanded) null else "H,16:10")
+            if (expanded) {
+                constraints.connect(R.id.preview_container, ConstraintSet.BOTTOM, ConstraintSet.PARENT_ID, ConstraintSet.BOTTOM)
+            } else {
+                constraints.clear(R.id.preview_container, ConstraintSet.BOTTOM)
+            }
         }
         constraints.applyTo(binding.root)
     }
@@ -440,6 +455,7 @@ class LiveFragment : Fragment() {
         binding.layoutLiveModeToggle?.visibility = vis
         binding.layoutNormalControls?.visibility = vis
         binding.layoutRideMode?.visibility = View.GONE
+        binding.root.findViewById<View>(R.id.side_controls_container)?.visibility = vis
         binding.btnFullscreen.visibility = vis
         binding.hudPipStatusContainer.visibility = if (isInPip) View.VISIBLE else View.GONE
         updatePreviewGeometry(isInPip || (activity as? MainActivity)?.isFullscreen == true)
@@ -500,22 +516,27 @@ class LiveFragment : Fragment() {
                         }
 
                         // Ride Mode HUD Updates (safe call for landscape mode)
-                        binding.speedGauge?.setSpeed(gps.speedKmh)
-                        binding.tvRideAltitude?.text = if (gps.altitudeMeters != null) {
+                        binding.speedGauge?.setSpeed(if (gps.isLocked) gps.speedKmh else null)
+                        binding.tvRideAltitude?.text = if (gps.isLocked && gps.altitudeMeters != null) {
                             String.format(java.util.Locale.getDefault(), "%.0f m", gps.altitudeMeters)
                         } else {
                             "-- m"
                         }
 
-                        binding.tvRideAscent?.text = String.format(
-                            java.util.Locale.getDefault(),
-                            "+%.0f m",
-                            gps.accumulatedAscentMeters
-                        )
+                        binding.tvRideAscent?.text = if (gps.isLocked) {
+                            String.format(
+                                java.util.Locale.getDefault(),
+                                "+%.0f m",
+                                gps.accumulatedAscentMeters
+                            )
+                        } else {
+                            "-- m"
+                        }
 
-                        binding.tvRideBearing?.text = if (gps.bearingDegrees != null) {
-                            val deg = gps.bearingDegrees
-                            val dirStr = when (((deg + 22.5f) % 360 / 45).toInt()) {
+                        val bearing = gps.bearingDegrees
+                        binding.tvRideBearing?.text = if (gps.isLocked && bearing != null) {
+                            val dirIdx = (((bearing + 22.5f) % 360) / 45).toInt()
+                            val dirStr = when (dirIdx) {
                                 0 -> "北"
                                 1 -> "東北"
                                 2 -> "東"
@@ -526,7 +547,7 @@ class LiveFragment : Fragment() {
                                 7 -> "西北"
                                 else -> "北"
                             }
-                            String.format(java.util.Locale.getDefault(), "%.0f° %s", deg, dirStr)
+                            String.format(java.util.Locale.getDefault(), "%.0f° %s", bearing, dirStr)
                         } else {
                             "--°"
                         }
@@ -534,7 +555,7 @@ class LiveFragment : Fragment() {
                         binding.tvRideGforce?.text = if (gps.accelerationG != null) {
                             String.format(java.util.Locale.getDefault(), "%.2f G", gps.accelerationG)
                         } else {
-                            "1.00 G"
+                            "-- G"
                         }
 
                         binding.tvRideGpsSource?.text = if (gps.isLocked) {
@@ -550,10 +571,26 @@ class LiveFragment : Fragment() {
                 launch {
                     kotlinx.coroutines.flow.combine(
                         viewModel.wifiNetwork,
-                        viewModel.deviceHost
-                    ) { net, host -> net to host }
-                        .collect { (network, _) ->
-                            setupMediaStream(network)
+                        viewModel.deviceHost,
+                        viewModel.currentStreamOwner
+                    ) { net, host, owner -> Triple(net, host, owner) }
+                        .collect { (network, _, owner) ->
+                            if (owner == DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK) {
+                                // 相簿正在回放，暫停預覽並關閉 proxy 與 player 以釋放記錄器 8080 RTSP 端口
+                                streamJob?.cancel()
+                                streamJob = null
+                                player?.stop()
+                                sdpProxy?.stop()
+                                sdpProxy = null
+                                lastStreamNetwork = null
+                                lastStreamHost = null
+                                binding.streamOverlay.visibility = View.VISIBLE
+                                binding.pbStreamLoading.visibility = View.GONE
+                                binding.btnRetryStream.visibility = View.GONE
+                                binding.tvStreamMessage.text = "相簿正在回放影片，即時預覽已暫停"
+                            } else if (owner == DashCamViewModel.MediaStreamOwner.LIVE_PREVIEW || owner == DashCamViewModel.MediaStreamOwner.NONE) {
+                                setupMediaStream(network)
+                            }
                         }
                 }
             }
@@ -654,8 +691,25 @@ class LiveFragment : Fragment() {
         binding.ivHudBatteryIcon.contentDescription = cdText
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (viewModel.currentStreamOwner.value == DashCamViewModel.MediaStreamOwner.NONE) {
+            viewModel.requestStreamOwner(DashCamViewModel.MediaStreamOwner.LIVE_PREVIEW)
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (viewModel.currentStreamOwner.value == DashCamViewModel.MediaStreamOwner.LIVE_PREVIEW) {
+            viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.LIVE_PREVIEW)
+        }
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
+        if (viewModel.currentStreamOwner.value == DashCamViewModel.MediaStreamOwner.LIVE_PREVIEW) {
+            viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.LIVE_PREVIEW)
+        }
         streamJob?.cancel()
         streamJob = null
         sdpProxy?.stop()

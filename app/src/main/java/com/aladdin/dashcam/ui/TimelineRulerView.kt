@@ -51,6 +51,7 @@ class TimelineRulerView @JvmOverloads constructor(
 
     private val scroller = Scroller(context)
     private var isUserInteracting = false
+    private var isFlinging = false
 
     var onTimeSeekListener: ((targetMillis: Long, isFinished: Boolean) -> Unit)? = null
 
@@ -60,6 +61,7 @@ class TimelineRulerView @JvmOverloads constructor(
     private val gestureDetector = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent): Boolean {
             scroller.forceFinished(true)
+            isFlinging = false
             isUserInteracting = true
             return true
         }
@@ -82,6 +84,7 @@ class TimelineRulerView @JvmOverloads constructor(
             velocityY: Float
         ): Boolean {
             // 水平慣性滑動
+            isFlinging = true
             scroller.fling(
                 0, 0,
                 (-velocityX).toInt(), 0,
@@ -202,6 +205,9 @@ class TimelineRulerView @JvmOverloads constructor(
             val deltaMillis = (currX / pixelsPerMinute * 100).toLong()
             setCursorMillisInternal(currentCursorMillis + deltaMillis, notify = true, isFinished = false)
             postInvalidateOnAnimation()
+        } else if (isFlinging) {
+            isFlinging = false
+            onTimeSeekListener?.invoke(currentCursorMillis, true)
         }
     }
 
@@ -223,7 +229,8 @@ class TimelineRulerView @JvmOverloads constructor(
         for (item in mediaItems) {
             if (item.timestampMillis <= 0L) continue
             val startMin = (item.timestampMillis - startOfDayMillis).toFloat() / 60_000f
-            val durationMin = if (item.durationSeconds > 0) item.durationSeconds / 60f else 1.0f // 預設至少 1 分鐘色塊寬度
+            // 未知片長時呈現細窄標記條，不虛構 60 秒區間 (R12)
+            val durationMin = if (item.durationSeconds > 0) item.durationSeconds / 60f else 0.05f
             val endMin = startMin + durationMin
 
             val blockLeft = centerX + (startMin - cursorMinuteOffset) * pixelsPerMinute

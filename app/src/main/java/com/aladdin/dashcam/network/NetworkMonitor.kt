@@ -75,6 +75,17 @@ class NetworkMonitor(context: Context) {
         }
     }
 
+    fun getWifiGatewayIp(): String? {
+        val net = _wifiNetwork.value ?: return null
+        val linkProps = connectivityManager.getLinkProperties(net) ?: return null
+        for (route in linkProps.routes) {
+            if (route.isDefaultRoute && route.gateway != null) {
+                return route.gateway?.hostAddress
+            }
+        }
+        return null
+    }
+
     fun stopMonitoring() {
         try {
             connectivityManager.unregisterNetworkCallback(wifiCallback)

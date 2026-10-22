@@ -37,6 +37,7 @@ data class TargetIdentity(
     val requestedHost: String,
     val activeHost: String?,
     val epoch: Long,
+    val sessionId: Long = 0L,
     val state: TargetState
 )
 
@@ -232,6 +233,7 @@ class DashCamClient(
                 requestedHost = currentHost,
                 activeHost = currentHost,
                 epoch = targetEpoch,
+                sessionId = newSession,
                 state = TargetState.READY
             )
             Log.i(TAG, "Connected to dashcam at $currentHost:$port (sessionId: $newSession, epoch: $targetEpoch)")
@@ -258,6 +260,7 @@ class DashCamClient(
                     requestedHost = currentHost,
                     activeHost = null,
                     epoch = targetEpoch,
+                    sessionId = 0L,
                     state = TargetState.DISCONNECTED
                 )
                 markStatusExpired()
@@ -764,12 +767,18 @@ class DashCamClient(
     suspend fun startPlayback(deviceIndex: Int, expectedEpoch: Long? = null): Result<Unit> = withContext(Dispatchers.IO) {
         synchronized(commandLock) {
             if (expectedEpoch != null && expectedEpoch != targetEpoch) {
-                return@withContext Result.failure(IllegalStateException("Target epoch expired before startPlayback"))
+                return@withContext Result.failure(IllegalStateException("Target epoch expired before startPlayback (expected $expectedEpoch, current $targetEpoch)"))
             }
             try {
                 ensureConnected()
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during connect (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 val req = GPSocketProtocol.buildPlaybackStartPacket(deviceIndex)
                 val resp = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_PLAYBACK_START, req)
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during startPlayback response wait (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 when (resp) {
                     is GPSocketResponse.Ack -> {
                         Log.i(TAG, "StartPlayback accepted by hardware for index $deviceIndex")
@@ -794,10 +803,19 @@ class DashCamClient(
      */
     suspend fun stopPlayback(expectedEpoch: Long? = null): Result<Unit> = withContext(Dispatchers.IO) {
         synchronized(commandLock) {
+            if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                return@withContext Result.failure(IllegalStateException("Target epoch expired before stopPlayback (expected $expectedEpoch, current $targetEpoch)"))
+            }
             try {
                 ensureConnected()
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during connect (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 val req = GPSocketProtocol.buildPlaybackStopPacket()
                 val resp = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_PLAYBACK_STOP, req)
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during stopPlayback response wait (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 when (resp) {
                     is GPSocketResponse.Ack -> {
                         Log.i(TAG, "StopPlayback accepted by hardware")
@@ -822,10 +840,19 @@ class DashCamClient(
      */
     suspend fun getThumbnail(deviceIndex: Int, expectedEpoch: Long? = null): Result<ByteArray> = withContext(Dispatchers.IO) {
         synchronized(commandLock) {
+            if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                return@withContext Result.failure(IllegalStateException("Target epoch expired before getThumbnail (expected $expectedEpoch, current $targetEpoch)"))
+            }
             try {
                 ensureConnected()
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during connect (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 val req = GPSocketProtocol.buildGetThumbnailPacket(deviceIndex)
                 val resp = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_GET_THUMBNAIL, req)
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during getThumbnail response wait (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 when (resp) {
                     is GPSocketResponse.Ack -> {
                         Result.success(resp.payload)
@@ -849,10 +876,19 @@ class DashCamClient(
      */
     suspend fun deleteFile(deviceIndex: Int, expectedEpoch: Long? = null): Result<Unit> = withContext(Dispatchers.IO) {
         synchronized(commandLock) {
+            if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                return@withContext Result.failure(IllegalStateException("Target epoch expired before deleteFile (expected $expectedEpoch, current $targetEpoch)"))
+            }
             try {
                 ensureConnected()
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during connect (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 val req = GPSocketProtocol.buildDeleteFilePacket(deviceIndex)
                 val resp = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_DELETE_FILE, req)
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during deleteFile response wait (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 when (resp) {
                     is GPSocketResponse.Ack -> {
                         Log.i(TAG, "Delete file accepted by hardware for index $deviceIndex")
@@ -875,12 +911,21 @@ class DashCamClient(
     /**
      * Toggles recording audio microphone via CMD_RECORD_AUDIO (0x01)
      */
-    suspend fun toggleAudio(): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun toggleAudio(expectedEpoch: Long? = null): Result<Unit> = withContext(Dispatchers.IO) {
         synchronized(commandLock) {
+            if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                return@withContext Result.failure(IllegalStateException("Target epoch expired before toggleAudio (expected $expectedEpoch, current $targetEpoch)"))
+            }
             try {
                 ensureConnected()
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during connect (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 val req = GPSocketProtocol.buildRecordAudioTogglePacket()
                 val resp = sendAndReceive(GPSocketProtocol.MODE_RECORD, GPSocketProtocol.CMD_RECORD_AUDIO, req)
+                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                    return@withContext Result.failure(IllegalStateException("Target epoch expired during toggleAudio response wait (expected $expectedEpoch, current $targetEpoch)"))
+                }
                 when (resp) {
                     is GPSocketResponse.Ack -> {
                         Log.i(TAG, "Audio toggle accepted by hardware")

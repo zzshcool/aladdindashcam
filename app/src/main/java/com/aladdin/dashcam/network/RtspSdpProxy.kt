@@ -85,30 +85,39 @@ internal class RtpVideoTimestampNormalizer(
 class RtspSdpProxy(
     private val remoteHost: String,
     private val remotePort: Int = 8080,
-    private val network: Network
+    private val network: Network,
+    private val deviceIdentifier: String = ""
 ) {
     companion object {
         private const val TAG = "RtspSdpProxy"
 
-        // P6: Keyed cache holding real, authenticated SPS/PPS extracted directly from stream: "$host:$port" -> "sps,pps"
-        // Genuine hardware parameter sets extracted directly from Aladdin B1 camera AVC configuration (1080p High@5.1)
-        const val HARDWARE_DEFAULT_SPS_PPS = "Z2RAM6wsqAKAC1k=,aO4xgg=="
-        private val spsPpsCache = ConcurrentHashMap<String, String>().apply {
-            put("192.168.25.1:8080", HARDWARE_DEFAULT_SPS_PPS)
-        }
+        // P6: Keyed cache holding real, authenticated SPS/PPS extracted directly from stream:
+        // Key format: "$host:$port" or "$host:$port@$deviceIdentifier"
+        private val spsPpsCache = ConcurrentHashMap<String, String>()
 
-        fun clearCache(host: String? = null) {
-            if (host != null) {
-                spsPpsCache.keys.filter { it.startsWith("$host:") || it == host }.forEach {
-                    spsPpsCache[it] = HARDWARE_DEFAULT_SPS_PPS
+        fun clearCache(keyPrefix: String? = null) {
+            if (keyPrefix != null) {
+                spsPpsCache.keys.filter { it.startsWith(keyPrefix) || it.contains(keyPrefix) }.forEach {
+                    spsPpsCache.remove(it)
                 }
-                Log.i(TAG, "Cache reset to hardware default for host: $host")
+                Log.i(TAG, "Cache cleared for prefix: $keyPrefix")
             } else {
                 spsPpsCache.clear()
-                spsPpsCache["192.168.25.1:8080"] = HARDWARE_DEFAULT_SPS_PPS
-                Log.i(TAG, "All RtspSdpProxy cache reset to hardware default")
+                Log.i(TAG, "All RtspSdpProxy cache cleared")
             }
         }
+
+        fun putCachedSpsPps(key: String, spsPps: String) {
+            spsPpsCache[key] = spsPps
+        }
+
+        fun getCachedSpsPps(key: String): String? {
+            return spsPpsCache[key]
+        }
+    }
+
+    fun getEffectiveCacheKey(): String {
+        return if (deviceIdentifier.isNotEmpty()) "$remoteHost:$remotePort@$deviceIdentifier" else "$remoteHost:$remotePort"
     }
 
     private var serverSocket: ServerSocket? = null
@@ -126,7 +135,7 @@ class RtspSdpProxy(
         val ss = ServerSocket(0, 5, InetAddress.getByName("127.0.0.1"))
         serverSocket = ss
         isRunning.set(true)
-        Log.i(TAG, "RtspSdpProxy started on 127.0.0.1:${ss.localPort} targeting $remoteHost:$remotePort")
+        Log.i(TAG, "RtspSdpProxy started on 127.0.0.1:${ss.localPort} targeting $remoteHost:$remotePort (device: $deviceIdentifier)")
 
         proxyJob = CoroutineScope(Dispatchers.IO).launch {
             while (isRunning.get() && !ss.isClosed) {
@@ -169,8 +178,9 @@ class RtspSdpProxy(
             clientSocket.tcpNoDelay = true
 
             // P7: Probe strictly beforehand in sequential order if cache is absent; never run two sessions in parallel
-            val cacheKey = "$remoteHost:$remotePort"
+            val cacheKey = getEffectiveCacheKey()
             if (!spsPpsCache.containsKey(cacheKey)) {
+                delay(300) // Allow dashcam lwIP sufficient time to release preceding socket
                 probeLiveSpsPpsSequentially(cacheKey)
             }
 
@@ -266,7 +276,7 @@ class RtspSdpProxy(
      */
     private fun forwardServerToClient(input: InputStream, output: OutputStream) {
         val streamReader = RtspFramingReader(input)
-        val cacheKey = "$remoteHost:$remotePort"
+        val cacheKey = getEffectiveCacheKey()
         val parameterSets = RtpParameterSetCollector()
         var timestamps = RtpVideoTimestampNormalizer()
         var timestampModeChosen = false
@@ -362,9 +372,9 @@ class RtspSdpProxy(
      * and patches only its fmtp attribute while keeping audio and session headers untouched.
      */
     private fun patchSdpVideoTrack(sdp: String, cacheKey: String): String? {
-        val spsPpsParam = spsPpsCache[cacheKey] ?: HARDWARE_DEFAULT_SPS_PPS
+        val spsPpsParam = spsPpsCache[cacheKey]
         if (spsPpsParam.isNullOrEmpty()) {
-            Log.e(TAG, "Cannot patch SDP: no verified real SPS/PPS parameter available in cache")
+            Log.w(TAG, "Cannot patch SDP: no verified real SPS/PPS parameter available in cache for $cacheKey")
             return null
         }
 
