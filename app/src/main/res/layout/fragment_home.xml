@@ -1,0 +1,56 @@
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:fillViewport="true" android:background="@color/bg_dark">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:paddingHorizontal="20dp" android:paddingBottom="20dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="64dp" android:gravity="center_vertical">
+            <TextView android:id="@+id/btn_manage_recorders" android:layout_width="0dp" android:layout_height="48dp"
+                android:layout_weight="1" android:gravity="center_vertical" android:text="我的記錄器 ▾"
+                android:textSize="20sp" android:textStyle="bold" android:textColor="@color/text_primary"
+                android:background="?attr/selectableItemBackground" android:clickable="true" android:focusable="true" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/btn_add_recorder"
+                style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="48dp" android:layout_height="48dp"
+                android:minWidth="48dp" android:padding="0dp" android:text="＋" android:textSize="28sp"
+                android:textColor="@color/accent_teal" android:contentDescription="新增記錄器" />
+        </LinearLayout>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+            android:gravity="center" android:minHeight="180dp" android:orientation="vertical">
+            <ImageView android:layout_width="150dp" android:layout_height="125dp" android:src="@drawable/ic_recorder_hero"
+                android:contentDescription="Aladdin 行車記錄器" />
+            <TextView android:id="@+id/tv_home_headline" android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginTop="16dp" android:text="準備好，記錄每段旅程" android:textSize="17sp"
+                android:textStyle="bold" android:textColor="@color/text_primary" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp"
+                android:text="連上記錄器 Wi-Fi，即可自動辨識" android:textSize="13sp" android:textColor="@color/text_secondary" />
+        </LinearLayout>
+        <com.google.android.material.card.MaterialCardView android:id="@+id/btn_home_map"
+            android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp"
+            android:clickable="true" android:focusable="true" app:cardCornerRadius="16dp"
+            app:cardBackgroundColor="@color/surface_elevated" app:strokeWidth="1dp" app:strokeColor="@color/border_subtle">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="18dp" android:gravity="center_vertical">
+                <ImageView android:layout_width="32dp" android:layout_height="32dp" android:src="@drawable/ic_my_location"
+                    app:tint="@color/accent_teal" android:contentDescription="@null" />
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:layout_marginStart="14dp" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="騎乘地圖" android:textSize="17sp" android:textStyle="bold" android:textColor="@color/text_primary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="手機定位 · 騎乘軌跡" android:textSize="12sp" android:layout_marginTop="4dp" android:textColor="@color/text_secondary" />
+                </LinearLayout>
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="›" android:textSize="28sp" android:textColor="@color/accent_teal" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="14dp" app:cardCornerRadius="16dp" app:cardBackgroundColor="@color/surface_dark">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="18dp" android:orientation="vertical">
+                <TextView android:id="@+id/tv_home_device" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:text="尚未新增記錄器" android:textSize="15sp" android:maxLines="1" android:ellipsize="end" android:textStyle="bold" android:textColor="@color/text_primary" />
+                <TextView android:id="@+id/tv_home_connection" android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp" android:text="新增後即可查看設備與連線狀態" android:textSize="13sp" android:textColor="@color/text_secondary" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/btn_home_connect" android:layout_width="match_parent"
+                    android:layout_height="52dp" android:layout_marginTop="12dp" android:text="新增記錄器" android:textAllCaps="false"
+                    app:cornerRadius="24dp" android:backgroundTint="@color/accent_teal" android:textColor="@color/bg_dark" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="16dp"
+            android:text="Aladdin DashCam" android:gravity="center" android:textSize="11sp" android:textColor="@color/text_secondary" />
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

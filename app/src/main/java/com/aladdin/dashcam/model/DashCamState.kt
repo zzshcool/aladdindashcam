@@ -43,7 +43,9 @@ data class DashCamDeviceStatus(
     val sdCardState: Int = 0, // 0: 未知/無卡, 1: 正常, 2: 寫保護/異常
     val sdFreeBytes: Long = -1L, // -1L 代表尚未取得或不支援
     val sdTotalBytes: Long = -1L, // -1L 代表尚未取得或不支援
-    val lastUpdatedTimestamp: Long = 0L
+    val lastUpdatedTimestamp: Long = 0L,
+    // Client-assigned ordering token for accepted status packets, independent of wall-clock changes.
+    val sampleSequence: Long = 0L
 )
 
 data class MediaItem(

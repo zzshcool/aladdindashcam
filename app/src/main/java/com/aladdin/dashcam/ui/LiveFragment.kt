@@ -60,6 +60,44 @@ class LiveFragment : Fragment() {
     private var phoneMarker: Marker? = null
     private var trajectoryPolyline: Polyline? = null
     private var isMapFollowEnabled = true
+    private var selectedModeId = R.id.btn_mode_normal
+    private var mapLoaded = false
+    private var mapRequested = false
+    private var hasSavedMapCamera = false
+    private var savedMapType = GoogleMap.MAP_TYPE_NORMAL
+    private var lastMapStatus: GpsStatus? = null
+    private var mapLoadJob: Job? = null
+
+    fun selectMode(modeId: Int) {
+        selectedModeId = modeId
+        if (_binding != null) {
+            binding.toggleLiveMode?.check(modeId)
+            applyLiveMode()
+        }
+    }
+
+    private fun applyLiveMode() {
+        if (_binding == null) return
+        val mapMode = selectedModeId == R.id.btn_mode_map
+        val split = selectedModeId == R.id.btn_mode_split
+        binding.previewContainer.visibility = if (mapMode) View.GONE else View.VISIBLE
+        binding.mapContainer.visibility = if (mapMode || split) View.VISIBLE else View.GONE
+        binding.layoutNormalControls?.visibility = if (selectedModeId == R.id.btn_mode_normal) View.VISIBLE else View.GONE
+        binding.layoutRideMode?.visibility = if (selectedModeId == R.id.btn_mode_ride) View.VISIBLE else View.GONE
+        val landscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        if (landscape) {
+            val constraints = ConstraintSet().apply { clone(binding.root) }
+            constraints.connect(R.id.preview_container, ConstraintSet.END,
+                if (split) R.id.map_split_guideline else R.id.side_controls_container, ConstraintSet.START)
+            constraints.connect(R.id.map_container, ConstraintSet.START,
+                if (split) R.id.map_split_guideline else ConstraintSet.PARENT_ID, ConstraintSet.START)
+            constraints.applyTo(binding.root)
+        }
+        if (mapMode || split) {
+            if (!mapRequested) initMap()
+            updateMapLocation(viewModel.gpsStatus.value)
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -78,19 +116,33 @@ class LiveFragment : Fragment() {
             android.util.Log.e("LiveFragment", "Error initializing MapView: ${e.message}")
         }
         initPlayer()
-        initMap()
         setupListeners()
+        isMapFollowEnabled = savedInstanceState?.getBoolean("map_follow", true) ?: true
+        hasSavedMapCamera = savedInstanceState?.getBoolean("map_camera", false) ?: false
+        savedMapType = savedInstanceState?.getInt("map_type", GoogleMap.MAP_TYPE_NORMAL) ?: GoogleMap.MAP_TYPE_NORMAL
+        selectedModeId = savedInstanceState?.getInt("live_mode", selectedModeId) ?: selectedModeId
+        binding.toggleLiveMode?.check(selectedModeId)
+        applyLiveMode()
         observeViewModel()
     }
 
     private fun initMap() {
         try {
-            binding.mapView.getMapAsync { map ->
+            mapRequested = true
+            val requestedView = binding.mapView
+            requestedView.getMapAsync { map ->
+                if (_binding?.mapView !== requestedView) return@getMapAsync
                 this.googleMap = map
+                map.mapType = savedMapType
+                binding.btnMapType.text = if (savedMapType == GoogleMap.MAP_TYPE_HYBRID) "一般地圖" else "衛星地圖"
                 try {
-                    map.uiSettings.isZoomControlsEnabled = true
+                    map.uiSettings.isZoomControlsEnabled = false
                     map.uiSettings.isCompassEnabled = true
                     map.uiSettings.isMyLocationButtonEnabled = false
+                    val density = resources.displayMetrics.density
+                    val landscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                    map.setPadding(0, ((if (landscape) 8 else 64) * density).toInt(),
+                        ((if (landscape) 8 else 64) * density).toInt(), (48 * density).toInt())
                 } catch (_: Exception) {}
 
                 val polylineOptions = PolylineOptions()
@@ -98,16 +150,33 @@ class LiveFragment : Fragment() {
                     .width(10f)
                     .geodesic(true)
                 trajectoryPolyline = map.addPolyline(polylineOptions)
+                if (!hasSavedMapCamera) map.moveCamera(CameraUpdateFactory.newLatLngZoom(LatLng(23.7, 121.0), 7f))
+                map.setOnMapLoadedCallback {
+                    if (_binding != null) {
+                        mapLoaded = true
+                        binding.tvMapNotice.text = "地圖已載入 · 定位來自手機"
+                        android.util.Log.i("MapValidation", "Map tiles rendered")
+                    }
+                }
+                mapLoadJob?.cancel()
+                mapLoadJob = viewLifecycleOwner.lifecycleScope.launch {
+                    delay(12000)
+                    if (!mapLoaded && _binding != null) {
+                        binding.tvMapNotice.text = "地圖尚未載入，請檢查網路與地圖服務設定"
+                    }
+                }
 
                 map.setOnCameraMoveStartedListener { reason ->
                     if (reason == GoogleMap.OnCameraMoveStartedListener.REASON_GESTURE) {
-                        isMapFollowEnabled = false
+                    isMapFollowEnabled = false
+                    binding.fabMapCenter.contentDescription = "回到目前位置並跟隨"
                     }
                 }
 
                 updateMapLocation(viewModel.gpsStatus.value)
             }
         } catch (e: Exception) {
+            mapRequested = false
             android.util.Log.e("LiveFragment", "getMapAsync exception: ${e.message}")
         }
     }
@@ -207,7 +276,7 @@ class LiveFragment : Fragment() {
 
     private fun setupMediaStream(network: android.net.Network?) {
         val p = player ?: return
-        if (network == null) {
+        if (network == null || viewModel.targetIdentity.value.state != com.aladdin.dashcam.network.TargetState.READY) {
             streamJob?.cancel()
             streamJob = null
             p.stop()
@@ -219,7 +288,7 @@ class LiveFragment : Fragment() {
             binding.streamOverlay.visibility = View.VISIBLE
             binding.pbStreamLoading.visibility = View.GONE
             binding.btnRetryStream.visibility = View.VISIBLE
-            binding.tvStreamMessage.text = getString(R.string.device_status_disconnected)
+            binding.tvStreamMessage.text = "記錄器未連線\n手機地圖仍可使用"
             return
         }
 
@@ -375,6 +444,18 @@ class LiveFragment : Fragment() {
         binding.batteryContainer.setOnClickListener {
             Toast.makeText(requireContext(), binding.ivBatteryIcon.contentDescription, Toast.LENGTH_SHORT).show()
         }
+        binding.tvSdStatus.setOnClickListener {
+            val estimate = viewModel.storageEstimate.value
+            val info = if (viewModel.connectionStatus.value != ConnectionStatus.CONNECTED) {
+                "記錄器未連線，尚無目前的記憶卡資訊。"
+            } else if (estimate.totalBytes > 0 && estimate.freeBytes >= 0) {
+                val gb = 1024.0 * 1024.0 * 1024.0
+                String.format(Locale.getDefault(), "總容量：%.1f GB\n已用：%.1f GB\n可用：%.1f GB\n\n%s",
+                    estimate.totalBytes / gb, estimate.usedBytes / gb, estimate.freeBytes / gb, estimate.statusText)
+            } else estimate.statusText
+            androidx.appcompat.app.AlertDialog.Builder(requireContext()).setTitle("記憶卡資訊")
+                .setMessage(info).setPositiveButton("知道了", null).show()
+        }
 
         binding.hudContainer.setOnClickListener {
             val context = requireContext()
@@ -388,39 +469,22 @@ class LiveFragment : Fragment() {
         // Toggle Live Mode: Normal vs Split vs Map vs Ride
         binding.toggleLiveMode?.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
-                when (checkedId) {
-                    R.id.btn_mode_normal -> {
-                        binding.previewContainer.visibility = View.VISIBLE
-                        binding.layoutNormalControls?.visibility = View.VISIBLE
-                        binding.mapContainer?.visibility = View.GONE
-                        binding.layoutRideMode?.visibility = View.GONE
-                    }
-                    R.id.btn_mode_split -> {
-                        binding.previewContainer.visibility = View.VISIBLE
-                        binding.layoutNormalControls?.visibility = View.GONE
-                        binding.mapContainer?.visibility = View.VISIBLE
-                        binding.layoutRideMode?.visibility = View.GONE
-                    }
-                    R.id.btn_mode_map -> {
-                        binding.previewContainer.visibility = View.GONE
-                        binding.layoutNormalControls?.visibility = View.GONE
-                        binding.mapContainer?.visibility = View.VISIBLE
-                        binding.layoutRideMode?.visibility = View.GONE
-                    }
-                    R.id.btn_mode_ride -> {
-                        binding.previewContainer.visibility = View.VISIBLE
-                        binding.layoutNormalControls?.visibility = View.GONE
-                        binding.mapContainer?.visibility = View.GONE
-                        binding.layoutRideMode?.visibility = View.VISIBLE
-                    }
+                selectedModeId = checkedId
+                applyLiveMode()
+                if (checkedId == R.id.btn_mode_map || checkedId == R.id.btn_mode_split) {
+                    (activity as? MainActivity)?.requestLocationPermission()
                 }
             }
         }
 
         binding.fabMapCenter?.setOnClickListener {
+            if (!viewModel.gpsStatus.value.hasPermission) {
+                (activity as? MainActivity)?.requestLocationPermission()
+                return@setOnClickListener
+            }
             isMapFollowEnabled = true
             val gps = viewModel.gpsStatus.value
-            if (gps.latitude != null && gps.longitude != null) {
+            if (gps.isLocked && gps.latitude != null && gps.longitude != null) {
                 val latLng = LatLng(gps.latitude, gps.longitude)
                 googleMap?.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 17f))
                 Toast.makeText(requireContext(), "已回到目前位置並開啟跟隨", Toast.LENGTH_SHORT).show()
@@ -430,9 +494,22 @@ class LiveFragment : Fragment() {
         }
 
         binding.btnMapClearTrajectory?.setOnClickListener {
-            viewModel.gpsSpeedometer.resetTrip()
-            trajectoryPolyline?.points = emptyList()
-            Toast.makeText(requireContext(), "已清除行駛軌跡", Toast.LENGTH_SHORT).show()
+            androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle("清除本次軌跡？")
+                .setMessage("只清除手機目前顯示的騎乘軌跡，不影響記錄器影片。")
+                .setPositiveButton("清除") { _, _ ->
+                    viewModel.gpsSpeedometer.resetTrip()
+                    trajectoryPolyline?.points = emptyList()
+                }.setNegativeButton("取消", null).show()
+        }
+
+        binding.btnMapType.setOnClickListener {
+            googleMap?.let { map ->
+                val satellite = map.mapType != GoogleMap.MAP_TYPE_HYBRID
+                map.mapType = if (satellite) GoogleMap.MAP_TYPE_HYBRID else GoogleMap.MAP_TYPE_NORMAL
+                savedMapType = map.mapType
+                binding.btnMapType.text = if (satellite) "一般地圖" else "衛星地圖"
+            }
         }
 
         binding.fabMapRecord?.setOnClickListener {
@@ -574,50 +651,24 @@ class LiveFragment : Fragment() {
                         // S3 / S4: Battery vector icons and accessibility texts
                         updateBatteryUi(status.batteryLevel, status.isCharging, status.lastUpdatedTimestamp != 0L)
 
-                        val estimate = viewModel.storageEstimate.value
-                        // SD Card status: 總容量 / 已用 / 剩餘可用容量 (滿足驗收需求，嚴格區分缺欄位與無卡)
-                        if (estimate != null && estimate.totalBytes > 0) {
-                            val totalGb = estimate.totalBytes / (1024.0 * 1024.0 * 1024.0)
-                            val freeGb = estimate.freeBytes / (1024.0 * 1024.0 * 1024.0)
-                            val usedGb = estimate.usedBytes / (1024.0 * 1024.0 * 1024.0)
-                            val overwriteStr = if (estimate.minutesUntilOverwrite > 0) " (約剩餘 ${estimate.minutesUntilOverwrite} 分)" else ""
-                            binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD: 餘 %.1fG/用 %.1fG/總 %.1fG%s", freeGb, usedGb, totalGb, overwriteStr)
-                        } else if (estimate != null && estimate.isCapacityFieldMissing) {
-                            if (estimate.usedBytes > 0L) {
-                                val usedMb = estimate.usedBytes / (1024.0 * 1024.0)
-                                binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD: 正常在位 (已載相簿 %.1fM, 總量韌體未報)", usedMb)
-                            } else {
-                                binding.tvSdStatus.text = "SD: 正常在位 (容量 bytes 韌體未提供)"
-                            }
-                        } else if (status.sdTotalBytes > 0) {
-                            val totalGb = status.sdTotalBytes / (1024.0 * 1024.0 * 1024.0)
-                            val freeGb = status.sdFreeBytes / (1024.0 * 1024.0 * 1024.0)
-                            val usedGb = (status.sdTotalBytes - status.sdFreeBytes).coerceAtLeast(0L) / (1024.0 * 1024.0 * 1024.0)
-                            binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD: 餘 %.1fG/用 %.1fG/總 %.1fG", freeGb, usedGb, totalGb)
-                        } else {
-                            binding.tvSdStatus.text = estimate?.statusText ?: getString(R.string.sd_remaining_unknown)
-                        }
                     }
                 }
 
                 launch {
-                    viewModel.storageEstimate.collect { estimate ->
-                        if (estimate.totalBytes > 0) {
-                            val totalGb = estimate.totalBytes / (1024.0 * 1024.0 * 1024.0)
-                            val freeGb = estimate.freeBytes / (1024.0 * 1024.0 * 1024.0)
-                            val usedGb = estimate.usedBytes / (1024.0 * 1024.0 * 1024.0)
-                            val overwriteStr = if (estimate.minutesUntilOverwrite > 0) " (約剩餘 ${estimate.minutesUntilOverwrite} 分)" else ""
-                            binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD: 餘 %.1fG/用 %.1fG/總 %.1fG%s", freeGb, usedGb, totalGb, overwriteStr)
-                        } else if (estimate.isCapacityFieldMissing) {
-                            if (estimate.usedBytes > 0L) {
-                                val usedMb = estimate.usedBytes / (1024.0 * 1024.0)
-                                binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD: 正常在位 (已載相簿 %.1fM, 總量韌體未報)", usedMb)
-                            } else {
-                                binding.tvSdStatus.text = "SD: 正常在位 (容量 bytes 韌體未提供)"
-                            }
+                    kotlinx.coroutines.flow.combine(viewModel.storageEstimate, viewModel.connectionStatus) { estimate, connection ->
+                        estimate to connection
+                    }.collect { (estimate, connection) ->
+                        if (connection != ConnectionStatus.CONNECTED) {
+                            binding.tvSdStatus.text = "SD 容量未知"
+                        } else if (estimate.totalBytes > 0 && estimate.freeBytes >= 0) {
+                            val gb = 1024.0 * 1024.0 * 1024.0
+                            binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD: 餘 %.1f / 總 %.1f GB",
+                                estimate.freeBytes / gb, estimate.totalBytes / gb)
                         } else {
-                            binding.tvSdStatus.text = estimate.statusText
+                            binding.tvSdStatus.text = "SD 容量未知"
                         }
+                        binding.tvSdStatus.contentDescription = estimate.statusText
+                        updateRecordingTimerUi(viewModel.recordingTimerDisplay.value)
                     }
                 }
 
@@ -631,7 +682,7 @@ class LiveFragment : Fragment() {
                         }
 
                         binding.tvHudGpsStatus.text = if (gps.isLocked) {
-                            getString(R.string.hud_gps_locked)
+                            gps.sourceName
                         } else if (!gps.hasPermission) {
                             getString(R.string.hud_gps_disabled)
                         } else {
@@ -697,8 +748,9 @@ class LiveFragment : Fragment() {
                     kotlinx.coroutines.flow.combine(
                         viewModel.wifiNetwork,
                         viewModel.deviceHost,
-                        viewModel.currentStreamOwner
-                    ) { net, host, owner -> Triple(net, host, owner) }
+                        viewModel.currentStreamOwner,
+                        viewModel.targetIdentity
+                    ) { net, host, owner, _ -> Triple(net, host, owner) }
                         .collect { (network, _, owner) ->
                             if (owner == DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK) {
                                 // 相簿正在回放，暫停預覽並關閉 proxy 與 player 以釋放記錄器 8080 RTSP 端口
@@ -725,7 +777,16 @@ class LiveFragment : Fragment() {
     private fun updateRecordingTimerUi(timer: RecordingTimerDisplay) {
         if (_binding == null) return
         val compact = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-        binding.btnToggleRecording.isEnabled = true
+        val connected = viewModel.connectionStatus.value == ConnectionStatus.CONNECTED
+        binding.btnToggleRecording.isEnabled = connected && !timer.isUnknown
+        binding.btnSnapshot.isEnabled = connected
+        binding.btnToggleRecording.alpha = if (binding.btnToggleRecording.isEnabled) 1f else 0.35f
+        binding.btnSnapshot.alpha = if (connected) 1f else 0.35f
+        binding.fabMapRecord.isEnabled = connected && !timer.isUnknown
+        binding.fabMapSnapshot.isEnabled = connected
+        binding.fabMapRecord.alpha = if (binding.fabMapRecord.isEnabled) 1f else 0.35f
+        binding.fabMapSnapshot.alpha = if (connected) 1f else 0.35f
+        if (!connected) binding.tvSdStatus.text = "SD 容量未知"
         when (timer.status) {
             RecordingStatus.RECORDING -> {
                 binding.ivRecordDot.visibility = View.VISIBLE
@@ -826,23 +887,31 @@ class LiveFragment : Fragment() {
 
     private fun updateMapLocation(gps: GpsStatus) {
         val map = googleMap ?: return
-        if (gps.latitude != null && gps.longitude != null) {
+        // Accelerometer updates share this flow; they must not redraw the route or restart camera animations.
+        val previous = lastMapStatus
+        if (previous != null && previous.lastUpdateElapsedRealtime == gps.lastUpdateElapsedRealtime &&
+            previous.isLocked == gps.isLocked && previous.hasPermission == gps.hasPermission &&
+            previous.trajectory === gps.trajectory) return
+        lastMapStatus = gps
+        binding.fabMapCenter.alpha = if (gps.isLocked) 1f else 0.65f
+        if (gps.isLocked && gps.latitude != null && gps.longitude != null) {
             val currentPos = LatLng(gps.latitude, gps.longitude)
             if (phoneMarker == null) {
                 val markerOptions = MarkerOptions()
                     .position(currentPos)
                     .title("手機目前位置")
-                    .snippet("速度: ${gps.speedKmh ?: 0} km/h")
+                    .snippet("速度: ${gps.speedKmh?.toString() ?: "--"} km/h")
                     .flat(true)
                     .anchor(0.5f, 0.5f)
                 phoneMarker = map.addMarker(markerOptions)
-                map.moveCamera(CameraUpdateFactory.newLatLngZoom(currentPos, 16f))
+                if (isMapFollowEnabled && !hasSavedMapCamera) map.moveCamera(CameraUpdateFactory.newLatLngZoom(currentPos, 16f))
             } else {
                 phoneMarker?.position = currentPos
                 if (gps.bearingDegrees != null) {
                     phoneMarker?.rotation = gps.bearingDegrees
                 }
-                phoneMarker?.snippet = "速度: ${gps.speedKmh ?: 0} km/h"
+                phoneMarker?.snippet = "速度: ${gps.speedKmh?.toString() ?: "--"} km/h"
+                phoneMarker?.alpha = 1f
             }
 
             if (isMapFollowEnabled) {
@@ -856,16 +925,17 @@ class LiveFragment : Fragment() {
                 trajectoryPolyline?.points = emptyList()
             }
 
-            binding.tvMapGpsInfo?.text = "手機定位 (與影像非毫秒級對齊)"
+            binding.tvMapGpsInfo?.text = "● ${gps.sourceName}"
             binding.tvMapSpeedInfo?.text = String.format(
                 Locale.getDefault(),
-                "速度: %s · 精度: ±%.0fm",
+                "%s · ±%.0fm",
                 if (gps.speedKmh != null) "${gps.speedKmh} km/h" else "--",
                 gps.accuracyMeters
             )
         } else {
-            binding.tvMapGpsInfo?.text = if (!gps.hasPermission) "未取得定位權限 (即時錄影正常)" else "手機 GPS 搜尋中..."
-            binding.tvMapSpeedInfo?.text = "速度: -- km/h · 精度: 未知"
+            phoneMarker?.alpha = 0.35f
+            binding.tvMapGpsInfo?.text = if (!gps.hasPermission) "尚未開啟定位" else "GPS 搜尋中"
+            binding.tvMapSpeedInfo?.text = "-- km/h · 精度未知"
         }
     }
 
@@ -878,6 +948,7 @@ class LiveFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
+        viewModel.gpsSpeedometer.startListening()
         try {
             binding.mapView.onResume()
         } catch (_: Exception) {}
@@ -898,16 +969,28 @@ class LiveFragment : Fragment() {
 
     override fun onStop() {
         super.onStop()
+        viewModel.gpsSpeedometer.stopListening()
         try {
             binding.mapView.onStop()
         } catch (_: Exception) {}
+        streamJob?.cancel()
+        streamJob = null
+        player?.stop()
+        sdpProxy?.stop()
+        sdpProxy = null
+        lastStreamNetwork = null
+        lastStreamHost = null
     }
 
     override fun onDestroyView() {
+        mapLoadJob?.cancel()
+        mapLoaded = false
+        mapRequested = false
         try {
             binding.mapView.onDestroy()
         } catch (_: Exception) {}
         googleMap = null
+        lastMapStatus = null
         phoneMarker = null
         trajectoryPolyline = null
         super.onDestroyView()
@@ -932,6 +1015,10 @@ class LiveFragment : Fragment() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
+        outState.putInt("live_mode", selectedModeId)
+        outState.putBoolean("map_follow", isMapFollowEnabled)
+        outState.putBoolean("map_camera", googleMap != null)
+        outState.putInt("map_type", savedMapType)
         try {
             _binding?.mapView?.onSaveInstanceState(outState)
         } catch (_: Exception) {}

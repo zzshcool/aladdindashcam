@@ -41,6 +41,11 @@ class AlbumFragment : Fragment() {
     private lateinit var viewerStripAdapter: ViewerStripAdapter
 
     private var isDeviceSource = true
+
+    fun showLocalMedia() {
+        isDeviceSource = false
+        _binding?.toggleAlbumSource?.check(R.id.btn_source_local)
+    }
     private var isTimelineMode = false
     private var currentFilter = FilterCategory.ALL
     private var currentFilteredMediaList: List<MediaItem> = emptyList()
@@ -88,6 +93,7 @@ class AlbumFragment : Fragment() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backPressedCallback)
         setupRecyclerView()
         setupListeners()
+        if (!isDeviceSource) binding.toggleAlbumSource.check(R.id.btn_source_local)
         setupPhotoZoom()
         observeViewModel()
     }

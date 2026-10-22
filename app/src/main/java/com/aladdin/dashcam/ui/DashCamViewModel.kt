@@ -97,7 +97,14 @@ data class DashCamDeviceRecord(
     val firmwareVersion: String = "未知 (待讀取)",
     val lastConnectedTime: String = "",
     val isSelected: Boolean = false
-)
+) {
+    fun matchesWifi(currentBssid: String): Boolean =
+        currentBssid.isNotBlank() && currentBssid != "02:00:00:00:00:00" &&
+            bssid.isNotBlank() && bssid.equals(currentBssid, ignoreCase = true)
+
+    fun cacheDirectoryName(): String = java.util.Base64.getUrlEncoder().withoutPadding()
+        .encodeToString(id.toByteArray(Charsets.UTF_8))
+}
 
 data class DownloadTask(
     val id: String,
@@ -334,7 +341,6 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         client.start()
-        gpsSpeedometer.startListening()
         loadLocalMedia()
     }
 
@@ -955,11 +961,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         val currentList = _registeredDevices.value
 
         // N03: 以 BSSID / SSID 作為主鍵，隔離相同熱點 IP (如 192.168.25.1) 的不同記錄器設備與快取
-        val existing = currentList.find { dev ->
-            (currentBssid.isNotEmpty() && dev.bssid.isNotEmpty() && dev.bssid.equals(currentBssid, ignoreCase = true)) ||
-            (currentSsid.isNotEmpty() && dev.ssid.isNotEmpty() && dev.ssid == currentSsid) ||
-            (dev.bssid.isEmpty() && dev.ssid.isEmpty() && dev.host == host)
-        }
+        val existing = currentList.find { it.matchesWifi(currentBssid) }
 
         if (existing != null) {
             val updatedExisting = existing.copy(
@@ -977,10 +979,8 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         } else {
             val devId = if (currentBssid.isNotEmpty()) {
                 "DEV_${currentBssid.replace(":", "")}"
-            } else if (currentSsid.isNotEmpty()) {
-                "DEV_${currentSsid.replace(" ", "_")}"
             } else {
-                "Aladdin-${host.replace(".", "_")}-${System.currentTimeMillis() % 10000}"
+                "DEV_${java.util.UUID.randomUUID()}"
             }
             val devName = if (currentSsid.isNotEmpty()) currentSsid else "Aladdin DashCam ($host)"
             val newDev = DashCamDeviceRecord(
@@ -989,7 +989,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                 host = host,
                 ssid = currentSsid,
                 bssid = currentBssid,
-                firmwareVersion = "20260513 V1.1.0",
+                firmwareVersion = "未知 (待讀取)",
                 lastConnectedTime = "",
                 isSelected = true
             )
@@ -1105,7 +1105,9 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
      */
     fun getPreviewCacheFile(item: MediaItem): File {
         val app = getApplication<Application>()
-        val cacheDir = File(app.cacheDir, "preview_cache")
+        val selected = _registeredDevices.value.firstOrNull { it.isSelected }
+        val deviceKey = selected?.cacheDirectoryName() ?: "session_${targetIdentity.value.epoch}"
+        val cacheDir = File(app.cacheDir, "preview_cache/$deviceKey")
         if (!cacheDir.exists()) cacheDir.mkdirs()
         return File(cacheDir, item.fileName)
     }

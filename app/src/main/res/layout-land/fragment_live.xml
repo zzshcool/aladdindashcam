@@ -6,13 +6,31 @@
     android:layout_height="match_parent"
     android:background="@color/bg_dark">
 
+    <androidx.constraintlayout.widget.Guideline android:id="@+id/map_split_guideline"
+        android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:orientation="vertical" app:layout_constraintGuide_percent="0.5" />
+
+    <LinearLayout android:id="@+id/layout_live_mode_toggle" android:layout_width="0dp" android:layout_height="44dp"
+        android:gravity="center" app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toStartOf="@id/side_controls_container">
+        <com.google.android.material.button.MaterialButtonToggleGroup android:id="@+id/toggle_live_mode"
+            android:layout_width="wrap_content" android:layout_height="40dp" app:singleSelection="true" app:selectionRequired="true" app:checkedButton="@id/btn_mode_normal">
+            <com.google.android.material.button.MaterialButton android:id="@+id/btn_mode_normal" style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content" android:layout_height="match_parent" android:text="直播" android:textColor="@color/text_primary" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/btn_mode_split" style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content" android:layout_height="match_parent" android:text="分割" android:textColor="@color/text_primary" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/btn_mode_map" style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content" android:layout_height="match_parent" android:text="地圖" android:textColor="@color/text_primary" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+    </LinearLayout>
+
     <!-- Video Preview Container: Left major area in landscape (LIVE-05) -->
     <FrameLayout
         android:id="@+id/preview_container"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:background="@color/black"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/layout_live_mode_toggle"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@id/side_controls_container">
@@ -320,7 +338,7 @@
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:visibility="gone"
-        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/layout_live_mode_toggle"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toStartOf="@id/side_controls_container">
@@ -329,6 +347,11 @@
             android:id="@+id/map_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
+
+        <com.google.android.material.button.MaterialButton android:id="@+id/btn_map_type"
+            style="@style/Widget.MaterialComponents.Button" android:layout_width="wrap_content" android:layout_height="48dp"
+            android:layout_gravity="top|end" android:layout_margin="10dp" android:text="衛星地圖"
+            android:backgroundTint="@color/surface_dark" android:textColor="@color/text_primary" app:cornerRadius="24dp" />
 
         <!-- Floating map header badge: Phone GPS status & Latency disclaimer -->
         <LinearLayout
@@ -344,6 +367,9 @@
 
             <TextView
                 android:id="@+id/tv_map_gps_info"
+                android:maxWidth="125dp"
+                android:maxLines="1"
+                android:ellipsize="end"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="手機定位 (與影像非毫秒級對齊)"
@@ -353,6 +379,9 @@
 
             <TextView
                 android:id="@+id/tv_map_speed_info"
+                android:maxWidth="125dp"
+                android:maxLines="1"
+                android:ellipsize="end"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="速度: -- km/h · 精度: -- m"
@@ -366,12 +395,13 @@
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|end"
             android:layout_margin="12dp"
-            android:orientation="vertical"
+            android:orientation="horizontal"
             android:gravity="end">
 
             <!-- Floating Record Action Button on Map -->
             <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/fab_map_record"
+                android:visibility="gone"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
@@ -384,6 +414,7 @@
             <!-- Floating Snapshot Action Button on Map -->
             <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/fab_map_snapshot"
+                android:visibility="gone"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
@@ -398,11 +429,12 @@
                 android:id="@+id/btn_map_clear_trajectory"
                 style="@style/Widget.MaterialComponents.Button"
                 android:layout_width="wrap_content"
-                android:layout_height="36dp"
+                android:layout_height="48dp"
                 android:layout_marginBottom="8dp"
                 android:backgroundTint="@color/surface_dark"
                 android:paddingHorizontal="10dp"
-                android:text="重設軌跡"
+                android:text="清除軌跡"
+                android:layout_marginEnd="8dp"
                 android:textColor="@color/text_secondary"
                 android:textSize="11sp"
                 app:cornerRadius="18dp"

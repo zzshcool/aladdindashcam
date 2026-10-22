@@ -71,6 +71,7 @@ class DashCamClient(
     @Volatile
     private var currentSessionId: Long = 0L
     private val sessionCounter = java.util.concurrent.atomic.AtomicLong(1L)
+    private val statusSampleCounter = java.util.concurrent.atomic.AtomicLong(0L)
 
     /**
      * Updates target host atomically in lock, increments target epoch, and invalidates obsolete session (R5-01)
@@ -205,7 +206,7 @@ class DashCamClient(
                         // R4-02: Validate session generation before committing state to prevent stale responses from overriding new session
                         if (sessionId != 0L && sessionId == currentSessionId) {
                             if (status != null && status.recordingStatus != RecordingStatus.UNKNOWN) {
-                                _deviceStatus.value = status
+                                _deviceStatus.value = status.copy(sampleSequence = statusSampleCounter.incrementAndGet())
                                 _connectionStatus.value = ConnectionStatus.CONNECTED
                                 consecutiveFailures = 0
                             } else {

@@ -81,14 +81,22 @@ class GpsSpeedometer(
     @SuppressLint("MissingPermission")
     fun startListening() {
         try {
+            val fine = androidx.core.content.ContextCompat.checkSelfPermission(context,
+                android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val coarse = androidx.core.content.ContextCompat.checkSelfPermission(context,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (!fine && !coarse) {
+                _gpsStatus.value = GpsStatus(hasPermission = false)
+                return
+            }
             // Register accelerometer for ride G-force measurement
             val accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
             accelerometer?.let {
                 sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
             }
 
-            val isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
-            if (!isGpsEnabled) {
+            val providers = selectLocationProviders(fine, coarse, locationManager.getProviders(true))
+            if (providers.isEmpty()) {
                 _gpsStatus.value = GpsStatus(
                     speedKmh = null,
                     isLocked = false,
@@ -98,12 +106,10 @@ class GpsSpeedometer(
                 return
             }
 
-            locationManager.requestLocationUpdates(
-                LocationManager.GPS_PROVIDER,
-                1000L,
-                0f,
-                this
-            )
+            locationManager.removeUpdates(this)
+            providers.forEach { provider ->
+                locationManager.requestLocationUpdates(provider, 1000L, 0f, this)
+            }
             _gpsStatus.value = _gpsStatus.value.copy(hasPermission = true)
             startWatchdog()
         } catch (e: SecurityException) {
@@ -195,7 +201,7 @@ class GpsSpeedometer(
             bearingDegrees = bearing,
             accelerationG = currentGForce,
             lastUpdateElapsedRealtime = now,
-            sourceName = "手機 GPS",
+            sourceName = if (location.provider == LocationManager.GPS_PROVIDER) "手機 GPS" else "手機網路定位",
             trajectory = currentPoints
         )
     }
@@ -226,5 +232,10 @@ class GpsSpeedometer(
 
     companion object {
         private const val TAG = "GpsSpeedometer"
+        internal fun selectLocationProviders(fine: Boolean, coarse: Boolean, enabled: List<String>): List<String> =
+            enabled.filter {
+                (it == LocationManager.GPS_PROVIDER && fine) ||
+                    (it == LocationManager.NETWORK_PROVIDER && (fine || coarse))
+            }
     }
 }

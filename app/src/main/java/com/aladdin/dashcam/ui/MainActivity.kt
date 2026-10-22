@@ -31,6 +31,7 @@ class MainActivity : AppCompatActivity() {
     private var albumFragment: AlbumFragment? = null
     private var downloadsFragment: DownloadsFragment? = null
     private var deviceFragment: DeviceFragment? = null
+    private var homeFragment: HomeFragment? = null
 
     private var activeFragment: Fragment? = null
 
@@ -45,6 +46,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setTheme(R.style.Theme_AladdinDashCam)
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -75,6 +77,9 @@ class MainActivity : AppCompatActivity() {
                 if (isFullscreen) {
                     setFullscreen(false)
                     liveFragment?.updateFullscreenLayout(false)
+                } else if (activeFragment != homeFragment) {
+                    binding.bottomNav.selectedItemId = R.id.nav_live
+                    homeFragment?.let { switchFragment(it) }
                 } else {
                     isEnabled = false
                     onBackPressedDispatcher.onBackPressed()
@@ -109,18 +114,18 @@ class MainActivity : AppCompatActivity() {
         val album = AlbumFragment()
         val downloads = DownloadsFragment()
         val device = DeviceFragment()
+        val home = HomeFragment()
 
         liveFragment = live
         albumFragment = album
         downloadsFragment = downloads
         deviceFragment = device
-        activeFragment = live
+        homeFragment = home
+        activeFragment = home
+        binding.topBar.visibility = View.GONE
 
         supportFragmentManager.beginTransaction()
-            .add(R.id.fragment_container, device, "DEVICE").hide(device)
-            .add(R.id.fragment_container, downloads, "DOWNLOADS").hide(downloads)
-            .add(R.id.fragment_container, album, "ALBUM").hide(album)
-            .add(R.id.fragment_container, live, "LIVE")
+            .add(R.id.fragment_container, home, "HOME")
             .commit()
     }
 
@@ -129,19 +134,23 @@ class MainActivity : AppCompatActivity() {
         albumFragment = supportFragmentManager.findFragmentByTag("ALBUM") as? AlbumFragment ?: AlbumFragment()
         downloadsFragment = supportFragmentManager.findFragmentByTag("DOWNLOADS") as? DownloadsFragment ?: DownloadsFragment()
         deviceFragment = supportFragmentManager.findFragmentByTag("DEVICE") as? DeviceFragment ?: DeviceFragment()
+        homeFragment = supportFragmentManager.findFragmentByTag("HOME") as? HomeFragment ?: HomeFragment()
 
-        val activeTag = savedInstanceState.getString("ACTIVE_FRAGMENT_TAG", "LIVE")
+        val activeTag = savedInstanceState.getString("ACTIVE_FRAGMENT_TAG", "HOME")
         activeFragment = when (activeTag) {
             "ALBUM" -> albumFragment
             "DOWNLOADS" -> downloadsFragment
             "DEVICE" -> deviceFragment
+            "HOME" -> homeFragment
             else -> liveFragment
         }
+        updateTopBarVisibility()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         val tag = when (activeFragment) {
+            homeFragment -> "HOME"
             albumFragment -> "ALBUM"
             downloadsFragment -> "DOWNLOADS"
             deviceFragment -> "DEVICE"
@@ -153,8 +162,11 @@ class MainActivity : AppCompatActivity() {
     private fun setupBottomNav() {
         binding.bottomNav.setOnItemSelectedListener { item ->
             when (item.itemId) {
-                R.id.nav_live -> liveFragment?.let { switchFragment(it) } ?: false
-                R.id.nav_album -> albumFragment?.let { switchFragment(it) } ?: false
+                R.id.nav_live -> homeFragment?.let { switchFragment(it) } ?: false
+                R.id.nav_album -> albumFragment?.let {
+                    if (viewModel.connectionStatus.value != ConnectionStatus.CONNECTED) it.showLocalMedia()
+                    switchFragment(it)
+                } ?: false
                 R.id.nav_downloads -> downloadsFragment?.let { switchFragment(it) } ?: false
                 R.id.nav_device -> deviceFragment?.let { switchFragment(it) } ?: false
                 else -> false
@@ -164,13 +176,30 @@ class MainActivity : AppCompatActivity() {
 
     private fun switchFragment(target: Fragment): Boolean {
         if (target != activeFragment && activeFragment != null) {
-            supportFragmentManager.beginTransaction()
+            val transaction = supportFragmentManager.beginTransaction()
                 .hide(activeFragment!!)
-                .show(target)
-                .commit()
+                .setMaxLifecycle(activeFragment!!, Lifecycle.State.CREATED)
+            if (target.isAdded) transaction.show(target) else {
+                val tag = when (target) {
+                    homeFragment -> "HOME"
+                    liveFragment -> "LIVE"
+                    albumFragment -> "ALBUM"
+                    downloadsFragment -> "DOWNLOADS"
+                    else -> "DEVICE"
+                }
+                transaction.add(R.id.fragment_container, target, tag)
+            }
+            transaction.setMaxLifecycle(target, Lifecycle.State.RESUMED).commit()
             activeFragment = target
+            updateTopBarVisibility()
         }
         return true
+    }
+
+    private fun updateTopBarVisibility() {
+        val landscapeLive = activeFragment == liveFragment &&
+            resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        binding.topBar.visibility = if (activeFragment == homeFragment || landscapeLive) View.GONE else View.VISIBLE
     }
 
     private fun setupTopBarActions() {
@@ -179,31 +208,96 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showMyDashCamDialog() {
-        val devices = viewModel.registeredDevices.value
-        val items = devices.map { dev ->
-            val mark = if (dev.isSelected) "✓ " else "   "
-            "$mark${dev.name} (${dev.host}) - ${dev.firmwareVersion}"
-        }.toTypedArray()
-
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle("我的記錄器")
-            .setItems(items) { _, which ->
-                if (which in devices.indices) {
-                    val selected = devices[which]
-                    viewModel.selectDevice(selected)
-                    binding.tvDeviceName.text = selected.name
-                    android.widget.Toast.makeText(this, "已切換至記錄器：${selected.name}", android.widget.Toast.LENGTH_SHORT).show()
-                }
-            }
-            .setPositiveButton("新增記錄器") { _, _ ->
-                promptAddDevice()
-            }
-            .setNegativeButton("關閉", null)
-            .show()
+    fun openLive(modeId: Int) {
+        val live = liveFragment ?: return
+        live.selectMode(modeId)
+        switchFragment(live)
     }
 
-    private fun promptAddDevice() {
+    fun showMyDashCamDialog() {
+        val devices = viewModel.registeredDevices.value
+        val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).toInt()
+        val content = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            setPadding(dp(20), dp(20), dp(20), dp(24))
+            setBackgroundColor(ContextCompat.getColor(context, R.color.bg_dark))
+        }
+        val heading = android.widget.LinearLayout(this).apply { gravity = android.view.Gravity.CENTER_VERTICAL }
+        heading.addView(android.widget.TextView(this).apply {
+            text = "我的記錄器"; textSize = 22f
+            setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+        }, android.widget.LinearLayout.LayoutParams(0, dp(48), 1f))
+        heading.addView(com.google.android.material.button.MaterialButton(this).apply {
+            text = "關閉"; textSize = 13f
+            backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            setOnClickListener { sheet.dismiss() }
+        })
+        content.addView(heading)
+        val list = android.widget.LinearLayout(this).apply { orientation = android.widget.LinearLayout.VERTICAL }
+        if (devices.isEmpty()) list.addView(android.widget.TextView(this).apply {
+            text = "尚未新增設備，連上記錄器 Wi-Fi 即可開始。"
+            setPadding(0, dp(24), 0, dp(24))
+            setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+        })
+        devices.forEach { device ->
+            val card = com.google.android.material.card.MaterialCardView(this).apply {
+                radius = dp(14).toFloat()
+                setCardBackgroundColor(ContextCompat.getColor(context, R.color.surface_dark))
+                strokeWidth = dp(1)
+                strokeColor = ContextCompat.getColor(context, if (device.isSelected) R.color.accent_teal else R.color.border_subtle)
+            }
+            val row = android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                setPadding(dp(16), dp(12), dp(16), dp(12))
+            }
+            row.addView(android.widget.TextView(this).apply {
+                text = if (device.isSelected) "✓  ${device.name}" else device.name
+                textSize = 15f; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
+                setTextColor(ContextCompat.getColor(context, R.color.text_primary))
+            })
+            row.addView(android.widget.TextView(this).apply {
+                val firmware = device.firmwareVersion.takeUnless { it.startsWith("讀取") || it == "未連線" } ?: "尚未取得"
+                text = "韌體版本：$firmware\n最近連線：${device.lastConnectedTime.ifBlank { "尚無成功連線紀錄" }}"
+                textSize = 12f; setPadding(0, dp(8), 0, dp(8))
+                setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            })
+            val actions = android.widget.LinearLayout(this)
+            actions.addView(com.google.android.material.button.MaterialButton(this).apply {
+                text = if (device.isSelected) "目前選取" else "選取設備"
+                textSize = 13f; isEnabled = !device.isSelected
+                setOnClickListener { viewModel.selectDevice(device); sheet.dismiss() }
+            }, android.widget.LinearLayout.LayoutParams(0, dp(48), 1f))
+            actions.addView(com.google.android.material.button.MaterialButton(this).apply {
+                text = "移除"; contentDescription = "移除 ${device.name} 的本機記錄"
+                textSize = 13f
+                backgroundTintList = android.content.res.ColorStateList.valueOf(ContextCompat.getColor(context, R.color.surface_elevated))
+                setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+                setOnClickListener {
+                    androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
+                        .setTitle("移除此設備？")
+                        .setMessage("只移除本機設備記錄，不會刪除影片或重設記錄器。")
+                        .setPositiveButton("移除") { _, _ ->
+                            viewModel.removeDevice(device.id); sheet.dismiss(); showMyDashCamDialog()
+                        }.setNegativeButton("取消", null).show()
+                }
+            }, android.widget.LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginStart = dp(8) })
+            row.addView(actions); card.addView(row)
+            list.addView(card, android.widget.LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) })
+        }
+        content.addView(android.widget.ScrollView(this).apply { addView(list) },
+            android.widget.LinearLayout.LayoutParams(-1, minOf(dp(320), resources.displayMetrics.heightPixels / 2)))
+        content.addView(com.google.android.material.button.MaterialButton(this).apply {
+            text = "＋ 新增記錄器"
+            setOnClickListener { sheet.dismiss(); promptAddDevice() }
+        })
+        sheet.setContentView(content)
+        sheet.show()
+    }
+
+    fun promptAddDevice() {
         val wifiNet = viewModel.networkMonitor.wifiNetwork.value
         val detectedGateway = viewModel.networkMonitor.getWifiGatewayIp() ?: "192.168.25.1"
         val probe = viewModel.probeStatus.value

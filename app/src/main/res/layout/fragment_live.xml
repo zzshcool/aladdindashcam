@@ -244,15 +244,18 @@
 
         <com.google.android.material.button.MaterialButtonToggleGroup
             android:id="@+id/toggle_live_mode"
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="38dp"
             app:checkedButton="@id/btn_mode_normal"
+            app:selectionRequired="true"
             app:singleSelection="true">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_mode_normal"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:minWidth="0dp"
                 android:layout_height="match_parent"
                 android:minHeight="38dp"
                 android:paddingHorizontal="12dp"
@@ -263,7 +266,9 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_mode_split"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:minWidth="0dp"
                 android:layout_height="match_parent"
                 android:minHeight="38dp"
                 android:paddingHorizontal="12dp"
@@ -274,7 +279,9 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_mode_map"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:minWidth="0dp"
                 android:layout_height="match_parent"
                 android:minHeight="38dp"
                 android:paddingHorizontal="12dp"
@@ -285,7 +292,9 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_mode_ride"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:minWidth="0dp"
                 android:layout_height="match_parent"
                 android:minHeight="38dp"
                 android:paddingHorizontal="12dp"
@@ -578,6 +587,11 @@
             android:id="@+id/map_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
+
+        <com.google.android.material.button.MaterialButton android:id="@+id/btn_map_type"
+            style="@style/Widget.MaterialComponents.Button" android:layout_width="wrap_content" android:layout_height="48dp"
+            android:layout_gravity="top|end" android:layout_margin="10dp" android:text="衛星地圖"
+            android:backgroundTint="@color/surface_dark" android:textColor="@color/text_primary" app:cornerRadius="24dp" />
 
         <!-- Floating map header badge: Phone GPS status & Latency disclaimer -->
         <LinearLayout
