@@ -69,3 +69,4 @@ captures/
 *.png
 **/test/
 docs/screenshots/
+scratch/
