@@ -50,6 +50,7 @@ class LiveFragment : Fragment() {
 
     private val viewModel: DashCamViewModel by activityViewModels()
     private var player: ExoPlayer? = null
+    private var nativePlayer: com.aladdin.dashcam.media.NativeFfmpegPlayer? = null
 
     private var lastStreamNetwork: android.net.Network? = null
     private var lastStreamHost: String? = null
@@ -184,12 +185,40 @@ class LiveFragment : Fragment() {
     private fun initPlayer() {
         val context = requireContext()
         val loadControl = DefaultLoadControl.Builder()
-            .setBufferDurationsMs(300, 1000, 150, 300)
+            .setBufferDurationsMs(200, 500, 100, 150)
             .setPrioritizeTimeOverSizeThresholds(true)
             .build()
         val newPlayer = ExoPlayer.Builder(context).setLoadControl(loadControl).build()
         binding.playerView.player = newPlayer
         this.player = newPlayer
+
+        if (com.aladdin.dashcam.media.NativeFfmpegPlayer.isSupported) {
+            try {
+                binding.glPlayerView.visibility = View.VISIBLE
+                binding.playerView.visibility = View.GONE
+                nativePlayer = com.aladdin.dashcam.media.NativeFfmpegPlayer(
+                    glSurfaceView = binding.glPlayerView,
+                    onFirstFrameRendered = {
+                        binding.streamOverlay.visibility = View.GONE
+                        binding.pbStreamLoading.visibility = View.GONE
+                        binding.btnRetryStream.visibility = View.GONE
+                        android.util.Log.i("LiveFragment", "Native ffmpeg first frame rendered successfully")
+                    },
+                    onError = { err ->
+                        android.util.Log.w("LiveFragment", "Native ffmpeg player error: $err")
+                    }
+                )
+                android.util.Log.i("LiveFragment", "NativeFfmpegPlayer initialized with GLSurfaceView")
+            } catch (e: Throwable) {
+                android.util.Log.e("LiveFragment", "Failed to initialize NativeFfmpegPlayer", e)
+                nativePlayer = null
+                binding.glPlayerView.visibility = View.GONE
+                binding.playerView.visibility = View.VISIBLE
+            }
+        } else {
+            binding.glPlayerView.visibility = View.GONE
+            binding.playerView.visibility = View.VISIBLE
+        }
 
         newPlayer.addListener(object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
@@ -231,24 +260,26 @@ class LiveFragment : Fragment() {
                 var stalled = false
                 var sample = 0
                 while (true) {
-                    delay(1000)
+                    delay(250)
                     val bufferedMs = newPlayer.totalBufferedDuration
-                    val speed = when {
-                        !newPlayer.isPlaying || bufferedMs <= 800 -> 1f
-                        bufferedMs > 1100 -> 1.05f
-                        else -> newPlayer.playbackParameters.speed
+                    val currentSpeed = newPlayer.playbackParameters.speed
+                    val targetSpeed = when {
+                        !newPlayer.isPlaying || bufferedMs <= 600 -> 1.0f
+                        bufferedMs <= 1000 -> 1.03f
+                        bufferedMs <= 1500 -> 1.06f
+                        else -> 1.10f
                     }
-                    if (newPlayer.playbackParameters.speed != speed) {
-                        newPlayer.playbackParameters = PlaybackParameters(speed)
+                    if (Math.abs(currentSpeed - targetSpeed) >= 0.02f) {
+                        newPlayer.playbackParameters = PlaybackParameters(targetSpeed)
                     }
-                    if (++sample % 5 != 0) continue
+                    if (++sample % 8 != 0) continue
                     val counters = newPlayer.videoDecoderCounters ?: continue
                     counters.ensureUpdated()
                     val frames = counters.renderedOutputBufferCount
-                    android.util.Log.d("LiveFragment", "Video progress: rendered=$frames, dropped=${counters.droppedBufferCount}, bufferedMs=$bufferedMs, speed=$speed")
+                    android.util.Log.d("LiveFragment", "Video progress: rendered=$frames, dropped=${counters.droppedBufferCount}, bufferedMs=$bufferedMs, speed=${newPlayer.playbackParameters.speed}")
                     if (newPlayer.isPlaying && frames > 0 && frames == previousFrames) {
                         unchangedSamples++
-                        if (unchangedSamples >= 2) {
+                        if (unchangedSamples >= 3) {
                             stalled = true
                             binding.streamOverlay.visibility = View.VISIBLE
                             binding.pbStreamLoading.visibility = View.GONE
@@ -341,28 +372,48 @@ class LiveFragment : Fragment() {
                     return@launch
                 }
 
-                // 8081 命令確認成功後，給予設備管線 350ms 穩定時間，才啟動本機 Proxy 與 ExoPlayer prepare
-                kotlinx.coroutines.delay(350)
-                sdpProxy?.stop()
-                val devId = "${host}@${viewModel.targetIdentity.value.epoch}"
-                val proxy = com.aladdin.dashcam.network.RtspSdpProxy(host, 8080, network, deviceIdentifier = devId)
-                val localPort = proxy.start()
-                sdpProxy = proxy
+                // 綁定整個進程至 Wi-Fi 網絡，讓 Native ffmpeg socket 直接走 Wi-Fi
+                try {
+                    val cm = requireContext().applicationContext.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+                    cm.bindProcessToNetwork(network)
+                    android.util.Log.i("LiveFragment", "Successfully bound process to Wi-Fi network")
+                } catch (e: Exception) {
+                    android.util.Log.w("LiveFragment", "Failed to bindProcessToNetwork: ${e.message}")
+                }
 
-                val rtspUri = "rtsp://127.0.0.1:$localPort/?action=stream"
-                val mediaItem = MediaItem.fromUri(rtspUri)
-                val rtspFactory = RtspMediaSource.Factory()
-                    .setForceUseRtpTcp(true) // S1: Prevent Android UDP packet drop on Wi-Fi AP
-                val mediaSource = rtspFactory.createMediaSource(mediaItem)
-                p.setMediaSource(mediaSource)
-                p.prepare()
-                p.playWhenReady = true
-                android.util.Log.i("LiveFragment", "RtspMediaSource connected via RtspSdpProxy on port $localPort after restartStreaming ACK")
+                if (nativePlayer != null) {
+                    // 原廠模式：直連記錄器 8080 RTSP，無中間 Proxy 轉發，零延遲，直接交給 Native ffmpeg 解碼與 GLSurfaceView 渲染
+                    sdpProxy?.stop()
+                    sdpProxy = null
+                    val directRtspUri = "rtsp://$host:8080/?action=stream"
+                    android.util.Log.i("LiveFragment", "Starting stream with Native C/C++ ffmpeg direct frame decoding: $directRtspUri")
+                    binding.glPlayerView.visibility = View.VISIBLE
+                    binding.playerView.visibility = View.GONE
+                    nativePlayer?.start(directRtspUri)
+                } else {
+                    binding.glPlayerView.visibility = View.GONE
+                    binding.playerView.visibility = View.VISIBLE
+                    sdpProxy?.stop()
+                    val devId = "${host}@${viewModel.targetIdentity.value.epoch}"
+                    val proxy = com.aladdin.dashcam.network.RtspSdpProxy(host, 8080, network, deviceIdentifier = devId)
+                    val localPort = proxy.start()
+                    sdpProxy = proxy
+                    val rtspUri = "rtsp://127.0.0.1:$localPort/?action=stream"
+                    val mediaItem = MediaItem.fromUri(rtspUri)
+                    val rtspFactory = RtspMediaSource.Factory()
+                        .setForceUseRtpTcp(true) // S1: Prevent Android UDP packet drop on Wi-Fi AP
+                    val mediaSource = rtspFactory.createMediaSource(mediaItem)
+                    p.setMediaSource(mediaSource)
+                    p.prepare()
+                    p.playWhenReady = true
+                    android.util.Log.i("LiveFragment", "RtspMediaSource connected via RtspSdpProxy on port $localPort after restartStreaming ACK")
+                }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 android.util.Log.e("LiveFragment", "Error during sequential stream setup: ${e.message}")
                 p.stop()
                 p.clearMediaItems()
+                nativePlayer?.stop()
                 sdpProxy?.stop()
                 sdpProxy = null
                 binding.streamOverlay.visibility = View.VISIBLE
@@ -659,13 +710,22 @@ class LiveFragment : Fragment() {
                         estimate to connection
                     }.collect { (estimate, connection) ->
                         if (connection != ConnectionStatus.CONNECTED) {
-                            binding.tvSdStatus.text = "SD 容量未知"
+                            binding.tvSdStatus.text = "未連線"
                         } else if (estimate.totalBytes > 0 && estimate.freeBytes >= 0) {
                             val gb = 1024.0 * 1024.0 * 1024.0
                             binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD: 餘 %.1f / 總 %.1f GB",
                                 estimate.freeBytes / gb, estimate.totalBytes / gb)
+                        } else if (estimate.isNormal) {
+                            if (estimate.listedMediaTotalBytes > 0L) {
+                                val mb = estimate.listedMediaTotalBytes / (1024.0 * 1024.0)
+                                binding.tvSdStatus.text = String.format(Locale.getDefault(), "SD 正常 · 檔案 %.0fMB", mb)
+                            } else {
+                                binding.tvSdStatus.text = "SD 正常 · 錄影中"
+                            }
+                        } else if (estimate.hasSdCard) {
+                            binding.tvSdStatus.text = "記憶卡異常"
                         } else {
-                            binding.tvSdStatus.text = "SD 容量未知"
+                            binding.tvSdStatus.text = "未偵測到記憶卡"
                         }
                         binding.tvSdStatus.contentDescription = estimate.statusText
                         updateRecordingTimerUi(viewModel.recordingTimerDisplay.value)
@@ -756,6 +816,7 @@ class LiveFragment : Fragment() {
                                 // 相簿正在回放，暫停預覽並關閉 proxy 與 player 以釋放記錄器 8080 RTSP 端口
                                 streamJob?.cancel()
                                 streamJob = null
+                                nativePlayer?.stop()
                                 player?.stop()
                                 sdpProxy?.stop()
                                 sdpProxy = null
@@ -786,7 +847,7 @@ class LiveFragment : Fragment() {
         binding.fabMapSnapshot.isEnabled = connected
         binding.fabMapRecord.alpha = if (binding.fabMapRecord.isEnabled) 1f else 0.35f
         binding.fabMapSnapshot.alpha = if (connected) 1f else 0.35f
-        if (!connected) binding.tvSdStatus.text = "SD 容量未知"
+        if (!connected) binding.tvSdStatus.text = "未連線"
         when (timer.status) {
             RecordingStatus.RECORDING -> {
                 binding.ivRecordDot.visibility = View.VISIBLE
@@ -975,6 +1036,7 @@ class LiveFragment : Fragment() {
         } catch (_: Exception) {}
         streamJob?.cancel()
         streamJob = null
+        nativePlayer?.stop()
         player?.stop()
         sdpProxy?.stop()
         sdpProxy = null
@@ -999,6 +1061,8 @@ class LiveFragment : Fragment() {
         }
         streamJob?.cancel()
         streamJob = null
+        nativePlayer?.release()
+        nativePlayer = null
         sdpProxy?.stop()
         sdpProxy = null
         player?.release()

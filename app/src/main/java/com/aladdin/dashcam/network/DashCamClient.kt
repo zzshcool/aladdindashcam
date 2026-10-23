@@ -106,6 +106,7 @@ class DashCamClient(
     private var outputStream: OutputStream? = null
 
     private var pollingJob: Job? = null
+    private var unsupportedThumbnailSessionId: Long = 0L
     private val commandLock = Any()
 
     private val _connectionStatus = MutableStateFlow(ConnectionStatus.DISCONNECTED)
@@ -538,11 +539,10 @@ class DashCamClient(
                     disconnectInternal()
                     Result.success(Unit)
                 } else {
-                    isPoweredOffByUser.set(false)
+                    disconnectInternal()
                     Result.failure(IllegalStateException("記錄器未確認關機：$response"))
                 }
             } catch (e: Exception) {
-                if (!attempted) isPoweredOffByUser.set(false)
                 if (attempted) disconnectInternal()
                 Result.failure(e)
             }
@@ -1141,6 +1141,9 @@ class DashCamClient(
                 if (expectedEpoch != null && expectedEpoch != targetEpoch) {
                     return@withContext Result.failure(IllegalStateException("Target epoch expired during connect (expected $expectedEpoch, current $targetEpoch)"))
                 }
+                if (unsupportedThumbnailSessionId == currentSessionId) {
+                    return@withContext Result.failure(IllegalStateException("Thumbnail command is unsupported in this session"))
+                }
                 val thumbnailSocket = socket ?: error("Thumbnail socket unavailable")
                 val previousTimeout = thumbnailSocket.soTimeout
                 val req = GPSocketProtocol.buildGetThumbnailPacket(deviceIndex)
@@ -1163,7 +1166,15 @@ class DashCamClient(
                                     image.write(response.payload)
                                 }
                             }
-                            is GPSocketResponse.Nak -> error("GetThumbnail NAK: 0x${response.errorCode.toString(16).uppercase()}")
+                            is GPSocketResponse.Nak -> {
+                                val message = "GetThumbnail NAK: 0x${response.errorCode.toString(16).uppercase()}"
+                                if (image.size() > 0) error(message)
+                                if (response.errorCode == GPSocketProtocol.ERR_INVALID_CMD) {
+                                    unsupportedThumbnailSessionId = currentSessionId
+                                }
+                                Log.w(TAG, message)
+                                return@withContext Result.failure(IllegalStateException(message))
+                            }
                             is GPSocketResponse.Error -> error(response.message)
                         }
                         if (!complete) {

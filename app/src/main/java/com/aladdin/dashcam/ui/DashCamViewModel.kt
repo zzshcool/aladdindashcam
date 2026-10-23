@@ -206,6 +206,9 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     private val _exposureDisplay = MutableStateFlow("未連線")
     val exposureDisplay: StateFlow<String> = _exposureDisplay.asStateFlow()
 
+    private val _exposureProgress = MutableStateFlow(6)
+    val exposureProgress: StateFlow<Int> = _exposureProgress.asStateFlow()
+
     private val _exposureValue = MutableStateFlow(0.0f)
     val exposureValue: StateFlow<Float> = _exposureValue.asStateFlow()
 
@@ -338,6 +341,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                     _captureResolutionDisplay.value = "未連線"
                     _captureQualityDisplay.value = "未連線"
                     _exposureDisplay.value = "未連線"
+                    _exposureProgress.value = 6
                     _watermarkDisplay.value = "未連線"
                     _audioRecordingDisplay.value = "未連線"
                     _firmwareVersionDisplay.value = "未連線"
@@ -466,14 +470,14 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                 val mediaMb = listedMediaBytes / (1024.0 * 1024.0)
                 String.format(
                     java.util.Locale.TAIWAN,
-                    "%s · 記憶卡可操作 · 已列舉媒體大小: %.1f MB (總容量韌體未回報)",
+                    "%s · 記憶卡正常 · 已列舉媒體大小: %.1f MB",
                     loopModePrefix,
                     mediaMb
                 )
             } else {
                 String.format(
                     java.util.Locale.TAIWAN,
-                    "%s · 記憶卡可操作 (容量 bytes 韌體未回報)",
+                    "%s · 記憶卡正常 (循環錄影中)",
                     loopModePrefix
                 )
             }
@@ -723,29 +727,36 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         return result
     }
 
-    suspend fun setExposure(exposureVal: Float): Result<Unit> {
+    suspend fun setExposureByRaw(rawVal: Int, displayName: String, progress: Int): Result<Unit> {
         val currentIdentity = targetIdentity.value
         val epoch = currentIdentity.epoch
-        val rawVal = (exposureVal * 3).toInt().coerceIn(-6, 6)
         val result = client.setParameter(
             GPSocketProtocol.PARAM_EXPOSURE,
             byteArrayOf(rawVal.toByte()),
             expectedEpoch = epoch
         )
-        val disp = String.format(java.util.Locale.US, "%+.1f", exposureVal)
         if (result.isSuccess) {
             if (targetIdentity.value.epoch == epoch) {
-                _exposureValue.value = exposureVal
-                _exposureDisplay.value = "$disp (確認中...)"
+                _exposureProgress.value = progress
+                _exposureDisplay.value = "$displayName (確認中...)"
                 viewModelScope.launch(Dispatchers.IO) {
                     kotlinx.coroutines.delay(250)
                     val check = client.getParameter(GPSocketProtocol.PARAM_EXPOSURE, expectedEpoch = epoch)
                     if (targetIdentity.value.epoch == epoch) {
                         if (check.isSuccess) {
                             val actual = check.getOrNull()?.firstOrNull()?.toInt()
-                            _exposureDisplay.value = if (actual == rawVal) disp else "回讀值: ${actual?.let { String.format(java.util.Locale.US, "%+.1f", it / 3.0f) } ?: actual}"
+                            if (actual == rawVal) {
+                                _exposureDisplay.value = displayName
+                                _exposureProgress.value = DashCamSettingMappings.exposureRawToProgress(actual)
+                            } else {
+                                val actualName = actual?.let { DashCamSettingMappings.getExposureName(it) } ?: actual.toString()
+                                _exposureDisplay.value = "回讀值: $actualName"
+                                if (actual != null) {
+                                    _exposureProgress.value = DashCamSettingMappings.exposureRawToProgress(actual)
+                                }
+                            }
                         } else {
-                            _exposureDisplay.value = "$disp (已送出，回讀失敗)"
+                            _exposureDisplay.value = "$displayName (已送出，回讀失敗)"
                         }
                     }
                 }
@@ -756,6 +767,13 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         return result
+    }
+
+    suspend fun setExposure(exposureVal: Float): Result<Unit> {
+        val progress = kotlin.math.round(exposureVal * 3f + 6f).toInt().coerceIn(0, 12)
+        val rawVal = DashCamSettingMappings.exposureProgressToRaw(progress)
+        val displayName = DashCamSettingMappings.getExposureName(rawVal)
+        return setExposureByRaw(rawVal, displayName, progress)
     }
 
     suspend fun setWatermark(rawVal: Int, displayName: String = DashCamSettingMappings.getWatermarkName(rawVal)): Result<Unit> {
@@ -919,10 +937,11 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             // 3. Exposure
             val expResult = client.getParameter(GPSocketProtocol.PARAM_EXPOSURE, expectedEpoch = epoch)
             if (expResult.isSuccess && targetIdentity.value.epoch == epoch) {
-                val byteVal = expResult.getOrNull()?.firstOrNull()?.toInt() ?: 0
-                val expVal = byteVal / 3.0f
-                _exposureValue.value = expVal
-                _exposureDisplay.value = String.format(java.util.Locale.US, "%+.1f", expVal)
+                val byteVal = expResult.getOrNull()?.firstOrNull()?.toInt() ?: 0x06
+                val name = DashCamSettingMappings.getExposureName(byteVal)
+                val progress = DashCamSettingMappings.exposureRawToProgress(byteVal)
+                _exposureDisplay.value = name
+                _exposureProgress.value = progress
             } else if (targetIdentity.value.epoch == epoch) {
                 _exposureDisplay.value = "讀取失敗"
             }
@@ -952,6 +971,13 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                 _captureQualityDisplay.value = DashCamSettingMappings.getCaptureQualityName(byteVal)
             } else if (targetIdentity.value.epoch == epoch) {
                 _captureQualityDisplay.value = "讀取失敗"
+            }
+
+            // 7. Record Audio
+            val audioResult = client.getParameter(GPSocketProtocol.PARAM_RECORD_AUDIO, expectedEpoch = epoch)
+            if (audioResult.isSuccess && targetIdentity.value.epoch == epoch) {
+                val byteVal = audioResult.getOrNull()?.firstOrNull()?.toInt() ?: 0
+                _audioRecordingDisplay.value = if (byteVal == 1) "開啟" else "關閉"
             }
         }
     }

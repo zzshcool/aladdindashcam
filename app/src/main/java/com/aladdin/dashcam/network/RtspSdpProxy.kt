@@ -201,9 +201,9 @@ class RtspSdpProxy(
             activeSockets.add(sock)
             Log.i(TAG, "Proxy successfully connected to dashcam at $remoteHost:$remotePort via dedicated Wi-Fi")
 
-            val clientIn = clientSocket.getInputStream()
+            val clientIn = java.io.BufferedInputStream(clientSocket.getInputStream(), 32768)
             val clientOut = clientSocket.getOutputStream()
-            val serverIn = dashcamSocket.getInputStream()
+            val serverIn = java.io.BufferedInputStream(dashcamSocket.getInputStream(), 32768)
             val serverOut = dashcamSocket.getOutputStream()
 
             val jobC2S = launch {
@@ -288,10 +288,7 @@ class RtspSdpProxy(
         val streamReader = RtspFramingReader(input)
         val cacheKey = getEffectiveCacheKey()
         val parameterSets = RtpParameterSetCollector()
-        var timestamps = RtpVideoTimestampNormalizer()
-        var timestampModeChosen = false
-        val initialVideoPackets = ArrayList<ByteArray>()
-        val initialDurations = ArrayList<Long>()
+        val timestamps = RtpVideoTimestampNormalizer(fallbackDuration = 3000L)
 
         var binaryCount = 0
         while (isRunning.get()) {
@@ -306,25 +303,11 @@ class RtspSdpProxy(
                     if (binaryCount == 1 || binaryCount % 100 == 0) {
                         Log.i(TAG, "S->C Binary frame #$binaryCount channel=${frame.channel} len=${frame.payload.size}")
                     }
-                    // Forward binary packet directly
-                    if (frame.channel == 0 && !timestampModeChosen) {
-                        initialVideoPackets.add(frame.rawPacket)
-                        timestamps.normalize(frame.rawPacket)
-                        if (frame.payload.size >= 12 && frame.payload[1].toInt() and 128 != 0) {
-                            initialDurations.add((4..7).fold(0L) { value, index ->
-                                (value shl 8) or (frame.payload[index].toLong() and 255)
-                            })
-                        }
-                        if (initialDurations.size < 12 && initialVideoPackets.size < 128) continue
-                        val durations = initialDurations.filter { it in 900L..9000L }.sorted()
-                        val fallback = durations.getOrNull(durations.size / 2) ?: 3000L
-                        Log.i(TAG, "RTP duration compatibility mode=${timestamps.durationMode}")
-                        timestamps = RtpVideoTimestampNormalizer(timestamps.durationMode, fallback)
-                        initialVideoPackets.forEach { output.write(timestamps.normalize(it)) }
-                        initialVideoPackets.clear()
-                        timestampModeChosen = true
+                    // Ultra-low latency zero-buffering passthrough: normalize timestamps on the fly without hoarding initial frames
+                    if (frame.channel == 0) {
+                        output.write(timestamps.normalize(frame.rawPacket))
                     } else {
-                        output.write(if (frame.channel == 0) timestamps.normalize(frame.rawPacket) else frame.rawPacket)
+                        output.write(frame.rawPacket)
                     }
                     output.flush()
 

@@ -49,6 +49,31 @@ object DashCamSettingMappings {
         SettingOption(0, "關閉")
     )
 
+    // Menu.xml ID 0x00000005: Record Audio
+    val RECORD_AUDIOS = listOf(
+        SettingOption(1, "開啟"),
+        SettingOption(0, "關閉")
+    )
+
+    // Menu.xml ID 0x00000001: Exposure
+    // Values: 00=+2.0, 01=+5/3, 02=+4/3, 03=+1.0, 04=+2/3, 05=+1/3, 06=+0.0, 07=-1/3, 08=-2/3, 09=-1.0, 0A=-4/3, 0B=-5/3, 0C=-2.0
+    // UI progress 0..12 maps left-to-right from -2.0 (progress 0) to +2.0 (progress 12), with center +0.0 (progress 6).
+    val EXPOSURE_OPTIONS = listOf(
+        SettingOption(0x0C, "-2.0"),
+        SettingOption(0x0B, "-5/3"),
+        SettingOption(0x0A, "-4/3"),
+        SettingOption(0x09, "-1.0"),
+        SettingOption(0x08, "-2/3"),
+        SettingOption(0x07, "-1/3"),
+        SettingOption(0x06, "+0.0"),
+        SettingOption(0x05, "+1/3"),
+        SettingOption(0x04, "+2/3"),
+        SettingOption(0x03, "+1.0"),
+        SettingOption(0x02, "+4/3"),
+        SettingOption(0x01, "+5/3"),
+        SettingOption(0x00, "+2.0")
+    )
+
     fun getVideoResolutionName(raw: Int): String =
         VIDEO_RESOLUTIONS.find { it.rawValue == raw }?.displayName ?: "未知 ($raw)"
 
@@ -63,4 +88,14 @@ object DashCamSettingMappings {
 
     fun getWatermarkName(raw: Int): String =
         WATERMARKS.find { it.rawValue == raw }?.displayName ?: "未知 ($raw)"
+
+    fun getExposureName(raw: Int): String =
+        EXPOSURE_OPTIONS.find { it.rawValue == raw }?.displayName ?: if (raw in 0x00..0x0C) {
+            val progress = (12 - raw).coerceIn(0, 12)
+            EXPOSURE_OPTIONS[progress].displayName
+        } else "未知 ($raw)"
+
+    fun exposureProgressToRaw(progress: Int): Int = (12 - progress.coerceIn(0, 12))
+
+    fun exposureRawToProgress(raw: Int): Int = (12 - raw.coerceIn(0, 12))
 }

@@ -74,6 +74,11 @@ class DeviceFragment : Fragment() {
                     }
                 }
                 launch {
+                    viewModel.exposureProgress.collect { progress ->
+                        binding.seekExposure.progress = progress
+                    }
+                }
+                launch {
                     viewModel.watermarkDisplay.collect { wmText ->
                         binding.tvCurrentWatermark.text = wmText
                     }
@@ -279,8 +284,8 @@ class DeviceFragment : Fragment() {
         binding.seekExposure.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) {
-                    val expVal = (progress - 6) / 3.0f
-                    binding.tvCurrentExposure.text = String.format(java.util.Locale.US, "%+.1f", expVal)
+                    val rawVal = com.aladdin.dashcam.model.DashCamSettingMappings.exposureProgressToRaw(progress)
+                    binding.tvCurrentExposure.text = com.aladdin.dashcam.model.DashCamSettingMappings.getExposureName(rawVal)
                 }
             }
 
@@ -288,9 +293,10 @@ class DeviceFragment : Fragment() {
 
             override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {
                 val progress = seekBar?.progress ?: 6
-                val expVal = (progress - 6) / 3.0f
+                val rawVal = com.aladdin.dashcam.model.DashCamSettingMappings.exposureProgressToRaw(progress)
+                val displayName = com.aladdin.dashcam.model.DashCamSettingMappings.getExposureName(rawVal)
                 viewLifecycleOwner.lifecycleScope.launch {
-                    viewModel.setExposure(expVal)
+                    viewModel.setExposureByRaw(rawVal, displayName, progress)
                 }
             }
         })

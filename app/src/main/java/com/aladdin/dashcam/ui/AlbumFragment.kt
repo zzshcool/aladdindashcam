@@ -28,10 +28,16 @@ import androidx.recyclerview.widget.GridLayoutManager
 import com.aladdin.dashcam.R
 import com.aladdin.dashcam.databinding.FragmentAlbumBinding
 import com.aladdin.dashcam.model.MediaItem
+import com.aladdin.dashcam.model.ConnectionStatus
+import com.aladdin.dashcam.model.DeviceMode
+import com.aladdin.dashcam.model.RecordingStatus
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.io.File
@@ -268,7 +274,7 @@ class AlbumFragment : Fragment() {
                 Toast.makeText(requireContext(), "無法進入裝置相簿：${enterResult.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
                 return@launch
             }
-            binding.tvAlbumRecordingPaused.text = "錄影已暫停 · 離開裝置相簿會自動恢復"
+            updateAlbumRecordingStatus()
             adapter.notifyItemRangeChanged(0, adapter.itemCount)
             val res = viewModel.fetchRemoteFileList()
             binding.layoutLoadingState.visibility = View.GONE
@@ -279,6 +285,26 @@ class AlbumFragment : Fragment() {
                 applyFilters()
             }
         }
+    }
+
+    private fun updateAlbumRecordingStatus() {
+        if (!isDeviceSource || isHidden || albumEnterJob == null || albumExitJob?.isActive == true) {
+            binding.tvAlbumRecordingPaused.visibility = View.GONE
+            return
+        }
+        val status = viewModel.deviceStatus.value
+        val ageMs = System.currentTimeMillis() - status.lastUpdatedTimestamp
+        binding.tvAlbumRecordingPaused.text = when {
+            viewModel.connectionStatus.value != ConnectionStatus.CONNECTED -> "記錄器未連線 · 錄影狀態未知"
+            albumEnterJob?.isActive == true -> "切換裝置相簿中 · 錄影將暫停"
+            status.lastUpdatedTimestamp <= 0L || ageMs !in 0L..10_000L -> "錄影狀態未知 · 等待設備回報"
+            status.mode == DeviceMode.RECORD && status.recordingStatus == RecordingStatus.RECORDING ->
+                "記錄器錄影中 · 裝置相簿模式已中斷"
+            status.mode == DeviceMode.PLAYBACK -> "設備處於回放模式 · 錄影已暫停"
+            status.recordingStatus == RecordingStatus.STOPPED -> "記錄器目前未錄影"
+            else -> "錄影狀態未知 · 等待設備回報"
+        }
+        binding.tvAlbumRecordingPaused.visibility = View.VISIBLE
     }
 
     private fun leaveDeviceAlbum() {
@@ -1016,6 +1042,14 @@ class AlbumFragment : Fragment() {
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    combine(viewModel.deviceStatus, viewModel.connectionStatus) { _, _ -> Unit }
+                        .collectLatest {
+                            updateAlbumRecordingStatus()
+                            delay(10_001L)
+                            updateAlbumRecordingStatus()
+                        }
+                }
                 launch {
                     viewModel.connectionStatus.collect { status ->
                         if (currentViewingItem?.isVideo == true && jpegPlayback != null &&

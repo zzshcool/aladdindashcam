@@ -30,6 +30,10 @@ android {
 
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
 
+        ndk {
+            abiFilters.addAll(listOf("arm64-v8a"))
+        }
+
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
