@@ -2,6 +2,7 @@ package com.aladdin.dashcam.ui
 
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -10,6 +11,7 @@ import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import android.widget.LinearLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -17,6 +19,7 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem as ExoMediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -26,7 +29,9 @@ import com.aladdin.dashcam.R
 import com.aladdin.dashcam.databinding.FragmentAlbumBinding
 import com.aladdin.dashcam.model.MediaItem
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.io.File
@@ -45,8 +50,15 @@ class AlbumFragment : Fragment() {
     private var isDeviceSource = true
 
     fun showLocalMedia() {
-        isDeviceSource = false
-        _binding?.toggleAlbumSource?.check(R.id.btn_source_local)
+        if (_binding != null) binding.toggleAlbumSource.check(R.id.btn_source_local)
+        else isDeviceSource = false
+    }
+    fun showDeviceMedia() {
+        if (_binding != null) binding.toggleAlbumSource.check(R.id.btn_source_device)
+        else isDeviceSource = true
+        if (_binding != null && !isHidden && viewModel.connectionStatus.value == com.aladdin.dashcam.model.ConnectionStatus.CONNECTED) {
+            triggerRemoteListRefresh()
+        }
     }
     private var isTimelineMode = false
     private var currentFilter = FilterCategory.ALL
@@ -55,11 +67,18 @@ class AlbumFragment : Fragment() {
 
     // Media viewer & player state
     private var exoPlayer: ExoPlayer? = null
-    private var sdpProxy: com.aladdin.dashcam.network.RtspSdpProxy? = null
+    private var jpegPlayback: com.aladdin.dashcam.network.GeneralplusPlaybackStream? = null
     private var currentViewingItem: MediaItem? = null
     private var previewJob: Job? = null
+    private var playbackCommandJob: Job? = null
     private var previewRequestId = 0L
     private var downloadJob: Job? = null
+    private var listRefreshJob: Job? = null
+    private var albumEnterJob: Deferred<Result<Unit>>? = null
+    private var albumExitJob: Job? = null
+    private var playbackStopJob: Job? = null
+    private var protectedPreviewFile: File? = null
+    private var previewStartedAt = 0L
 
     // Touch & zoom matrix for photo viewer
     private val imageMatrix = Matrix()
@@ -95,9 +114,56 @@ class AlbumFragment : Fragment() {
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backPressedCallback)
         setupRecyclerView()
         setupListeners()
+        updateResponsiveControls(resources.configuration)
         if (!isDeviceSource) binding.toggleAlbumSource.check(R.id.btn_source_local)
         setupPhotoZoom()
         observeViewModel()
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        if (_binding != null) {
+            updateResponsiveControls(newConfig)
+            adapter.notifyItemRangeChanged(0, adapter.itemCount)
+            updateViewerOrientation(newConfig)
+        }
+    }
+
+    private fun updateResponsiveControls(config: Configuration) {
+        val landscape = config.orientation == Configuration.ORIENTATION_LANDSCAPE
+        binding.layoutNormalHeader.visibility = if (landscape || adapter.isSelectionMode) View.GONE else View.VISIBLE
+        binding.layoutFilterControls.orientation = if (landscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+        binding.scrollFilterChips.layoutParams = LinearLayout.LayoutParams(
+            if (landscape) 0 else ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT,
+            if (landscape) 1f else 0f
+        )
+        binding.toggleViewMode.layoutParams = LinearLayout.LayoutParams(
+            if (landscape) (220 * resources.displayMetrics.density).toInt() else ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.WRAP_CONTENT
+        ).apply { bottomMargin = if (landscape) 0 else (8 * resources.displayMetrics.density).toInt() }
+    }
+
+    private fun updateViewerOrientation(config: Configuration) {
+        val viewingVideo = currentViewingItem?.isVideo == true
+        (activity as? MainActivity)?.setAlbumPreviewExpanded(
+            currentViewingItem != null && !isHidden && config.orientation == Configuration.ORIENTATION_LANDSCAPE
+        )
+        binding.layoutViewerStripContainer.visibility = if (viewingVideo && config.orientation != Configuration.ORIENTATION_LANDSCAPE) View.VISIBLE else View.GONE
+        binding.viewerTopBar.visibility = View.VISIBLE
+    }
+
+    override fun onHiddenChanged(hidden: Boolean) {
+        super.onHiddenChanged(hidden)
+        if (hidden && _binding != null && currentViewingItem != null) closeViewer()
+        if (_binding != null) updateViewerOrientation(resources.configuration)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (isDeviceSource && viewModel.connectionStatus.value == com.aladdin.dashcam.model.ConnectionStatus.CONNECTED) {
+            triggerRemoteListRefresh()
+        }
     }
 
     private val thumbnailJobs = mutableMapOf<android.widget.ImageView, Job>()
@@ -176,16 +242,34 @@ class AlbumFragment : Fragment() {
 
     private fun exitBatchSelectionMode() {
         adapter.setSelectionMode(false)
-        binding.layoutNormalHeader.visibility = View.VISIBLE
+        updateResponsiveControls(resources.configuration)
         binding.layoutBatchHeader.visibility = View.GONE
         binding.layoutBatchBottomBar.visibility = View.GONE
         backPressedCallback.isEnabled = binding.layoutMediaViewer.visibility == View.VISIBLE
     }
 
     private fun triggerRemoteListRefresh() {
-        viewLifecycleOwner.lifecycleScope.launch {
+        if (!isDeviceSource || isHidden || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
+        if (listRefreshJob?.isActive == true) return
+        listRefreshJob = viewLifecycleOwner.lifecycleScope.launch {
             binding.layoutLoadingState.visibility = View.VISIBLE
             binding.layoutEmptyState.visibility = View.GONE
+            albumExitJob?.join()
+            binding.tvAlbumRecordingPaused.text = "切換裝置相簿中 · 錄影將暫停"
+            binding.tvAlbumRecordingPaused.visibility = View.VISIBLE
+            val enterJob = albumEnterJob ?: viewModel.viewModelScope.async {
+                viewModel.enterRemoteAlbumBrowsing()
+            }.also { albumEnterJob = it }
+            val enterResult = enterJob.await()
+            if (enterResult.isFailure) {
+                albumEnterJob = null
+                binding.tvAlbumRecordingPaused.visibility = View.GONE
+                binding.layoutLoadingState.visibility = View.GONE
+                Toast.makeText(requireContext(), "無法進入裝置相簿：${enterResult.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                return@launch
+            }
+            binding.tvAlbumRecordingPaused.text = "錄影已暫停 · 離開裝置相簿會自動恢復"
+            adapter.notifyItemRangeChanged(0, adapter.itemCount)
             val res = viewModel.fetchRemoteFileList()
             binding.layoutLoadingState.visibility = View.GONE
             res.onSuccess { list ->
@@ -197,13 +281,41 @@ class AlbumFragment : Fragment() {
         }
     }
 
+    private fun leaveDeviceAlbum() {
+        binding.tvAlbumRecordingPaused.visibility = View.GONE
+        if (albumExitJob?.isActive == true) return
+        val pendingEnter = albumEnterJob
+        val pendingPlaybackStop = playbackStopJob
+        albumExitJob = viewModel.viewModelScope.launch {
+            pendingEnter?.join()
+            pendingPlaybackStop?.join()
+            val result = viewModel.exitRemoteAlbumBrowsing()
+            albumEnterJob = null
+            if (result.isFailure && isAdded) {
+                Toast.makeText(context, "未確認恢復錄影：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     private fun setupListeners() {
+        binding.playerView.setControllerVisibilityListener(
+            androidx.media3.ui.PlayerView.ControllerVisibilityListener { visibility ->
+                if (_binding != null && resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                    binding.viewerTopBar.visibility = visibility
+                }
+            }
+        )
         binding.toggleAlbumSource.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
                 if (adapter.isSelectionMode) {
                     exitBatchSelectionMode()
                 }
+                val wasDeviceSource = isDeviceSource
                 isDeviceSource = (checkedId == R.id.btn_source_device)
+                if (wasDeviceSource && !isDeviceSource) leaveDeviceAlbum()
+                if (isDeviceSource && viewModel.connectionStatus.value == com.aladdin.dashcam.model.ConnectionStatus.CONNECTED) {
+                    triggerRemoteListRefresh()
+                } else if (!isDeviceSource) viewModel.loadLocalMedia()
                 applyFilters()
             }
         }
@@ -462,7 +574,7 @@ class AlbumFragment : Fragment() {
             } else if (b.timestampMillis > 0) {
                 1
             } else {
-                b.fileName.compareTo(a.fileName)
+                b.deviceIndex.compareTo(a.deviceIndex)
             }
         }
         currentFilteredMediaList = sortedList
@@ -540,6 +652,11 @@ class AlbumFragment : Fragment() {
      * Opens media viewer with fast RTSP playback on remote dashcam and offline local playback.
      */
     private fun openViewer(item: MediaItem, startOffsetMs: Long = 0L) {
+        playbackCommandJob?.cancel()
+        previewStartedAt = android.os.SystemClock.elapsedRealtime()
+        android.util.Log.i("AlbumFragment", "Open media index=${item.deviceIndex}, file=${item.fileName}")
+        thumbnailJobs.values.forEach { it.cancel() }
+        thumbnailJobs.clear()
         currentViewingItem = item
         binding.layoutMediaViewer.visibility = View.VISIBLE
         backPressedCallback.isEnabled = true
@@ -562,8 +679,10 @@ class AlbumFragment : Fragment() {
 
         // Reset player & photo view
         releasePlayer()
+        releasePreviewProtection()
         binding.playerView.visibility = View.GONE
         binding.ivPhotoViewer.visibility = View.GONE
+        binding.ivPhotoViewer.setImageDrawable(null)
         binding.viewerLoadingLayout.visibility = View.GONE
         binding.viewerErrorLayout.visibility = View.GONE
 
@@ -580,6 +699,7 @@ class AlbumFragment : Fragment() {
         } else {
             binding.layoutViewerStripContainer.visibility = View.GONE
         }
+        updateViewerOrientation(resources.configuration)
 
         // Check if file is already on local device
         val localFile = viewModel.getLocalMediaFile(item)
@@ -590,52 +710,65 @@ class AlbumFragment : Fragment() {
 
         // Check if temporary viewing cache already exists
         val cacheFile = viewModel.getPreviewCacheFile(item)
+        viewModel.mediaCacheManager.protectFile(cacheFile)
+        protectedPreviewFile = cacheFile
         if (cacheFile.exists() && (item.sizeBytes <= 0 || cacheFile.length() == item.sizeBytes)) {
             displayMediaContent(item, cacheFile, startOffsetMs)
             return
         }
 
-        // Fast Remote Playback: Stream via RTSP directly from DashCam
         if (isDeviceSource && item.isVideo) {
             binding.viewerLoadingLayout.visibility = View.VISIBLE
-            binding.tvViewerLoadingText.text = "正在啟動快速開片串流..."
-
+            binding.tvViewerLoadingText.text = "正在開啟錄影檔（回放時暫停錄影）…"
+            binding.ivPhotoViewer.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             previewJob = viewLifecycleOwner.lifecycleScope.launch {
-                // 先向 ViewModel 申請媒體所有權，使 LiveFragment 釋放 8080 RTSP 端口
                 viewModel.requestStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
                 kotlinx.coroutines.delay(200)
-
-                val streamResult = viewModel.startRemotePlayback(item)
-                if (!isAdded || previewRequestId != currentToken || currentViewingItem?.fileName != item.fileName) {
-                    viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
+                val network = viewModel.wifiNetwork.value
+                if (network == null) {
+                    showPlaybackError(currentToken, "記錄器 Wi-Fi 已中斷")
                     return@launch
                 }
-
-                streamResult.onSuccess {
-                    val host = viewModel.deviceHost.value
-                    val network = viewModel.wifiNetwork.value
-                    if (network != null) {
-                        try {
-                            sdpProxy?.stop()
-                            val devId = "${host}@${viewModel.targetIdentity.value.epoch}"
-                            val proxy = com.aladdin.dashcam.network.RtspSdpProxy(host, 8080, network, deviceIdentifier = devId)
-                            val localPort = proxy.start()
-                            sdpProxy = proxy
-                            binding.viewerLoadingLayout.visibility = View.GONE
-                            setupExoPlayerStream("rtsp://127.0.0.1:$localPort/?action=stream", startOffsetMs, item, currentToken)
-                        } catch (e: Exception) {
-                            binding.viewerLoadingLayout.visibility = View.GONE
-                            fetchPreviewFallback(item, currentToken, startOffsetMs)
-                        }
-                    } else {
-                        binding.viewerLoadingLayout.visibility = View.GONE
-                        fetchPreviewFallback(item, currentToken, startOffsetMs)
+                val stream = com.aladdin.dashcam.network.GeneralplusPlaybackStream(network, viewModel.deviceHost.value)
+                jpegPlayback = stream
+                val sent = kotlinx.coroutines.CompletableDeferred<Unit>()
+                playbackCommandJob = viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                    val result = viewModel.startRemotePlayback(item) { sent.complete(Unit) }
+                    result.exceptionOrNull()?.let { error ->
+                        sent.completeExceptionally(error)
+                        stream.close()
+                        withContext(Dispatchers.Main) { showPlaybackError(currentToken, error.message ?: "記錄器拒絕回放") }
                     }
-                }.onFailure { _ ->
-                    binding.viewerLoadingLayout.visibility = View.GONE
-                    // Fallback to preview cache download if stream handshake rejected
-                    fetchPreviewFallback(item, currentToken, startOffsetMs)
                 }
+                var firstFrame = true
+                try {
+                    stream.play(onSourceRequested = { sent.await() }, onAudioAvailable = { available ->
+                        withContext(Dispatchers.Main) {
+                            if (_binding != null && previewRequestId == currentToken && !available) binding.tvViewerTime.append(" · 此回放無音訊")
+                        }
+                    }) { bytes ->
+                        val bitmap = withContext(Dispatchers.IO) {
+                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        } ?: return@play
+                        withContext(Dispatchers.Main) {
+                            if (_binding != null && previewRequestId == currentToken) {
+                                binding.ivPhotoViewer.visibility = View.VISIBLE
+                                binding.ivPhotoViewer.setImageBitmap(bitmap)
+                                if (firstFrame) {
+                                    firstFrame = false
+                                    binding.viewerLoadingLayout.visibility = View.GONE
+                                    android.util.Log.i("AlbumFragment", "JPEG file frame index=${item.deviceIndex}, elapsedMs=${android.os.SystemClock.elapsedRealtime() - previewStartedAt}")
+                                }
+                            } else bitmap.recycle()
+                        }
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    if (_binding != null && previewRequestId == currentToken && binding.viewerErrorLayout.visibility != View.VISIBLE) {
+                        showPlaybackError(currentToken, e.message ?: "錄影檔傳輸中斷")
+                    }
+                } finally { stream.close() }
             }
             return
         }
@@ -673,41 +806,15 @@ class AlbumFragment : Fragment() {
         }
     }
 
-    private fun setupExoPlayerStream(streamUri: String, startOffsetMs: Long = 0L, item: MediaItem, currentToken: Long) {
-        // N01: Only release previous exoPlayer instance, do NOT kill active sdpProxy
-        exoPlayer?.stop()
-        exoPlayer?.release()
-        exoPlayer = null
-        binding.playerView.player = null
-
-        val player = ExoPlayer.Builder(requireContext()).build()
-        binding.playerView.player = player
-        binding.playerView.visibility = View.VISIBLE
-        binding.ivPhotoViewer.visibility = View.GONE
-
-        player.addListener(object : Player.Listener {
-            override fun onPlayerError(error: PlaybackException) {
-                android.util.Log.w("AlbumFragment", "RTSP stream playback failed: ${error.message}, falling back to preview download")
-                if (isAdded && previewRequestId == currentToken && currentViewingItem?.fileName == item.fileName) {
-                    releasePlayer()
-                    fetchPreviewFallback(item, currentToken, startOffsetMs)
-                } else {
-                    binding.viewerErrorLayout.visibility = View.VISIBLE
-                    binding.tvViewerErrorMsg.text = "影片串流播放中斷：${error.message ?: "無法讀取串流"}"
-                }
-            }
-        })
-
-        val factory = androidx.media3.exoplayer.rtsp.RtspMediaSource.Factory()
-            .setForceUseRtpTcp(true)
-        val mediaSource = factory.createMediaSource(ExoMediaItem.fromUri(streamUri))
-        player.setMediaSource(mediaSource)
-        if (startOffsetMs > 0L) {
-            player.seekTo(startOffsetMs)
+    private fun showPlaybackError(token: Long, message: String) {
+        if (_binding == null || previewRequestId != token) return
+        binding.viewerLoadingLayout.visibility = View.GONE
+        if (isDeviceSource && currentViewingItem?.isVideo == true) {
+            binding.ivPhotoViewer.setImageDrawable(null)
+            binding.ivPhotoViewer.visibility = View.GONE
         }
-        player.prepare()
-        player.playWhenReady = true
-        exoPlayer = player
+        binding.viewerErrorLayout.visibility = View.VISIBLE
+        binding.tvViewerErrorMsg.text = "回放失敗：$message"
     }
 
     private fun displayMediaContent(item: MediaItem, file: File, startOffsetMs: Long = 0L) {
@@ -718,6 +825,7 @@ class AlbumFragment : Fragment() {
         } else {
             binding.playerView.visibility = View.GONE
             binding.ivPhotoViewer.visibility = View.VISIBLE
+            binding.ivPhotoViewer.scaleType = android.widget.ImageView.ScaleType.MATRIX
             displayPhoto(file)
         }
     }
@@ -803,6 +911,12 @@ class AlbumFragment : Fragment() {
         })
 
         binding.ivPhotoViewer.setOnTouchListener { _, event ->
+            if (currentViewingItem?.isVideo == true) {
+                if (event.action == MotionEvent.ACTION_UP && resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                    binding.viewerTopBar.visibility = if (binding.viewerTopBar.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+                }
+                return@setOnTouchListener true
+            }
             scaleDetector?.onTouchEvent(event)
             when (event.action and MotionEvent.ACTION_MASK) {
                 MotionEvent.ACTION_DOWN -> {
@@ -854,35 +968,73 @@ class AlbumFragment : Fragment() {
     }
 
     private fun closeViewer() {
+        playbackCommandJob?.cancel()
         ++previewRequestId // Invalidate any in-flight preview requests (R2)
         previewJob?.cancel()
         previewJob = null
         downloadJob = null
         releasePlayer()
+        releasePreviewProtection()
         currentViewingItem = null
+        (activity as? MainActivity)?.setAlbumPreviewExpanded(false)
         binding.layoutMediaViewer.visibility = View.GONE
         backPressedCallback.isEnabled = false
 
         if (isDeviceSource) {
-            viewLifecycleOwner.lifecycleScope.launch {
-                viewModel.stopRemotePlayback()
-                viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
+            playbackStopJob = viewModel.viewModelScope.launch {
+                val result = viewModel.stopRemotePlayback()
+                if (currentViewingItem == null) viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
+                if (result.isFailure && isAdded) Toast.makeText(context, "回放已關閉，但未確認恢復錄影：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
             }
         }
     }
 
     private fun releasePlayer() {
-        sdpProxy?.stop()
-        sdpProxy = null
+        jpegPlayback?.close()
+        jpegPlayback = null
         exoPlayer?.stop()
         exoPlayer?.release()
         exoPlayer = null
         binding.playerView.player = null
     }
 
+    private fun releasePreviewProtection() {
+        val file = protectedPreviewFile ?: return
+        protectedPreviewFile = null
+        viewModel.mediaCacheManager.unprotectFile(file)
+        viewModel.viewModelScope.launch(Dispatchers.IO) {
+            file.parentFile?.parentFile?.let { directory ->
+                viewModel.mediaCacheManager.evictDirectoryIfExceeds(
+                    directory,
+                    viewModel.mediaCacheManager.previewQuotaBytes,
+                    viewModel.mediaCacheManager.previewLowWatermarkBytes
+                )
+            }
+        }
+    }
+
     private fun observeViewModel() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    viewModel.connectionStatus.collect { status ->
+                        if (currentViewingItem?.isVideo == true && jpegPlayback != null &&
+                            status != com.aladdin.dashcam.model.ConnectionStatus.CONNECTED) {
+                            val disconnectedToken = ++previewRequestId
+                            previewJob?.cancel()
+                            previewJob = null
+                            playbackCommandJob?.cancel()
+                            jpegPlayback?.close()
+                            jpegPlayback = null
+                            binding.ivPhotoViewer.setImageDrawable(null)
+                            showPlaybackError(disconnectedToken, "記錄器連線已中斷，請重新連線後再試")
+                        }
+                        if (isDeviceSource && status == com.aladdin.dashcam.model.ConnectionStatus.CONNECTED &&
+                            viewModel.albumQueryState.value is AlbumQueryState.Idle) {
+                            triggerRemoteListRefresh()
+                        }
+                    }
+                }
                 launch {
                     viewModel.deviceMediaList.collect {
                         if (isDeviceSource) applyFilters()
@@ -964,22 +1116,29 @@ class AlbumFragment : Fragment() {
 
     override fun onStop() {
         super.onStop()
-        exoPlayer?.pause()
+        if (_binding != null && currentViewingItem != null) closeViewer()
+        if (_binding != null && isDeviceSource) {
+            listRefreshJob?.cancel()
+            thumbnailJobs.values.forEach { it.cancel() }
+            thumbnailJobs.clear()
+            leaveDeviceAlbum()
+        }
     }
 
     override fun onDestroyView() {
+        if (_binding != null && currentViewingItem != null) closeViewer()
+        playbackCommandJob?.cancel()
         thumbnailJobs.values.forEach { it.cancel() }
         thumbnailJobs.clear()
         super.onDestroyView()
-        if (viewModel.currentStreamOwner.value == DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK) {
-            viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
-        }
         ++previewRequestId
         previewJob?.cancel()
         previewJob = null
         downloadJob = null
         currentViewingItem = null
+        (activity as? MainActivity)?.setAlbumPreviewExpanded(false)
         releasePlayer()
+        releasePreviewProtection()
         _binding = null
     }
 }

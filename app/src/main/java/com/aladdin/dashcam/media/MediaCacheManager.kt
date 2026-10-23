@@ -57,6 +57,19 @@ class MediaCacheManager(
         }
     }
 
+    private val protectedFiles = mutableSetOf<String>()
+
+    /** 保護目前預覽的檔案（包含尚未下載完成的目的路徑），關閉預覽時解除。 */
+    @Synchronized
+    fun protectFile(file: File) {
+        protectedFiles.add(file.canonicalPath)
+    }
+
+    @Synchronized
+    fun unprotectFile(file: File) {
+        protectedFiles.remove(file.canonicalPath)
+    }
+
     /**
      * 更新檔案的 lastModified 時間，保持其在 LRU 中的最新狀態。
      */
@@ -73,6 +86,7 @@ class MediaCacheManager(
      * 直到總大小小於等於 targetBytes。
      * @return 釋放的位元組數
      */
+    @Synchronized
     fun evictDirectoryIfExceeds(
         directory: File,
         quotaBytes: Long,
@@ -95,6 +109,7 @@ class MediaCacheManager(
 
         for (file in sortedFiles) {
             if (currentSize <= targetBytes) break
+            if (file.name.endsWith(".tmp") || file.canonicalPath in protectedFiles) continue
             val fileSize = file.length()
             if (file.delete()) {
                 currentSize -= fileSize

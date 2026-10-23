@@ -1,12 +1,14 @@
 package com.aladdin.dashcam.ui
 
 import android.graphics.Typeface
+import android.content.res.Configuration
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
@@ -121,8 +123,9 @@ class MediaAdapter(
             val textView = TextView(context).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    (42 * dm.density).toInt()
+                    ViewGroup.LayoutParams.WRAP_CONTENT
                 )
+                minimumHeight = (32 * dm.density).toInt()
                 gravity = Gravity.CENTER_VERTICAL
                 setPadding((12 * dm.density).toInt(), (8 * dm.density).toInt(), (12 * dm.density).toInt(), 0)
                 setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
@@ -157,6 +160,20 @@ class MediaAdapter(
                 val mediaHolder = holder as MediaViewHolder
                 val media = item.item
                 val binding = mediaHolder.binding
+                val landscape = binding.root.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                val density = binding.root.resources.displayMetrics.density
+                val thumbnailFrame = binding.ivThumbnail.parent as View
+                val row = thumbnailFrame.parent as LinearLayout
+                row.orientation = if (landscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+                thumbnailFrame.layoutParams = LinearLayout.LayoutParams(
+                    if (landscape) (88 * density).toInt() else ViewGroup.LayoutParams.MATCH_PARENT,
+                    ((if (landscape) 88 else 100) * density).toInt()
+                )
+                row.getChildAt(1).layoutParams = LinearLayout.LayoutParams(
+                    if (landscape) 0 else ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    if (landscape) 1f else 0f
+                )
 
                 // Primary: Recording time
                 if (media.timestampMillis > 0L) {
@@ -166,7 +183,7 @@ class MediaAdapter(
                 }
 
                 // Secondary: File name
-                binding.tvMediaTitle.text = media.fileName
+                binding.tvMediaTitle.text = media.fileName.replace("_", "_\u200B")
 
                 // File size
                 val sizeMb = media.sizeBytes / (1024 * 1024)

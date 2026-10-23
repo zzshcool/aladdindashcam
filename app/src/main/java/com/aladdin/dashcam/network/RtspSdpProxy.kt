@@ -15,6 +15,15 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.*
 
+internal fun resolveRtspControlUri(base: String, control: String): String {
+    val track = java.net.URI(control)
+    if (track.isAbsolute) return control
+    val source = java.net.URI(base)
+    val resolved = source.resolve(track)
+    return java.net.URI(resolved.scheme, resolved.authority, resolved.path,
+        resolved.query ?: source.query, resolved.fragment).toASCIIString()
+}
+
 /** Detects GeneralPlus firmware sending frame durations instead of cumulative 90 kHz RTP timestamps. */
 internal class RtpVideoTimestampNormalizer(
     private val durationOverride: Boolean = false,
@@ -183,6 +192,7 @@ class RtspSdpProxy(
                 delay(300) // Allow dashcam lwIP sufficient time to release preceding socket
                 probeLiveSpsPpsSequentially(cacheKey)
             }
+
 
             val sock = network.socketFactory.createSocket()
             dashcamSocket = sock
@@ -475,7 +485,7 @@ class RtspSdpProxy(
             val setupUri = if (videoControlTrack.startsWith("rtsp://")) {
                 videoControlTrack
             } else {
-                "rtsp://$remoteHost:$remotePort/?action=stream/$videoControlTrack"
+                resolveRtspControlUri("rtsp://$remoteHost:$remotePort/?action=stream", videoControlTrack)
             }
 
             // 3. SETUP

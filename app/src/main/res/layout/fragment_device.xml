@@ -637,11 +637,11 @@
             <Button
                 android:id="@+id/btn_format_sd"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:backgroundTint="@color/surface_elevated"
-                android:enabled="false"
-                android:text="不支援遠端格式化 (請於機身操作)"
-                android:textColor="@color/text_disabled" />
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:backgroundTint="@color/error_red"
+                android:text="格式化記錄器 SD 卡"
+                android:textColor="@color/text_primary" />
 
             <Button
                 android:id="@+id/btn_factory_reset"
@@ -657,7 +657,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="為保護行車錄影完整性與連線安全，此版本不支援手機遠端抹除 SD 卡或重設設備，高風險操作請使用機身實體按鍵執行。"
+                android:text="格式化會刪除記錄器內所有影片、照片與鎖檔；請先備份並保持供電。恢復原廠設定仍請於機身操作。"
                 android:textColor="@color/text_disabled"
                 android:textSize="12sp" />
         </LinearLayout>

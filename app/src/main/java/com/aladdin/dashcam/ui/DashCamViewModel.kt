@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.aladdin.dashcam.gps.GpsSpeedometer
 import com.aladdin.dashcam.model.ConnectionStatus
+import com.aladdin.dashcam.model.DeviceMode
 import com.aladdin.dashcam.model.DashCamDeviceStatus
 import com.aladdin.dashcam.model.MediaItem
 import com.aladdin.dashcam.model.RecordingStatus
@@ -321,8 +322,10 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                 _timerTickTrigger.tryEmit(Unit)
                 if (identity.state == TargetState.READY && identity.sessionId > 0L) {
                     val session = identity.sessionId
-                    if (session != lastSyncedSessionId) {
+                    if (session != lastSyncedSessionId && currentStreamOwner.value != MediaStreamOwner.ALBUM_PLAYBACK &&
+                        android.os.SystemClock.elapsedRealtime() - lastSessionInitializationAt >= 10_000L) {
                         lastSyncedSessionId = session
+                        lastSessionInitializationAt = android.os.SystemClock.elapsedRealtime()
                         // 新連線成功建立 Session，自動執行一次校時（R06）
                         performAutoSyncRtc(identity.epoch)
                         // 同步發起真實設定值回讀（R05）
@@ -355,11 +358,15 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             }
         }
         client.start()
-        loadLocalMedia()
     }
 
+    private var lastSessionInitializationAt = -10_000L
+    private var autoSyncJob: Job? = null
+    private var settingsRefreshJob: Job? = null
+
     private fun performAutoSyncRtc(epoch: Long) {
-        viewModelScope.launch(Dispatchers.IO) {
+        if (autoSyncJob?.isActive == true) return
+        autoSyncJob = viewModelScope.launch(Dispatchers.IO) {
             val res = client.syncRtc(expectedEpoch = epoch)
             if (epoch != targetIdentity.value.epoch) {
                 return@launch
@@ -792,15 +799,37 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         return result
     }
 
-    suspend fun startRemotePlayback(item: MediaItem): Result<Unit> {
+    suspend fun startRemotePlayback(item: MediaItem, onRequestSent: (() -> Unit)? = null): Result<Unit> {
         if (!isCurrentMediaSource(item)) return Result.failure(IllegalStateException("影片來源已切換"))
         _currentPlaybackItem.value = item
         val epoch = item.sourceEpoch
-        val res = client.startPlayback(item.deviceIndex, expectedEpoch = epoch)
+        val res = client.startPlayback(item.deviceIndex, expectedEpoch = epoch, onRequestSent = onRequestSent)
         if (res.isSuccess) {
             _isRemotePlaybackActive.value = true
         }
         return res
+    }
+
+    private val formatStorageMutex = Mutex()
+    private val _isFormattingStorage = MutableStateFlow(false)
+    val isFormattingStorage: StateFlow<Boolean> = _isFormattingStorage.asStateFlow()
+
+    suspend fun formatRecorderStorage(expectedEpoch: Long): Result<Unit> = withContext(kotlinx.coroutines.NonCancellable) {
+        if (!formatStorageMutex.tryLock()) return@withContext Result.failure(IllegalStateException("格式化處理中，請勿重複操作"))
+        _isFormattingStorage.value = true
+        try {
+            if (expectedEpoch != targetIdentity.value.epoch) return@withContext Result.failure(IllegalStateException("設備已切換，請重新確認"))
+            val result = client.formatStorage(expectedEpoch)
+            if (expectedEpoch == targetIdentity.value.epoch) {
+                _deviceMediaList.value = emptyList()
+                _albumQueryState.value = AlbumQueryState.Idle
+                fetchRemoteFileList()
+            }
+            result
+        } finally {
+            _isFormattingStorage.value = false
+            formatStorageMutex.unlock()
+        }
     }
 
     suspend fun stopRemotePlayback(): Result<Unit> {
@@ -811,6 +840,12 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         client.restartStreaming()
         return res
     }
+
+    suspend fun enterRemoteAlbumBrowsing(): Result<Unit> =
+        client.enterAlbumBrowsing(targetIdentity.value.epoch)
+
+    suspend fun exitRemoteAlbumBrowsing(): Result<Unit> =
+        client.exitAlbumBrowsing(targetIdentity.value.epoch)
 
     suspend fun deleteRemoteMedia(item: MediaItem): Result<Unit> {
         if (!isCurrentMediaSource(item)) return Result.failure(IllegalStateException("影片來源已切換"))
@@ -846,8 +881,9 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun refreshSettings() {
+        if (settingsRefreshJob?.isActive == true) return
         val epoch = targetIdentity.value.epoch
-        viewModelScope.launch(Dispatchers.IO) {
+        settingsRefreshJob = viewModelScope.launch(Dispatchers.IO) {
             _resolutionDisplay.value = "讀取中..."
             _loopDisplay.value = "讀取中..."
             _exposureDisplay.value = "讀取中..."
@@ -1562,21 +1598,25 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             return@withContext null
         }
 
-        if (!isCurrentMediaSource(item)) return@withContext null
-        val res = client.getThumbnail(item.deviceIndex, expectedEpoch = item.sourceEpoch)
-        if (res.isSuccess) {
-            val bytes = res.getOrNull()
-            if (bytes != null && bytes.size > 4) {
-                try {
-                    thumbFile.writeBytes(bytes)
-                    mediaCacheManager.touchFile(thumbFile)
-                    mediaCacheManager.evictDirectoryIfExceeds(
-                        thumbDir,
-                        mediaCacheManager.thumbnailQuotaBytes,
-                        mediaCacheManager.thumbnailLowWatermarkBytes
-                    )
-                    return@withContext thumbFile
-                } catch (_: Exception) {}
+        if (!isCurrentMediaSource(item) || deviceStatus.value.mode != DeviceMode.PLAYBACK) {
+            return@withContext null
+        }
+        val image = client.getThumbnail(item.deviceIndex, expectedEpoch = item.sourceEpoch).getOrNull()
+        if (image != null && image.size > 4 &&
+            image[0] == 0xFF.toByte() && image[1] == 0xD8.toByte() &&
+            image[image.lastIndex - 1] == 0xFF.toByte() && image[image.lastIndex] == 0xD9.toByte()
+        ) {
+            try {
+                thumbFile.writeBytes(image)
+                mediaCacheManager.touchFile(thumbFile)
+                mediaCacheManager.evictDirectoryIfExceeds(
+                    thumbDir,
+                    mediaCacheManager.thumbnailQuotaBytes,
+                    mediaCacheManager.thumbnailLowWatermarkBytes
+                )
+                return@withContext thumbFile
+            } catch (_: java.io.IOException) {
+                thumbFile.delete()
             }
         }
         null

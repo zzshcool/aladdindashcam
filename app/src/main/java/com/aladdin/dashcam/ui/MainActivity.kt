@@ -35,6 +35,13 @@ class MainActivity : AppCompatActivity() {
     private var homeFragment: HomeFragment? = null
 
     private var activeFragment: Fragment? = null
+    private var albumPreviewExpanded = false
+
+    fun setAlbumPreviewExpanded(enabled: Boolean) {
+        albumPreviewExpanded = enabled
+        updateTopBarVisibility()
+        binding.bottomNav.visibility = if (enabled || isFullscreen || isInPictureInPictureMode) View.GONE else View.VISIBLE
+    }
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -174,7 +181,7 @@ class MainActivity : AppCompatActivity() {
             when (item.itemId) {
                 R.id.nav_live -> homeFragment?.let { switchFragment(it) } ?: false
                 R.id.nav_album -> albumFragment?.let {
-                    if (viewModel.connectionStatus.value != ConnectionStatus.CONNECTED) it.showLocalMedia()
+                    it.showDeviceMedia()
                     switchFragment(it)
                 } ?: false
                 R.id.nav_downloads -> downloadsFragment?.let { switchFragment(it) } ?: false
@@ -209,7 +216,7 @@ class MainActivity : AppCompatActivity() {
     private fun updateTopBarVisibility() {
         val landscapeLive = activeFragment == liveFragment &&
             resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        binding.topBar.visibility = if (activeFragment == homeFragment || landscapeLive) View.GONE else View.VISIBLE
+        binding.topBar.visibility = if (activeFragment == homeFragment || landscapeLive || albumPreviewExpanded) View.GONE else View.VISIBLE
     }
 
     private fun setupTopBarActions() {

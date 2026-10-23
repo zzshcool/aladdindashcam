@@ -94,11 +94,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
-                android:ellipsize="middle"
-                android:singleLine="true"
                 android:text="REC_20261021_143205_0001.MP4"
                 android:textColor="@color/text_secondary"
-                android:textSize="@dimen/text_size_caption" />
+                android:textSize="11sp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -114,7 +112,7 @@
                     android:layout_weight="1"
                     android:text="120 MB"
                     android:textColor="@color/text_secondary"
-                    android:textSize="@dimen/text_size_caption" />
+                    android:textSize="11sp" />
 
                 <TextView
                     android:id="@+id/tv_media_type"
@@ -122,7 +120,7 @@
                     android:layout_height="wrap_content"
                     android:text="常規錄影"
                     android:textColor="@color/accent_teal"
-                    android:textSize="@dimen/text_size_caption" />
+                    android:textSize="11sp" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

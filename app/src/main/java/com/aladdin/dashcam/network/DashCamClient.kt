@@ -205,7 +205,8 @@ class DashCamClient(
                     synchronized(commandLock) {
                         // R4-02: Validate session generation before committing state to prevent stale responses from overriding new session
                         if (sessionId != 0L && sessionId == currentSessionId) {
-                            if (status != null && status.recordingStatus != RecordingStatus.UNKNOWN) {
+                            if (status != null && (status.mode == DeviceMode.PLAYBACK ||
+                                        status.recordingStatus != RecordingStatus.UNKNOWN)) {
                                 _deviceStatus.value = status.copy(sampleSequence = statusSampleCounter.incrementAndGet())
                                 _connectionStatus.value = ConnectionStatus.CONNECTED
                                 consecutiveFailures = 0
@@ -320,13 +321,16 @@ class DashCamClient(
     /**
      * Unified send and receive with strict pair and ACK/NAK checking (C01)
      */
-    private fun sendAndReceive(expectedMode: Byte, expectedCmd: Byte, packet: ByteArray): GPSocketResponse {
+    private fun sendAndReceive(expectedMode: Byte, expectedCmd: Byte, packet: ByteArray, onRequestSent: (() -> Unit)? = null): GPSocketResponse {
         val out = outputStream ?: throw java.io.IOException("Socket output stream is null")
-        val inStream = inputStream ?: throw java.io.IOException("Socket input stream is null")
-
         out.write(packet)
         out.flush()
+        onRequestSent?.invoke()
+        return readResponse(expectedMode, expectedCmd)
+    }
 
+    private fun readResponse(expectedMode: Byte, expectedCmd: Byte): GPSocketResponse {
+        val inStream = inputStream ?: throw java.io.IOException("Socket input stream is null")
         val header = ByteArray(12)
         readFully(inStream, header)
 
@@ -384,7 +388,8 @@ class DashCamClient(
             try {
                 ensureConnected()
                 val status = queryStatusInternal()
-                if (status != null && status.recordingStatus != RecordingStatus.UNKNOWN) {
+                if (status != null && (status.mode == DeviceMode.PLAYBACK ||
+                            status.recordingStatus != RecordingStatus.UNKNOWN)) {
                     _deviceStatus.value = status
                     _connectionStatus.value = ConnectionStatus.CONNECTED
                 } else {
@@ -603,26 +608,37 @@ class DashCamClient(
                 if (expectedEpoch != null && expectedEpoch != targetEpoch) {
                     return@withContext Result.failure(IllegalStateException("Target epoch expired during connect (expected $expectedEpoch, current $targetEpoch)"))
                 }
-                val req = GPSocketProtocol.buildGetNameListPacket()
-                val resp = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_GET_NAME_LIST, req)
+                val countReply = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_GET_FILE_COUNT, GPSocketProtocol.buildGetFileCountPacket())
+                if (countReply !is GPSocketResponse.Ack || countReply.payload.size != 2) {
+                    return@withContext Result.failure(java.io.IOException("Invalid file-count response"))
+                }
+                val expectedCount = (countReply.payload[0].toInt() and 0xFF) or ((countReply.payload[1].toInt() and 0xFF) shl 8)
+                val items = linkedMapOf<Int, MediaItem>()
+                var cursor = 0
+                while (items.size < expectedCount) {
+                    if (!coroutineContext.isActive) throw kotlinx.coroutines.CancellationException("File-list query cancelled")
+                    if (expectedEpoch != null && expectedEpoch != targetEpoch) {
+                        return@withContext Result.failure(IllegalStateException("Target changed during file-list query"))
+                    }
+                    val req = GPSocketProtocol.buildGetNameListPacket(flag = if (items.isEmpty()) 1 else 0, cursor = cursor.toShort())
+                    when (val resp = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_GET_NAME_LIST, req)) {
+                        is GPSocketResponse.Ack -> {
+                            val page = GPSocketProtocol.parseFileList(resp.payload)
+                            if (page.isEmpty()) throw java.io.IOException("File list ended before reported count (${items.size}/$expectedCount)")
+                            val previousSize = items.size
+                            page.forEach { items[it.deviceIndex] = it }
+                            if (items.size == previousSize) throw java.io.IOException("File-list cursor did not advance")
+                            cursor = page.last().deviceIndex
+                        }
+                        is GPSocketResponse.Nak -> return@withContext Result.failure(java.io.IOException("GetNameList NAK: ${resp.errorCode}"))
+                        is GPSocketResponse.Error -> return@withContext Result.failure(java.io.IOException(resp.message))
+                    }
+                }
                 if (expectedEpoch != null && expectedEpoch != targetEpoch) {
-                    return@withContext Result.failure(IllegalStateException("Target epoch expired during getFileList wait (expected $expectedEpoch, current $targetEpoch)"))
+                    return@withContext Result.failure(IllegalStateException("Target changed after file-list query"))
                 }
-                when (resp) {
-                    is GPSocketResponse.Ack -> {
-                        val items = GPSocketProtocol.parseFileList(resp.payload)
-                        Log.i(TAG, "Hardware returned real file list: ${items.size} items")
-                        Result.success(items)
-                    }
-                    is GPSocketResponse.Nak -> {
-                        val msg = "GetNameList NAK: 0x${resp.errorCode.toString(16).uppercase()}"
-                        Log.w(TAG, msg)
-                        Result.failure(Exception(msg))
-                    }
-                    is GPSocketResponse.Error -> {
-                        Result.failure(Exception(resp.message))
-                    }
-                }
+                Log.i(TAG, "Hardware file list: ${items.size}/$expectedCount entries")
+                Result.success(items.values.toList())
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get file list", e)
                 disconnectInternal()
@@ -819,7 +835,162 @@ class DashCamClient(
     /**
      * Starts RTSP streaming playback for recorded file (deviceIndex) via CMD_PLAYBACK_START (Spec 25.8)
      */
-    suspend fun startPlayback(deviceIndex: Int, expectedEpoch: Long? = null): Result<Unit> = withContext(Dispatchers.IO) {
+    private var playbackRestoreState: Triple<Long, DeviceMode, Boolean>? = null
+    private var albumRestoreState: Triple<Long, DeviceMode, Boolean>? = null
+    private var activePlaybackIndex: Int? = null
+
+    private fun setWorkModeInternal(mode: DeviceMode) {
+        check(sendAndReceive(GPSocketProtocol.MODE_DEVICE, GPSocketProtocol.CMD_SET_MODE,
+            GPSocketProtocol.buildSetModePacket(mode)) is GPSocketResponse.Ack) { "Device rejected mode $mode" }
+        Thread.sleep(300)
+        val status = queryStatusInternal() ?: error("Cannot verify device mode")
+        check(status.mode == mode) { "Device mode mismatch: expected $mode, actual ${status.mode}" }
+        _deviceStatus.value = status
+    }
+
+    private fun setRecordingInternal(recording: Boolean) {
+        val status = queryStatusInternal() ?: error("無法確認錄影狀態")
+        check(status.recordingStatus != RecordingStatus.UNKNOWN) { "錄影狀態未知" }
+        if ((status.recordingStatus == RecordingStatus.RECORDING) != recording) {
+            check(sendAndReceive(GPSocketProtocol.MODE_RECORD, GPSocketProtocol.CMD_RECORD_TOGGLE,
+                GPSocketProtocol.buildRecordTogglePacket()) is GPSocketResponse.Ack) { "切換錄影失敗" }
+            Thread.sleep(800)
+        }
+        val actual = queryStatusInternal() ?: error("無法回讀錄影狀態")
+        _deviceStatus.value = actual
+        check((actual.recordingStatus == RecordingStatus.RECORDING) == recording) { "錄影狀態未符合要求" }
+    }
+
+    private fun resumeRecordingInternal() {
+        val current = queryStatusInternal() ?: error("Cannot verify recording before restore")
+        check(current.mode == DeviceMode.RECORD) { "Cannot resume recording outside record mode" }
+        if (current.recordingStatus == RecordingStatus.STOPPED) {
+            check(sendAndReceive(GPSocketProtocol.MODE_RECORD, GPSocketProtocol.CMD_RECORD_TOGGLE,
+                GPSocketProtocol.buildRecordTogglePacket()) is GPSocketResponse.Ack) { "Cannot resume recording" }
+            Thread.sleep(800)
+        }
+        val restoreDeadline = System.nanoTime() + 35_000_000_000L
+        var restored = queryStatusInternal() ?: error("Cannot verify recording restoration")
+        while (restored.recordingStatus == RecordingStatus.STOPPED && System.nanoTime() < restoreDeadline) {
+            Thread.sleep(2_000)
+            restored = queryStatusInternal() ?: error("Cannot verify recording restoration")
+        }
+        _deviceStatus.value = restored
+        check(restored.recordingStatus == RecordingStatus.RECORDING) { "Recording did not resume" }
+    }
+
+    suspend fun enterAlbumBrowsing(expectedEpoch: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        synchronized(commandLock) {
+            try {
+                check(expectedEpoch == targetEpoch) { "Device changed before opening album" }
+                ensureConnected()
+                check(expectedEpoch == targetEpoch) { "Device changed while opening album" }
+                val current = queryStatusInternal() ?: error("Cannot read device mode before opening album")
+                check(current.mode != DeviceMode.UNKNOWN) { "Cannot identify device mode before opening album" }
+                val active = albumRestoreState?.takeIf { it.first == targetEpoch }
+                if (active != null) {
+                    check(current.mode == DeviceMode.PLAYBACK) { "Album mode transition incomplete" }
+                    return@withContext Result.success(Unit)
+                }
+                albumRestoreState = Triple(targetEpoch, current.mode, current.recordingStatus == RecordingStatus.RECORDING)
+                if (current.mode == DeviceMode.RECORD && current.recordingStatus == RecordingStatus.RECORDING) {
+                    setRecordingInternal(false)
+                }
+                if (current.mode != DeviceMode.PLAYBACK) setWorkModeInternal(DeviceMode.PLAYBACK)
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to enter album browsing", e)
+                val restore = albumRestoreState?.takeIf { it.first == expectedEpoch && it.first == targetEpoch }
+                if (restore != null) {
+                    try {
+                        val current = queryStatusInternal() ?: error("Cannot read device mode after album failure")
+                        if (current.mode != restore.second) setWorkModeInternal(restore.second)
+                        if (restore.second == DeviceMode.RECORD && restore.third) resumeRecordingInternal()
+                        albumRestoreState = null
+                    } catch (restoreError: Exception) {
+                        e.addSuppressed(restoreError)
+                    }
+                }
+                Result.failure(e)
+            }
+        }
+    }
+
+    suspend fun exitAlbumBrowsing(expectedEpoch: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        synchronized(commandLock) {
+            val restore = albumRestoreState?.takeIf { it.first == expectedEpoch && it.first == targetEpoch }
+                ?: return@withContext Result.success(Unit)
+            try {
+                ensureConnected()
+                check(expectedEpoch == targetEpoch) { "Device changed while closing album" }
+                val current = queryStatusInternal() ?: error("Cannot read device mode when closing album")
+                if (activePlaybackIndex != null && current.mode == DeviceMode.PLAYBACK) {
+                    check(sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_PLAYBACK_STOP,
+                        GPSocketProtocol.buildPlaybackStopPacket()) is GPSocketResponse.Ack) { "Cannot stop album playback" }
+                    activePlaybackIndex = null
+                    playbackRestoreState = null
+                }
+                if (restore.second != DeviceMode.UNKNOWN && current.mode != restore.second) {
+                    setWorkModeInternal(restore.second)
+                }
+                if (restore.second == DeviceMode.RECORD && restore.third) resumeRecordingInternal()
+                Log.i(TAG, "Album exit verified: mode=${_deviceStatus.value.mode}, recording=${_deviceStatus.value.recordingStatus}")
+                albumRestoreState = null
+                Result.success(Unit)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to restore recording after album browsing", e)
+                Result.failure(e)
+            }
+        }
+    }
+
+    /** 僅由使用者確認後呼叫；逾時不重送格式化動作。 */
+    suspend fun formatStorage(expectedEpoch: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        synchronized(commandLock) {
+            try {
+                check(expectedEpoch == targetEpoch) { "設備已切換" }
+                ensureConnected()
+                check(expectedEpoch == targetEpoch) { "設備已切換" }
+                val before = queryStatusInternal() ?: error("無法確認記錄器狀態")
+                check(before.sdCardReady) { "記憶卡尚未就緒" }
+                check(before.mode == DeviceMode.RECORD || before.mode == DeviceMode.MENU) { "請先離開影片回放" }
+                val wasRecording = before.recordingStatus == RecordingStatus.RECORDING
+                if (wasRecording) {
+                    setRecordingInternal(false)
+                }
+                setWorkModeInternal(DeviceMode.MENU)
+                try {
+                    val activeSocket = socket ?: error("連線已中斷")
+                    val timeout = activeSocket.soTimeout
+                    val response = try {
+                        activeSocket.soTimeout = 20_000
+                        sendAndReceive(GPSocketProtocol.MODE_PARAM, GPSocketProtocol.CMD_SET_PARAM,
+                            GPSocketProtocol.buildFormatStoragePacket())
+                    } finally {
+                        if (!activeSocket.isClosed) activeSocket.soTimeout = timeout
+                    }
+                    check(response is GPSocketResponse.Ack) { "記錄器未接受格式化：$response" }
+                    Thread.sleep(2000)
+                    val count = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_GET_FILE_COUNT,
+                        GPSocketProtocol.buildGetFileCountPacket())
+                    check(count is GPSocketResponse.Ack && count.payload.contentEquals(byteArrayOf(0, 0))) {
+                        "格式化已送出，但尚未確認記憶卡清空；請重新讀取檢查，勿重複操作"
+                    }
+                    check(queryStatusInternal()?.sdCardReady == true) { "格式化後記憶卡尚未就緒" }
+                    Result.success(Unit)
+                } finally {
+                    if (expectedEpoch == targetEpoch) {
+                        setWorkModeInternal(before.mode)
+                        if (wasRecording) setRecordingInternal(true)
+                    }
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+    }
+
+    suspend fun startPlayback(deviceIndex: Int, expectedEpoch: Long? = null, onRequestSent: (() -> Unit)? = null): Result<Unit> = withContext(Dispatchers.IO) {
         synchronized(commandLock) {
             if (expectedEpoch != null && expectedEpoch != targetEpoch) {
                 return@withContext Result.failure(IllegalStateException("Target epoch expired before startPlayback (expected $expectedEpoch, current $targetEpoch)"))
@@ -829,14 +1000,40 @@ class DashCamClient(
                 if (expectedEpoch != null && expectedEpoch != targetEpoch) {
                     return@withContext Result.failure(IllegalStateException("Target epoch expired during connect (expected $expectedEpoch, current $targetEpoch)"))
                 }
+                val status = queryStatusInternal() ?: error("Cannot read mode before playback")
+                if (playbackRestoreState?.first != targetEpoch) {
+                    playbackRestoreState = Triple(targetEpoch, status.mode, status.recordingStatus == RecordingStatus.RECORDING)
+                    activePlaybackIndex = null
+                }
+                if (activePlaybackIndex != null && status.mode == DeviceMode.PLAYBACK) {
+                    check(sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_PLAYBACK_STOP,
+                        GPSocketProtocol.buildPlaybackStopPacket()) is GPSocketResponse.Ack) { "Cannot stop previous recording playback" }
+                    activePlaybackIndex = null
+                }
+                if (status.mode == DeviceMode.RECORD && status.recordingStatus == RecordingStatus.RECORDING) {
+                    check(sendAndReceive(GPSocketProtocol.MODE_RECORD, GPSocketProtocol.CMD_RECORD_TOGGLE,
+                        GPSocketProtocol.buildRecordTogglePacket()) is GPSocketResponse.Ack) { "Cannot pause recording for playback" }
+                    Thread.sleep(800)
+                    check(queryStatusInternal()?.recordingStatus == RecordingStatus.STOPPED) { "Recording did not stop for playback" }
+                }
+                if (status.mode != DeviceMode.PLAYBACK) setWorkModeInternal(DeviceMode.PLAYBACK)
                 val req = GPSocketProtocol.buildPlaybackStartPacket(deviceIndex)
-                val resp = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_PLAYBACK_START, req)
+                val playbackSocket = socket ?: error("Playback socket unavailable")
+                val previousTimeout = playbackSocket.soTimeout
+                if (!coroutineContext.isActive) throw kotlinx.coroutines.CancellationException("Playback cancelled")
+                val resp = try {
+                    playbackSocket.soTimeout = 15_000
+                    sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_PLAYBACK_START, req, onRequestSent)
+                } finally {
+                    if (!playbackSocket.isClosed) playbackSocket.soTimeout = previousTimeout
+                }
                 if (expectedEpoch != null && expectedEpoch != targetEpoch) {
                     return@withContext Result.failure(IllegalStateException("Target epoch expired during startPlayback response wait (expected $expectedEpoch, current $targetEpoch)"))
                 }
                 when (resp) {
                     is GPSocketResponse.Ack -> {
                         Log.i(TAG, "StartPlayback accepted by hardware for index $deviceIndex")
+                        activePlaybackIndex = deviceIndex
                         Result.success(Unit)
                     }
                     is GPSocketResponse.Nak -> {
@@ -858,6 +1055,8 @@ class DashCamClient(
      */
     suspend fun stopPlayback(expectedEpoch: Long? = null): Result<Unit> = withContext(Dispatchers.IO) {
         synchronized(commandLock) {
+            val restore = playbackRestoreState?.takeIf { it.first == targetEpoch }
+                ?: return@withContext Result.success(Unit)
             if (expectedEpoch != null && expectedEpoch != targetEpoch) {
                 return@withContext Result.failure(IllegalStateException("Target epoch expired before stopPlayback (expected $expectedEpoch, current $targetEpoch)"))
             }
@@ -874,6 +1073,14 @@ class DashCamClient(
                 when (resp) {
                     is GPSocketResponse.Ack -> {
                         Log.i(TAG, "StopPlayback accepted by hardware")
+                        if (restore.second != DeviceMode.UNKNOWN && restore.second != DeviceMode.PLAYBACK) {
+                            setWorkModeInternal(restore.second)
+                            if (restore.third && restore.second == DeviceMode.RECORD) {
+                                resumeRecordingInternal()
+                            }
+                        }
+                        playbackRestoreState = null
+                        activePlaybackIndex = null
                         Result.success(Unit)
                     }
                     is GPSocketResponse.Nak -> {
@@ -903,24 +1110,46 @@ class DashCamClient(
                 if (expectedEpoch != null && expectedEpoch != targetEpoch) {
                     return@withContext Result.failure(IllegalStateException("Target epoch expired during connect (expected $expectedEpoch, current $targetEpoch)"))
                 }
+                val thumbnailSocket = socket ?: error("Thumbnail socket unavailable")
+                val previousTimeout = thumbnailSocket.soTimeout
                 val req = GPSocketProtocol.buildGetThumbnailPacket(deviceIndex)
-                val resp = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_GET_THUMBNAIL, req)
-                if (expectedEpoch != null && expectedEpoch != targetEpoch) {
-                    return@withContext Result.failure(IllegalStateException("Target epoch expired during getThumbnail response wait (expected $expectedEpoch, current $targetEpoch)"))
-                }
-                when (resp) {
-                    is GPSocketResponse.Ack -> {
-                        Result.success(resp.payload)
+                try {
+                    thumbnailSocket.soTimeout = 10_000
+                    val image = java.io.ByteArrayOutputStream()
+                    val deadline = System.nanoTime() + THUMBNAIL_TIMEOUT_NS
+                    var response = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_GET_THUMBNAIL, req)
+                    var complete = false
+                    while (!complete) {
+                        if (!coroutineContext.isActive) throw kotlinx.coroutines.CancellationException("Thumbnail cancelled")
+                        if (expectedEpoch != null && expectedEpoch != targetEpoch) error("Device changed during thumbnail transfer")
+                        when (response) {
+                            is GPSocketResponse.Ack -> {
+                                if (response.payload.isEmpty()) {
+                                    check(image.size() > 0) { "Thumbnail transfer ended without image data" }
+                                    complete = true
+                                } else {
+                                    check(image.size() + response.payload.size <= MAX_THUMBNAIL_BYTES) { "Thumbnail exceeds 2 MiB" }
+                                    image.write(response.payload)
+                                }
+                            }
+                            is GPSocketResponse.Nak -> error("GetThumbnail NAK: 0x${response.errorCode.toString(16).uppercase()}")
+                            is GPSocketResponse.Error -> error(response.message)
+                        }
+                        if (!complete) {
+                            val remainingMs = (deadline - System.nanoTime()) / 1_000_000L
+                            check(remainingMs > 0) { "Thumbnail transfer timed out" }
+                            thumbnailSocket.soTimeout = minOf(10_000L, remainingMs).toInt().coerceAtLeast(1)
+                            response = readResponse(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_GET_THUMBNAIL)
+                        }
                     }
-                    is GPSocketResponse.Nak -> {
-                        Result.failure(Exception("GetThumbnail NAK: 0x${resp.errorCode.toString(16).uppercase()}"))
-                    }
-                    is GPSocketResponse.Error -> {
-                        Result.failure(Exception(resp.message))
-                    }
+                    Result.success(image.toByteArray())
+                } finally {
+                    if (!thumbnailSocket.isClosed) thumbnailSocket.soTimeout = previousTimeout
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get thumbnail for index $deviceIndex", e)
+                disconnectInternal()
+                if (e is kotlinx.coroutines.CancellationException) throw e
                 Result.failure(e)
             }
         }
@@ -1013,5 +1242,7 @@ class DashCamClient(
 
     companion object {
         private const val TAG = "DashCamClient"
+        private const val MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024
+        private const val THUMBNAIL_TIMEOUT_NS = 30_000_000_000L
     }
 }

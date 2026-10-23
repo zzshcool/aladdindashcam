@@ -74,6 +74,7 @@ object GPSocketProtocol {
     const val MODE_VENDOR: Byte = 0xFF.toByte()
 
     // Commands
+    const val CMD_SET_MODE: Byte = 0x00
     const val CMD_GET_STATUS: Byte = 0x01
     const val CMD_GET_PARAM_FILE: Byte = 0x02
     const val CMD_RESTART_STREAM: Byte = 0x04
@@ -100,6 +101,9 @@ object GPSocketProtocol {
     const val PARAM_CAPTURE_RESOLUTION = 0x0100 // 圖片解析度 (256)
     const val PARAM_CAPTURE_QUALITY = 0x0102   // 圖片畫質 (258 per Menu.xml)
     const val PARAM_VERSION = 0x0209           // 韌體版本 (521)
+    const val PARAM_FORMAT_STORAGE = 0x0207 // Generalplus 原廠 Format_ID，動作不帶值
+
+    fun buildFormatStoragePacket(): ByteArray = buildSetParameterPacket(PARAM_FORMAT_STORAGE, byteArrayOf())
 
     // Error Codes (Spec 25.10)
     const val ERR_SERVER_IS_BUSY = 0xFFFF
@@ -136,6 +140,11 @@ object GPSocketProtocol {
 
     fun buildRestartStreamPacket(): ByteArray =
         buildPacket(TYPE_CMD, MODE_DEVICE, CMD_RESTART_STREAM)
+
+    fun buildSetModePacket(mode: DeviceMode): ByteArray {
+        require(mode != DeviceMode.UNKNOWN)
+        return buildPacket(TYPE_CMD, MODE_DEVICE, CMD_SET_MODE, byteArrayOf(mode.raw.toByte()))
+    }
 
     fun buildCapturePacket(): ByteArray =
         buildPacket(TYPE_CMD, MODE_CAPTURE, CMD_CAPTURE_PHOTO)
@@ -397,20 +406,17 @@ object GPSocketProtocol {
         val items = mutableListOf<MediaItem>()
         if (payload.isEmpty()) return items
 
-        var offset = 0
-        val buf = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)
-
-        // Check if prefix contains 2-byte count field
-        if (payload.size >= 2) {
-            val candidateCount = buf.short.toInt() and 0xFFFF
-            if (candidateCount in 1..1000 && 2 + candidateCount * 13 <= payload.size) {
-                offset = 2
-            } else {
-                buf.rewind()
-            }
+        val count = payload[0].toInt() and 0xFF
+        if (count == 0) {
+            require(payload.size == 1) { "Empty file-list page contains trailing data" }
+            return items
         }
-
-        while (offset + 13 <= payload.size) {
+        require((payload.size - 1) % count == 0) { "Truncated file-list page" }
+        val stride = (payload.size - 1) / count
+        require(stride >= 13) { "File-list record is shorter than 13 bytes" }
+        var offset = 1
+        val buf = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN)
+        repeat(count) {
             buf.position(offset)
             val typeByte = buf.get()
             val typeChar = typeByte.toInt().toChar()
@@ -468,7 +474,7 @@ object GPSocketProtocol {
                     deviceIndex = deviceIndex
                 )
             )
-            offset += 13
+            offset += stride
         }
         return items
     }

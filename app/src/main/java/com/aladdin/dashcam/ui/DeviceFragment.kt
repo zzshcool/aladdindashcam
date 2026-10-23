@@ -20,6 +20,7 @@ class DeviceFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val viewModel: DashCamViewModel by activityViewModels()
+    private var formatting = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -39,6 +40,13 @@ class DeviceFragment : Fragment() {
     private fun observeSettings() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    viewModel.isFormattingStorage.collect { busy ->
+                        formatting = busy
+                        binding.btnFormatSd.isEnabled = !busy
+                        binding.btnFormatSd.text = if (busy) "格式化中，請勿斷電…" else "格式化記錄器 SD 卡"
+                    }
+                }
                 launch {
                     viewModel.captureResolutionDisplay.collect { resText ->
                         binding.tvCurrentCaptureRes.text = resText
@@ -122,6 +130,34 @@ class DeviceFragment : Fragment() {
     }
 
     private fun setupListeners() {
+        binding.btnFormatSd.setOnClickListener {
+            if (formatting) return@setOnClickListener
+            if (viewModel.connectionStatus.value != ConnectionStatus.CONNECTED) {
+                Toast.makeText(requireContext(), "請先連線記錄器", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val epoch = viewModel.targetIdentity.value.epoch
+            AlertDialog.Builder(requireContext())
+                .setTitle("格式化記錄器 SD 卡？")
+                .setMessage("將永久刪除目前記錄器內所有影片、照片及緊急鎖檔，無法復原。請先備份重要檔案。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("繼續確認") { _, _ ->
+                    AlertDialog.Builder(requireContext())
+                        .setTitle("最後確認：清空記錄器記憶卡")
+                        .setMessage("目標：${viewModel.deviceHost.value}\n格式化期間會暫停錄影，請保持供電與 Wi-Fi 連線。確定已完成備份？")
+                        .setNegativeButton("取消", null)
+                        .setPositiveButton("確定格式化") { _, _ ->
+                            viewLifecycleOwner.lifecycleScope.launch {
+                                val result = viewModel.formatRecorderStorage(epoch)
+                                if (_binding == null) return@launch
+                                AlertDialog.Builder(requireContext())
+                                    .setTitle(if (result.isSuccess) "格式化完成" else "格式化未確認完成")
+                                    .setMessage(if (result.isSuccess) "已回讀確認記憶卡清空。" else result.exceptionOrNull()?.message ?: "請檢查記錄器狀態")
+                                    .setPositiveButton("知道了", null).show()
+                            }
+                        }.show()
+                }.show()
+        }
         // Toggle diagnostics collapsible section (UX-05)
         binding.btnToggleDiagnostics.setOnClickListener {
             val isCurrentlyVisible = binding.layoutDiagnosticsContent.visibility == View.VISIBLE
