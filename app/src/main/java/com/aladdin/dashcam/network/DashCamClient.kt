@@ -141,41 +141,47 @@ class DashCamClient(
      * Safely probes candidate gateway to verify whether it is an actual GeneralPlus dashcam (N02)
      */
     suspend fun probeDevice(candidateHost: String, network: Network): Result<Boolean> = withContext(Dispatchers.IO) {
-        var testSocket: Socket? = null
-        try {
-            testSocket = Socket()
-            network.bindSocket(testSocket)
-            testSocket.connect(InetSocketAddress(candidateHost, port), 2000)
-            testSocket.soTimeout = 2500
-
-            val out = testSocket.getOutputStream()
-            val inStream = testSocket.getInputStream()
-
-            val packet = GPSocketProtocol.buildGetStatusPacket()
-            out.write(packet)
-            out.flush()
-
-            val header = ByteArray(12)
-            readFully(inStream, header)
-
-            val tagMatch = header[0] == 0x47.toByte() && // 'G'
-                    header[1] == 0x50.toByte() && // 'P'
-                    header[2] == 0x53.toByte() && // 'S'
-                    header[3] == 0x4F.toByte() && // 'O'
-                    header[4] == 0x43.toByte() && // 'C'
-                    header[5] == 0x4B.toByte()    // 'K'
-
-            if (tagMatch) {
-                Result.success(true)
-            } else {
-                Result.failure(IllegalStateException("Connected endpoint is not a GeneralPlus dashcam"))
+        synchronized(commandLock) {
+            if (connectedHost == candidateHost && connectedNetwork == network && socket?.isConnected == true && socket?.isClosed == false) {
+                return@synchronized runCatching { queryStatusInternal() != null }
             }
-        } catch (e: Exception) {
-            Result.failure(e)
-        } finally {
+            disconnectInternal()
+            var testSocket: Socket? = null
             try {
-                testSocket?.close()
-            } catch (_: Exception) {}
+                testSocket = Socket()
+                network.bindSocket(testSocket)
+                testSocket.connect(InetSocketAddress(candidateHost, port), 2000)
+                testSocket.soTimeout = 2500
+
+                val out = testSocket.getOutputStream()
+                val inStream = testSocket.getInputStream()
+
+                val packet = GPSocketProtocol.buildGetStatusPacket()
+                out.write(packet)
+                out.flush()
+
+                val header = ByteArray(12)
+                readFully(inStream, header)
+
+                val tagMatch = header[0] == 0x47.toByte() && // 'G'
+                        header[1] == 0x50.toByte() && // 'P'
+                        header[2] == 0x53.toByte() && // 'S'
+                        header[3] == 0x4F.toByte() && // 'O'
+                        header[4] == 0x43.toByte() && // 'C'
+                        header[5] == 0x4B.toByte()    // 'K'
+
+                if (tagMatch) {
+                    Result.success(true)
+                } else {
+                    Result.failure(IllegalStateException("Connected endpoint is not a GeneralPlus dashcam"))
+                }
+            } catch (e: Exception) {
+                Result.failure(e)
+            } finally {
+                try {
+                    testSocket?.close()
+                } catch (_: Exception) {}
+            }
         }
     }
 
@@ -203,8 +209,15 @@ class DashCamClient(
                     continue
                 }
                 try {
-                    ensureConnected()
-                    val (status, sessionId) = queryStatusWithSessionInternal()
+                    val (status, sessionId) = synchronized(commandLock) {
+                        try {
+                            ensureConnected()
+                            queryStatusWithSessionInternal()
+                        } catch (error: Exception) {
+                            disconnectInternal()
+                            throw error
+                        }
+                    }
                     synchronized(commandLock) {
                         // R4-02: Validate session generation before committing state to prevent stale responses from overriding new session
                         if (sessionId != 0L && sessionId == currentSessionId) {
@@ -223,7 +236,6 @@ class DashCamClient(
                 } catch (e: Exception) {
                     consecutiveFailures++
                     Log.w(TAG, "Communication cycle warning (fail #$consecutiveFailures): ${e.javaClass.simpleName} - ${e.message}")
-                    disconnectInternal()
                 }
                 val delayMs = if (consecutiveFailures == 0) {
                     2500L
@@ -327,10 +339,19 @@ class DashCamClient(
      */
     private fun sendAndReceive(expectedMode: Byte, expectedCmd: Byte, packet: ByteArray, onRequestSent: (() -> Unit)? = null): GPSocketResponse {
         val out = outputStream ?: throw java.io.IOException("Socket output stream is null")
-        out.write(packet)
-        out.flush()
-        onRequestSent?.invoke()
-        return readResponse(expectedMode, expectedCmd)
+        return try {
+            out.write(packet)
+            out.flush()
+            onRequestSent?.invoke()
+            val response = readResponse(expectedMode, expectedCmd)
+            com.aladdin.dashcam.media.Diagnostics.record("control.${expectedMode.toInt() and 255}.${expectedCmd.toInt() and 255}", response.javaClass.simpleName)
+            if (response is GPSocketResponse.Error) disconnectInternal()
+            response
+        } catch (error: java.io.IOException) {
+            com.aladdin.dashcam.media.Diagnostics.record("control.failure", error.javaClass.simpleName)
+            disconnectInternal()
+            throw error
+        }
     }
 
     private fun readResponse(expectedMode: Byte, expectedCmd: Byte): GPSocketResponse {
@@ -1197,7 +1218,6 @@ class DashCamClient(
                     var response = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_GET_THUMBNAIL, req)
                     var complete = false
                     while (!complete) {
-                        if (!coroutineContext.isActive) throw kotlinx.coroutines.CancellationException("Thumbnail cancelled")
                         if (expectedEpoch != null && expectedEpoch != targetEpoch) error("Device changed during thumbnail transfer")
                         when (response) {
                             is GPSocketResponse.Ack -> {

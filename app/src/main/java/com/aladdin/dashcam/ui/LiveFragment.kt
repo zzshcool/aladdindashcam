@@ -33,6 +33,7 @@ import com.google.android.gms.maps.model.Polyline
 import com.google.android.gms.maps.model.PolylineOptions
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -41,7 +42,7 @@ class LiveFragment : Fragment() {
     private var _binding: FragmentLiveBinding? = null
     private val binding get() = _binding!!
 
-    private val viewModel: DashCamViewModel by activityViewModels()
+    private val viewModel: DashCamViewModel by lazy { (requireActivity().application as com.aladdin.dashcam.AladdinApp).recorder }
     private var nativePlayer: com.aladdin.dashcam.media.NativeFfmpegPlayer? = null
 
     private var lastStreamNetwork: android.net.Network? = null
@@ -458,6 +459,10 @@ class LiveFragment : Fragment() {
         val isFs = mainAct?.isFullscreen == true
         popup.menu.add(0, 2, 1, if (isFs) getString(R.string.action_exit_fullscreen) else getString(R.string.action_enter_fullscreen))
         popup.menu.add(0, 3, 2, getString(R.string.live_clear_route))
+        popup.menu.add(0, 5, 4, getString(R.string.live_snapshot_phone))
+        popup.menu.add(0, 6, 5, getString(R.string.ride_title))
+        val rides = com.aladdin.dashcam.gps.RideRepository.get(requireContext())
+        popup.menu.add(0, 7, 6, getString(if (rides.activeId.value == null) R.string.ride_start else R.string.ride_stop))
         if (selectedModeId == R.id.btn_mode_map || selectedModeId == R.id.btn_mode_split) {
             popup.menu.add(0, 4, 3, binding.btnMapType.text)
         }
@@ -479,10 +484,50 @@ class LiveFragment : Fragment() {
                     binding.btnMapType.performClick()
                     true
                 }
+                5 -> {
+                    savePhoneSnapshot()
+                    true
+                }
+                6 -> {
+                    startActivity(Intent(requireContext(), RideHistoryActivity::class.java))
+                    true
+                }
+                7 -> {
+                    val intent = Intent(requireContext(), com.aladdin.dashcam.gps.RideRecordingService::class.java)
+                    if (rides.activeId.value != null) requireContext().startService(intent.setAction("stop"))
+                    else if (viewModel.gpsStatus.value.hasPermission) {
+                        try { ContextCompat.startForegroundService(requireContext(), intent) }
+                        catch (error: Exception) { Toast.makeText(requireContext(), error.message, Toast.LENGTH_LONG).show() }
+                    } else startActivity(Intent(requireContext(), RideHistoryActivity::class.java))
+                    true
+                }
                 else -> false
             }
         }
         popup.show()
+    }
+
+    private fun savePhoneSnapshot() {
+        if (takingPhoto) return
+        takingPhoto = true
+        updateRecordingTimerUi(viewModel.recordingTimerDisplay.value)
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                val context = requireContext().applicationContext
+                val name = java.text.SimpleDateFormat("yyyyMMddHHmmss", Locale.US).format(java.util.Date()) +
+                    "_SNAP_${java.util.UUID.randomUUID().toString().take(8)}.jpg"
+                val file = java.io.File(com.aladdin.dashcam.media.MediaFiles.moviesDir(context), name)
+                val result = nativePlayer?.saveSnapshot(file) ?: Result.failure(IllegalStateException(getString(R.string.live_snapshot_no_frame)))
+                result.getOrThrow()
+                val published = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    runCatching { com.aladdin.dashcam.media.MediaFiles.publish(context, file, false) }.isSuccess
+                }
+                viewModel.loadLocalMedia()
+                Toast.makeText(requireContext(), getString(if (published) R.string.live_snapshot_saved else R.string.live_snapshot_app_only), Toast.LENGTH_LONG).show()
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) { Toast.makeText(requireContext(), getString(R.string.live_photo_failed_s, error.message), Toast.LENGTH_LONG).show() }
+            finally { takingPhoto = false; updateRecordingTimerUi(viewModel.recordingTimerDisplay.value) }
+        }
     }
 
     fun toggleFullscreen() {
@@ -697,7 +742,7 @@ class LiveFragment : Fragment() {
                         viewModel.targetIdentity
                     ) { net, host, owner, _ -> Triple(net, host, owner) }
                         .collect { (network, _, owner) ->
-                            if (owner == DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK) {
+                            if (owner == DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK || owner == DashCamViewModel.MediaStreamOwner.DOWNLOAD) {
                                 // 相簿正在回放，停止 FFmpeg 預覽以釋放記錄器 8080 RTSP 端口
                                 streamJob?.cancel()
                                 streamJob = null

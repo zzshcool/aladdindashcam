@@ -20,7 +20,7 @@ class DownloadsFragment : Fragment() {
     private var _binding: FragmentDownloadsBinding? = null
     private val binding get() = _binding!!
 
-    private val viewModel: DashCamViewModel by activityViewModels()
+    private val viewModel: DashCamViewModel by lazy { (requireActivity().application as com.aladdin.dashcam.AladdinApp).recorder }
     private lateinit var adapter: DownloadTaskAdapter
 
     override fun onCreateView(
@@ -44,7 +44,7 @@ class DownloadsFragment : Fragment() {
         adapter = DownloadTaskAdapter { task ->
             when (task.status) {
                 DownloadStatus.COMPLETED -> {
-                    viewModel.requestOpenMedia(task.mediaItem)
+                    viewModel.requestOpenMedia(task.mediaItem.copy(isDownloaded = true, localPath = task.localFile?.absolutePath))
                     activity?.findViewById<BottomNavigationView>(R.id.bottom_nav)?.selectedItemId = R.id.nav_album
                 }
                 DownloadStatus.DOWNLOADING -> {

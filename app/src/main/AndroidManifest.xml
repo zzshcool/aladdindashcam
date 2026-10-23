@@ -27,6 +27,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Wake lock for keeping screen on during ride preview -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -55,6 +57,16 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}" />
 
+        <provider android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files" android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/shared_files" />
+        </provider>
+        <service android:name=".media.DownloadService" android:exported="false" android:foregroundServiceType="dataSync" />
+        <service android:name=".gps.RideRecordingService" android:exported="false" android:foregroundServiceType="location" />
+        <activity android:name=".ui.RideHistoryActivity" android:exported="false"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation" />
+        <activity android:name=".ui.MediaToolsActivity" android:exported="false"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation" />
         <activity
             android:name=".ui.MainActivity"
             android:theme="@style/Theme.AladdinDashCam.Launcher"

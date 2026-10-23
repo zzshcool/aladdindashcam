@@ -22,7 +22,7 @@ class DeviceFragment : Fragment() {
     private var _binding: FragmentDeviceBinding? = null
     private val binding get() = _binding!!
 
-    private val viewModel: DashCamViewModel by activityViewModels()
+    private val viewModel: DashCamViewModel by lazy { (requireActivity().application as com.aladdin.dashcam.AladdinApp).recorder }
     private var formatting = false
     private var poweringOff = false
 
@@ -242,6 +242,22 @@ class DeviceFragment : Fragment() {
                 }.show()
         }
         // Toggle diagnostics collapsible section (UX-05)
+        binding.btnToggleDiagnostics.setOnLongClickListener {
+            viewLifecycleOwner.lifecycleScope.launch {
+                val file = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    com.aladdin.dashcam.media.Diagnostics.export(requireContext().applicationContext)
+                }
+                com.aladdin.dashcam.media.MediaFiles.share(requireContext(), file, "application/x-ndjson")
+            }
+            true
+        }
+        binding.btnToggleDiagnostics.tooltipText = getString(R.string.diagnostics_export_hint)
+        (binding.layoutDiagnosticsContent as? android.view.ViewGroup)?.addView(
+            android.widget.Button(requireContext(), null, android.R.attr.borderlessButtonStyle).apply {
+                text = getString(R.string.diagnostics_export)
+                setOnClickListener { binding.btnToggleDiagnostics.performLongClick() }
+            })
+
         binding.btnToggleDiagnostics.setOnClickListener {
             val isCurrentlyVisible = binding.layoutDiagnosticsContent.visibility == View.VISIBLE
             if (isCurrentlyVisible) {

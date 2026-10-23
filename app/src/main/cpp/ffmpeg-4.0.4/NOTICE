@@ -1,0 +1,6 @@
+Public headers from the official FFmpeg 4.0.4 release:
+https://ffmpeg.org/releases/ffmpeg-4.0.4.tar.xz
+These headers retain their upstream copyright and LGPL notices.
+COPYING.LGPLv2.1 is included. libavutil/avconfig.h describes the Android
+arm64 target (little endian, unaligned access). The export bridge links to
+the existing OEM libffmpeg.so; it does not replace or rebuild that engine.

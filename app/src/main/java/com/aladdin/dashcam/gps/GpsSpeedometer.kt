@@ -44,7 +44,9 @@ data class GpsStatus(
     val accelerationG: Float? = null,
     val lastUpdateElapsedRealtime: Long = 0L,
     val sourceName: String = "手機 GPS",
-    val trajectory: List<LocationPoint> = emptyList()
+    val trajectory: List<LocationPoint> = emptyList(),
+    val fixTimestampMillis: Long = 0L,
+    val verticalAccuracyMeters: Float? = null
 )
 
 class GpsSpeedometer(
@@ -199,7 +201,9 @@ class GpsSpeedometer(
             accelerationG = currentGForce,
             lastUpdateElapsedRealtime = fixTime,
             sourceName = if (location.provider == LocationManager.GPS_PROVIDER) "手機 GPS" else "手機網路定位",
-            trajectory = currentPoints
+            trajectory = currentPoints,
+            fixTimestampMillis = location.time,
+            verticalAccuracyMeters = if (location.hasVerticalAccuracy()) location.verticalAccuracyMeters else null
         )
     }
 

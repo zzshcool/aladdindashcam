@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="download_background">背景下載</string>
+    <string name="download_waiting">尚有 %1$d 個任務；等待記錄器或下載中</string>
+    <string name="download_pause_all">暫停全部</string>
+    <string name="diagnostics_export_hint">長按匯出診斷紀錄</string>
+    <string name="diagnostics_export">匯出診斷紀錄</string>
+    <string name="ride_extended_summary">移動 %1$d 分鐘 · 停留 %2$d 次 · GPS 覆蓋 %3$d%% · 平均精度 ±%4$s m</string>
+    <string name="sync_no_fix">此時刻沒有有效 GPS；點選路線位置可對齊目前影格</string>
+    <string name="sync_position">%1$s km/h · GPS ±%2$d m</string>
+    <string name="event_export">建立事件片段包</string>
+    <string name="event_window">事件前後各幾秒？（1–300）</string>
+    <string name="event_local_coverage">收集同一裝置已下載的相鄰影片並剪輯，包含可用截圖與 GPX。未下載或缺少的時段會記錄在 event.json。</string>
+    <string name="event_no_media">此時段沒有可用的本機錄影</string>
+    <string name="event_unknown_time">無法確認錄製時間，請改選有時間資訊的原始影片。</string>
+    <string name="event_progress">正在整理片段 %1$d／%2$d</string>
+    <string name="event_ready">事件片段包已完成；缺少時段請查看 event.json。</string>
+    <string name="event_share">分享事件片段包</string>
+    <string name="event_download_neighbors">下載事件前後 30 秒片段</string>
+    <string name="event_queued">已加入 %1$d 個任務；完成後到本機影片工具建立事件包。未知片長的前一段會一併保留。</string>
+    <string name="download_finishing">正在完成傳輸並恢復設備狀態</string>
+</resources>

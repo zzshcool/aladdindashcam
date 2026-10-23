@@ -79,6 +79,18 @@ class TimelineRulerView @JvmOverloads constructor(
             return true
         }
 
+        override fun onSingleTapUp(e: MotionEvent): Boolean {
+            val tappedMillis = currentCursorMillis + ((e.x - width / 2f) / pixelsPerMinute * 60_000).toLong()
+            val nearest = mediaItems.minByOrNull { kotlin.math.abs(it.timestampMillis - tappedMillis) }
+            val markerRadiusMillis = (24f * resources.displayMetrics.density / pixelsPerMinute * 60_000).toLong()
+            val target = if (nearest != null && kotlin.math.abs(nearest.timestampMillis - tappedMillis) <= markerRadiusMillis) {
+                nearest.timestampMillis
+            } else tappedMillis
+            setCursorMillisInternal(target, notify = true, isFinished = false)
+            performClick()
+            return true
+        }
+
         override fun onFling(
             e1: MotionEvent?,
             e2: MotionEvent,
@@ -152,16 +164,22 @@ class TimelineRulerView @JvmOverloads constructor(
      * 設定特定日期的媒體項目清單
      */
     fun setDayMedia(dayTimestamp: Long, items: List<MediaItem>) {
+        val previousDay = startOfDayMillis
+        val previousCursor = currentCursorMillis
+        val hadMedia = mediaItems.isNotEmpty()
         initStartOfDay(dayTimestamp)
+        scroller.forceFinished(true)
+        isFlinging = false
+        isUserInteracting = false
         mediaItems.clear()
         mediaItems.addAll(items)
 
-        // 若當前游標不在當天範圍內，設為當天第一個影片時間或當天中午
+        // 同一天更新保留游標；首次載入或換日定位到實際第一段影片。
         val endOfDayMillis = startOfDayMillis + 24 * 3600_000L
-        if (currentCursorMillis < startOfDayMillis || currentCursorMillis >= endOfDayMillis) {
-            val firstItem = items.firstOrNull { it.timestampMillis in startOfDayMillis until endOfDayMillis }
-            currentCursorMillis = firstItem?.timestampMillis ?: (startOfDayMillis + 12 * 3600_000L)
-        }
+        currentCursorMillis = if (hadMedia && previousDay == startOfDayMillis && previousCursor in startOfDayMillis until endOfDayMillis) {
+            previousCursor
+        } else items.filter { it.timestampMillis in startOfDayMillis until endOfDayMillis }
+            .minOfOrNull { it.timestampMillis } ?: startOfDayMillis
         invalidate()
     }
 
@@ -191,14 +209,26 @@ class TimelineRulerView @JvmOverloads constructor(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) parent?.requestDisallowInterceptTouchEvent(true)
         val result = gestureDetector.onTouchEvent(event)
-        if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
-            if (isUserInteracting) {
+        if (event.actionMasked == MotionEvent.ACTION_UP || event.actionMasked == MotionEvent.ACTION_CANCEL) {
+            parent?.requestDisallowInterceptTouchEvent(false)
+            if (isUserInteracting && event.actionMasked == MotionEvent.ACTION_UP && !isFlinging) {
                 isUserInteracting = false
                 onTimeSeekListener?.invoke(currentCursorMillis, true)
             }
+            if (event.actionMasked == MotionEvent.ACTION_CANCEL) {
+                scroller.forceFinished(true)
+                isFlinging = false
+                isUserInteracting = false
+            }
         }
         return result || super.onTouchEvent(event)
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        return true
     }
 
     override fun computeScroll() {
@@ -211,6 +241,7 @@ class TimelineRulerView @JvmOverloads constructor(
             postInvalidateOnAnimation()
         } else if (isFlinging) {
             isFlinging = false
+            isUserInteracting = false
             lastScrollerX = 0
             onTimeSeekListener?.invoke(currentCursorMillis, true)
         }
@@ -268,7 +299,10 @@ class TimelineRulerView @JvmOverloads constructor(
                 // 每整點大刻度 (例如 14:00)
                 canvas.drawLine(x, rulerTop, x, rulerBottom, rulerPaint)
                 val hourStr = String.format(Locale.getDefault(), "%02d:00", m / 60)
-                canvas.drawText(hourStr, x, rulerTop - 8f, textPaint)
+                val bubbleHalfWidth = timeBubbleTextPaint.measureText(timeFormat.format(Date(currentCursorMillis))) / 2f + 12f
+                if (kotlin.math.abs(x - centerX) > bubbleHalfWidth + textPaint.measureText(hourStr) / 2f) {
+                    canvas.drawText(hourStr, x, rulerTop - 8f, textPaint)
+                }
             } else if (m % 10 == 0) {
                 // 每 10 分鐘中刻度
                 canvas.drawLine(x, rulerBottom - rulerHeight * 0.4f, x, rulerBottom, rulerPaint)

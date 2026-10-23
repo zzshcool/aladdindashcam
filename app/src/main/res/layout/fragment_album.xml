@@ -34,7 +34,7 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_source_device"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
@@ -52,7 +52,7 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btn_source_local"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
@@ -228,7 +228,7 @@
                     android:textColor="@color/text_primary"
                     android:layout_width="48dp"
                     android:text="▦"
-                    android:textSize="22sp"
+                    android:textSize="18sp"
                     android:contentDescription="@string/album_view_grid"
                     app:strokeWidth="0dp"
                     android:backgroundTint="@color/transparent"
@@ -246,7 +246,7 @@
                     android:textColor="@color/text_primary"
                     android:layout_width="48dp"
                     android:text="≡"
-                    android:textSize="22sp"
+                    android:textSize="18sp"
                     android:contentDescription="@string/album_view_timeline"
                     app:strokeWidth="0dp"
                     android:backgroundTint="@color/transparent"
@@ -335,8 +335,8 @@
                 <com.aladdin.dashcam.ui.TimelineRulerView
                     android:id="@+id/timeline_ruler"
                     android:layout_width="match_parent"
-                    android:layout_height="130dp"
-                    android:layout_marginTop="8dp"
+                    android:layout_height="104dp"
+                    android:layout_marginTop="4dp"
                     android:background="@color/surface_dark" />
 
                 <!-- Timeline Seek Details & Quick Jump -->
@@ -345,28 +345,60 @@
                     android:layout_height="wrap_content"
                     android:gravity="center"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="8dp">
 
                     <TextView
                         android:id="@+id/tv_timeline_cursor_info"
-                        android:layout_width="wrap_content"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="@string/album_drag_the_timeline_to_find_a"
                         android:textColor="@color/text_primary"
-                        android:textSize="14sp" />
+                        android:maxLines="1"
+                        android:ellipsize="middle"
+                        android:textSize="12sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="48dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/tv_timeline_segment_count"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:textColor="@color/text_secondary"
+                            android:textSize="12sp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btn_timeline_play"
+                            style="@style/Widget.MaterialComponents.Button.TextButton"
+                            android:layout_width="wrap_content"
+                            android:layout_height="48dp"
+                            android:enabled="false"
+                            android:text="@string/timeline_play_selected" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btn_timeline_jump_next"
-                        style="@style/Widget.MaterialComponents.Button"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
                         android:layout_width="wrap_content"
-                        android:layout_height="44dp"
-                        android:layout_marginTop="12dp"
-                        android:backgroundTint="@color/surface_elevated"
-                        android:text="@string/album_no_video_here_jumping_to_the"
+                        android:layout_height="48dp"
+                        android:text="@string/timeline_next_segment"
                         android:textColor="@color/accent_teal"
-                        android:visibility="gone"
-                        app:cornerRadius="@dimen/radius_button" />
+                        android:visibility="gone" />
+                    </LinearLayout>
                 </LinearLayout>
+
+                <ListView
+                    android:id="@+id/list_timeline_segments"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:choiceMode="singleChoice"
+                    android:divider="@color/border_subtle"
+                    android:dividerHeight="1dp" />
             </LinearLayout>
 
             <!-- Empty / Unqueried State View -->
@@ -627,11 +659,17 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_viewer_segments" style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="48dp" android:layout_height="48dp" android:minWidth="0dp"
-                android:padding="0dp" android:text="▤" android:textSize="22sp" android:textColor="@color/white"
+                android:padding="0dp" android:text="▤" android:textSize="18sp" android:textColor="@color/white"
                 android:contentDescription="@string/viewer_segments"
                 android:textAllCaps="false"
                 android:stateListAnimator="@null"
                 android:elevation="0dp" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_viewer_more" style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="48dp" android:layout_height="48dp" android:minWidth="0dp"
+                android:padding="0dp" android:text="⋯" android:textSize="18sp" android:textColor="@color/white"
+                android:contentDescription="@string/video_tools" android:textAllCaps="false" />
 
             <!-- Independent Download Button on Viewer Top Bar -->
             <com.google.android.material.button.MaterialButton

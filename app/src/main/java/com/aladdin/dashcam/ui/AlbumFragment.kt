@@ -43,10 +43,13 @@ import java.util.Date
 import java.util.Locale
 
 class AlbumFragment : Fragment() {
+    private companion object {
+        const val REMOTE_STOP_GRACE_MS = 300L
+    }
     private var _binding: FragmentAlbumBinding? = null
     private val binding get() = _binding!!
 
-    private val viewModel: DashCamViewModel by activityViewModels()
+    private val viewModel: DashCamViewModel by lazy { (requireActivity().application as com.aladdin.dashcam.AladdinApp).recorder }
     private lateinit var adapter: MediaAdapter
     private lateinit var viewerStripAdapter: ViewerStripAdapter
     private var segmentsExpanded = false
@@ -68,11 +71,14 @@ class AlbumFragment : Fragment() {
     private var currentFilter = FilterCategory.ALL
     private var currentFilteredMediaList: List<MediaItem> = emptyList()
     private var selectedTimelineDateStr: String? = null
+    private var timelineItems: List<MediaItem> = emptyList()
+    private var timelineSelectedItemId: String? = null
 
     // Media viewer & player state
     private var nativePlayer: com.aladdin.dashcam.media.NativeFfmpegPlayer? = null
     private var remotePlayback = false
     private var videoDurationMs = 0L
+    private var videoPositionMs = 0L
     private var seekingVideo = false
     private var currentViewingItem: MediaItem? = null
     private var previewJob: Job? = null
@@ -82,6 +88,7 @@ class AlbumFragment : Fragment() {
     private var listRefreshJob: Job? = null
     private var albumEnterJob: Deferred<Result<Unit>>? = null
     private var albumExitJob: Job? = null
+    private var controlsHideJob: Job? = null
     private var playbackStopJob: Job? = null
     private var protectedPreviewFile: File? = null
     private var previewStartedAt = 0L
@@ -151,13 +158,36 @@ class AlbumFragment : Fragment() {
         )
     }
 
+    private fun setViewerControlsVisible(visible: Boolean) {
+        if (_binding == null) return
+        binding.viewerTopBar.visibility = if (visible) View.VISIBLE else View.GONE
+        binding.layoutViewerControls.visibility = if (visible && currentViewingItem?.isVideo == true) View.VISIBLE else View.GONE
+        val video = binding.glVideoView.layoutParams as android.widget.FrameLayout.LayoutParams
+        if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+            video.topMargin = 0; video.bottomMargin = 0
+            binding.glVideoView.layoutParams = video
+        }
+    }
+
+    private fun scheduleControlsHide() {
+        controlsHideJob?.cancel()
+        val accessibility = context?.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
+        if (accessibility?.isTouchExplorationEnabled == true) return
+        controlsHideJob = viewLifecycleOwner.lifecycleScope.launch {
+            delay(3500)
+            if (_binding != null && currentViewingItem?.isVideo == true && nativePlayer?.isPlaying == true &&
+                resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) setViewerControlsVisible(false)
+        }
+    }
+
     private fun updateViewerOrientation(config: Configuration) {
+        scheduleControlsHide()
         val viewingVideo = currentViewingItem?.isVideo == true
         (activity as? MainActivity)?.setAlbumPreviewExpanded(
             currentViewingItem != null && !isHidden
         )
         binding.layoutViewerStripContainer.visibility = if (viewingVideo && segmentsExpanded) View.VISIBLE else View.GONE
-        binding.btnViewerSegments.visibility = if (viewingVideo) View.VISIBLE else View.GONE
+        binding.btnViewerSegments.visibility = View.GONE
         binding.btnViewerSegments.isSelected = segmentsExpanded
         binding.viewerTopBar.visibility = View.VISIBLE
         binding.layoutViewerControls.visibility = if (viewingVideo) View.VISIBLE else View.GONE
@@ -170,8 +200,8 @@ class AlbumFragment : Fragment() {
                 controls.bottomMargin = stripHeight
                 binding.layoutViewerControls.layoutParams = controls
                 val video = binding.glVideoView.layoutParams as android.widget.FrameLayout.LayoutParams
-                video.topMargin = if (binding.viewerTopBar.visibility == View.VISIBLE) binding.viewerTopBar.height else 0
-                video.bottomMargin = stripHeight + binding.layoutViewerControls.height
+                video.topMargin = if (config.orientation == Configuration.ORIENTATION_LANDSCAPE) 0 else binding.viewerTopBar.height
+                video.bottomMargin = if (config.orientation == Configuration.ORIENTATION_LANDSCAPE) 0 else stripHeight + binding.layoutViewerControls.height
                 binding.glVideoView.layoutParams = video
             }
         }
@@ -349,16 +379,19 @@ class AlbumFragment : Fragment() {
         nativePlayer = com.aladdin.dashcam.media.NativeFfmpegPlayer(
             binding.glVideoView,
             onFirstFrameRendered = {
-                if (_binding != null && currentViewingItem?.isVideo == true) {
+                if (_binding != null && currentViewingItem?.isVideo == true && playbackStopJob?.isActive != true) {
+                    if (remotePlayback) viewModel.playbackSession.rendered()
                     binding.viewerLoadingLayout.visibility = View.GONE
                     binding.btnVideoPlayPause.isEnabled = true
                     binding.btnVideoPlayPause.text = getString(R.string.album_pause)
+                    scheduleControlsHide()
                     android.util.Log.i("AlbumFragment", "FFmpeg file frame index=${currentViewingItem?.deviceIndex}, elapsedMs=${android.os.SystemClock.elapsedRealtime() - previewStartedAt}")
                 }
             },
-            onError = { error -> if (_binding != null) showPlaybackError(previewRequestId, error) },
+            onError = { error -> if (_binding != null && currentViewingItem != null && playbackStopJob?.isActive != true) showPlaybackError(previewRequestId, error) },
             onProgress = { position, duration ->
-                if (_binding != null && currentViewingItem?.isVideo == true) {
+                videoPositionMs = position
+                if (_binding != null && currentViewingItem?.isVideo == true && playbackStopJob?.isActive != true) {
                     videoDurationMs = duration
                     val positionText = formatVideoTime(position)
                     val progressText = if (remotePlayback) {
@@ -376,16 +409,19 @@ class AlbumFragment : Fragment() {
                 }
             },
             onEnded = {
-                if (_binding != null) {
+                if (_binding != null && currentViewingItem != null && playbackStopJob?.isActive != true) {
+                    controlsHideJob?.cancel()
+                    setViewerControlsVisible(true)
+                    if (remotePlayback) viewModel.playbackSession.ended()
                     binding.btnVideoPlayPause.text = getString(R.string.album_replay)
                     binding.btnVideoPlayPause.isEnabled = true
                 }
             }
         )
         binding.glVideoView.setOnClickListener {
-            if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                binding.viewerTopBar.visibility = if (binding.viewerTopBar.visibility == View.VISIBLE) View.GONE else View.VISIBLE
-            }
+            val visible = binding.viewerTopBar.visibility != View.VISIBLE
+            setViewerControlsVisible(visible)
+            if (visible) scheduleControlsHide()
         }
         binding.btnVideoPlayPause.setOnClickListener {
             val item = currentViewingItem ?: return@setOnClickListener
@@ -407,6 +443,8 @@ class AlbumFragment : Fragment() {
                     if (remotePlayback) viewModel.toggleRemotePlaybackPause(item).getOrThrow()
                     if (previewRequestId != token) return@launch
                     native.setPaused(pause, controlSource = !remotePlayback)
+                    if (remotePlayback) viewModel.playbackSession.paused(pause)
+                    if (pause) controlsHideJob?.cancel() else scheduleControlsHide()
                     binding.btnVideoPlayPause.text = if (pause) getString(R.string.album_play) else getString(R.string.album_pause)
                 } catch (error: Exception) {
                     if (previewRequestId == token) showPlaybackError(token, error.message ?: getString(R.string.album_pause_state_unknown_reopen_the_video))
@@ -500,31 +538,15 @@ class AlbumFragment : Fragment() {
         }
 
         // Timeline Seek Listeners
-        binding.timelineRuler.onTimeSeekListener = { targetMillis, isFinished ->
-            val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(targetMillis))
-            val hitItem = binding.timelineRuler.findItemAtCursor()
-            if (hitItem != null) {
-                binding.tvTimelineCursorInfo.text = getString(R.string.album_video_found_s_s, hitItem.fileName, timeStr)
-                binding.btnTimelineJumpNext.visibility = View.GONE
-                if (isFinished) {
-                    val inClipOffsetMs = if (hitItem.durationSeconds > 0) {
-                        (targetMillis - hitItem.timestampMillis).coerceIn(0L, hitItem.durationSeconds * 1000L)
-                    } else {
-                        0L
-                    }
-                    openViewer(hitItem, startOffsetMs = inClipOffsetMs)
-                }
-            } else {
-                binding.tvTimelineCursorInfo.text = getString(R.string.album_no_recordings_at_this_time_s, timeStr)
-                val nextItem = binding.timelineRuler.findNextItem()
-                binding.btnTimelineJumpNext.visibility = if (nextItem != null) View.VISIBLE else View.GONE
-                binding.btnTimelineJumpNext.setOnClickListener {
-                    nextItem?.let {
-                        binding.timelineRuler.seekToTime(it.timestampMillis)
-                        openViewer(it, startOffsetMs = 0L)
-                    }
-                }
-            }
+        binding.timelineRuler.onTimeSeekListener = ::updateTimelineSelection
+        binding.btnTimelinePlay.setOnClickListener {
+            updateTimelineSelection(binding.timelineRuler.currentCursorMillis, true)
+        }
+        binding.btnTimelineJumpNext.setOnClickListener {
+            binding.timelineRuler.findNextItem()?.let { binding.timelineRuler.seekToTime(it.timestampMillis) }
+        }
+        binding.listTimelineSegments.setOnItemClickListener { _, _, position, _ ->
+            timelineItems.getOrNull(position)?.let { binding.timelineRuler.seekToTime(it.timestampMillis) }
         }
 
         binding.filterAll.setOnClickListener { selectFilter(FilterCategory.ALL) }
@@ -543,6 +565,59 @@ class AlbumFragment : Fragment() {
         // Viewer controls
         binding.btnViewerBack.setOnClickListener {
             closeViewer()
+        }
+        binding.btnViewerMore.setOnClickListener { anchor ->
+            val item = currentViewingItem ?: return@setOnClickListener
+            val menu = androidx.appcompat.widget.PopupMenu(requireContext(), anchor)
+            if (item.isVideo) {
+                menu.menu.add(0, 1, 0, getString(R.string.bookmark_add))
+                menu.menu.add(0, 2, 1, getString(R.string.video_tools))
+                menu.menu.add(0, 4, 3, getString(R.string.viewer_segments))
+                if (isDeviceSource) menu.menu.add(0, 5, 4, getString(R.string.event_download_neighbors))
+            }
+            menu.menu.add(0, 3, 2, getString(R.string.video_share))
+            menu.setOnMenuItemClickListener { action ->
+                if (action.itemId == 5) {
+                    val event = item.timestampMillis + videoPositionMs
+                    closeViewer()
+                    val count = viewModel.downloadEventWindow(item, event)
+                    Toast.makeText(requireContext(), getString(R.string.event_queued, count), Toast.LENGTH_LONG).show()
+                    return@setOnMenuItemClickListener true
+                }
+                if (action.itemId == 4) { binding.btnViewerSegments.performClick(); return@setOnMenuItemClickListener true }
+                if (action.itemId == 1) {
+                    if (remotePlayback) {
+                        Toast.makeText(requireContext(), R.string.video_download_first, Toast.LENGTH_LONG).show()
+                        return@setOnMenuItemClickListener true
+                    }
+                    com.aladdin.dashcam.media.VideoBookmarks(requireContext()).add(item.sourceDeviceId + ":" + item.fileName, videoPositionMs)
+                    Toast.makeText(requireContext(), R.string.bookmark_saved, Toast.LENGTH_SHORT).show()
+                } else {
+                    val file = viewModel.getLocalMediaFile(item)?.takeIf { it.isFile }
+                    if (file == null) Toast.makeText(requireContext(), R.string.video_download_first, Toast.LENGTH_LONG).show()
+                    else if (action.itemId == 2) {
+                        startActivity(android.content.Intent(requireContext(), MediaToolsActivity::class.java)
+                            .putExtra("path", file.absolutePath).putExtra("key", item.sourceDeviceId + ":" + item.fileName)
+                            .putExtra("time", item.timestampMillis).putExtra("position", videoPositionMs))
+                    } else com.aladdin.dashcam.media.MediaFiles.share(requireContext(), file, if (item.isVideo) "video/*" else "image/jpeg")
+                }
+                true
+            }
+            val sheet = com.google.android.material.bottomsheet.BottomSheetDialog(requireContext())
+            val actions = android.widget.LinearLayout(requireContext()).apply {
+                orientation = android.widget.LinearLayout.VERTICAL
+                setPadding(24, 12, 24, 24)
+            }
+            for (index in 0 until menu.menu.size()) {
+                val entry = menu.menu.getItem(index)
+                actions.addView(android.widget.Button(requireContext(), null, android.R.attr.borderlessButtonStyle).apply {
+                    text = entry.title; isAllCaps = false
+                    minHeight = (48 * resources.displayMetrics.density).toInt()
+                    setOnClickListener { sheet.dismiss(); menu.menu.performIdentifierAction(entry.itemId, 0) }
+                })
+            }
+            sheet.setContentView(actions)
+            sheet.show()
         }
 
         binding.btnViewerRetry.setOnClickListener {
@@ -630,12 +705,41 @@ class AlbumFragment : Fragment() {
         }
     }
 
+    private fun updateTimelineSelection(targetMillis: Long, isFinished: Boolean) {
+        val hitItem = binding.timelineRuler.findItemAtCursor()
+        val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(targetMillis))
+        binding.tvTimelineCursorInfo.text = if (hitItem != null) {
+            getString(R.string.timeline_selected_clip, timeStr, hitItem.fileName)
+        } else getString(R.string.album_no_recordings_at_this_time_s, timeStr)
+        binding.btnTimelinePlay.isEnabled = hitItem != null
+        binding.btnTimelineJumpNext.visibility = if (hitItem == null && binding.timelineRuler.findNextItem() != null) View.VISIBLE else View.GONE
+        if (timelineSelectedItemId != hitItem?.id) {
+            timelineSelectedItemId = hitItem?.id
+            binding.listTimelineSegments.clearChoices()
+            val index = timelineItems.indexOfFirst { it.id == timelineSelectedItemId }
+            if (index >= 0) binding.listTimelineSegments.setItemChecked(index, true)
+            (binding.listTimelineSegments.adapter as? android.widget.ArrayAdapter<*>)?.notifyDataSetChanged()
+        }
+        if (isFinished && hitItem != null) {
+            val offset = if (hitItem.durationSeconds > 0) {
+                (targetMillis - hitItem.timestampMillis).coerceIn(0L, hitItem.durationSeconds * 1000L)
+            } else 0L
+            openViewer(hitItem, startOffsetMs = offset)
+        }
+    }
+
     private fun applyTimelineData() {
         val rawList = if (isDeviceSource) viewModel.deviceMediaList.value else viewModel.localMediaList.value
         val videoList = rawList.filter { it.isVideo && it.timestampMillis > 0L }
         if (videoList.isEmpty()) {
+            timelineItems = emptyList()
+            timelineSelectedItemId = null
+            binding.listTimelineSegments.adapter = null
+            binding.timelineRuler.setDayMedia(System.currentTimeMillis(), emptyList())
             binding.containerTimelineDates.removeAllViews()
             binding.tvTimelineCursorInfo.text = getString(R.string.album_no_video_segments_available)
+            binding.tvTimelineSegmentCount.text = ""
+            binding.btnTimelinePlay.isEnabled = false
             binding.btnTimelineJumpNext.visibility = View.GONE
             return
         }
@@ -661,31 +765,49 @@ class AlbumFragment : Fragment() {
                 setBackgroundResource(if (isSelected) R.drawable.bg_status_badge else 0)
                 setOnClickListener {
                     selectedTimelineDateStr = dateStr
-                    val items = dateMap[dateStr] ?: emptyList()
-                    val targetTimestamp = items.firstOrNull()?.timestampMillis ?: System.currentTimeMillis()
-                    binding.timelineRuler.setDayMedia(targetTimestamp, items)
-                    val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(binding.timelineRuler.currentCursorMillis))
-                    binding.tvTimelineCursorInfo.text = getString(R.string.album_position_s_s_segments, timeStr, items.size)
                     applyTimelineData() // refresh chip selection
                 }
             }
             binding.containerTimelineDates.addView(chip)
         }
 
-        val itemsForDate = dateMap[currentSelectedDate] ?: emptyList()
+        val itemsForDate = dateMap[currentSelectedDate].orEmpty().sortedBy { it.timestampMillis }
+        timelineItems = itemsForDate
+        timelineSelectedItemId = null
+        binding.tvTimelineSegmentCount.text = getString(R.string.timeline_segment_count, itemsForDate.size)
+        val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        binding.listTimelineSegments.adapter = object : android.widget.ArrayAdapter<MediaItem>(requireContext(), android.R.layout.simple_list_item_2, android.R.id.text1, itemsForDate) {
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val row = super.getView(position, convertView, parent)
+                val item = getItem(position) ?: return row
+                row.findViewById<android.widget.TextView>(android.R.id.text1).apply {
+                    text = "${timeFormat.format(Date(item.timestampMillis))}  ·  ${getString(if (item.isEmergency) R.string.album_protected_events else R.string.album_loop_recordings)}"
+                    val selected = timelineSelectedItemId == item.id
+                    setTextColor(ContextCompat.getColor(context, if (selected) R.color.accent_teal else R.color.text_primary))
+                    textSize = 14f
+                }
+                row.findViewById<android.widget.TextView>(android.R.id.text2).apply {
+                    text = item.fileName
+                    setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+                    textSize = 12f
+                    maxLines = 1
+                    ellipsize = android.text.TextUtils.TruncateAt.MIDDLE
+                }
+                return row
+            }
+        }
         val targetTimestamp = itemsForDate.firstOrNull()?.timestampMillis ?: System.currentTimeMillis()
         binding.timelineRuler.setDayMedia(targetTimestamp, itemsForDate)
-        val timeStr = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(binding.timelineRuler.currentCursorMillis))
-        binding.tvTimelineCursorInfo.text = getString(R.string.album_position_s_s_segments, timeStr, itemsForDate.size)
+        updateTimelineSelection(binding.timelineRuler.currentCursorMillis, false)
     }
 
     private fun applyFilters() {
+        val rawList = if (isDeviceSource) viewModel.deviceMediaList.value else viewModel.localMediaList.value
         if (isTimelineMode) {
             applyTimelineData()
+            updateAlbumEmptyState(rawList, rawList.none { it.isVideo && it.timestampMillis > 0L })
             return
         }
-
-        val rawList = if (isDeviceSource) viewModel.deviceMediaList.value else viewModel.localMediaList.value
 
         // Filter by category
         val filtered = rawList.filter { item ->
@@ -725,9 +847,12 @@ class AlbumFragment : Fragment() {
         }
 
         adapter.submitList(itemsWithHeaders)
+        updateAlbumEmptyState(rawList, itemsWithHeaders.isEmpty())
+    }
 
+    private fun updateAlbumEmptyState(rawList: List<MediaItem>, empty: Boolean) {
         // Accurate state separation: unqueried vs empty vs filter-no-result
-        if (itemsWithHeaders.isEmpty()) {
+        if (empty) {
             binding.layoutEmptyState.visibility = View.VISIBLE
             binding.rvAlbum.visibility = View.GONE
 
@@ -741,9 +866,11 @@ class AlbumFragment : Fragment() {
                             binding.btnRefreshAlbum.setOnClickListener { triggerRemoteListRefresh() }
                         } else {
                             binding.tvAlbumEmpty.text = getString(R.string.album_no_media_in_this_category)
-                            binding.btnRefreshAlbum.text = getString(R.string.album_show_all_media)
+                            binding.btnRefreshAlbum.text = getString(if (isTimelineMode) R.string.album_view_grid else R.string.album_show_all_media)
                             binding.btnRefreshAlbum.visibility = View.VISIBLE
-                            binding.btnRefreshAlbum.setOnClickListener { selectFilter(FilterCategory.ALL) }
+                            binding.btnRefreshAlbum.setOnClickListener {
+                                if (isTimelineMode) binding.toggleViewMode.check(R.id.btn_mode_grid) else selectFilter(FilterCategory.ALL)
+                            }
                         }
                     }
                     is AlbumQueryState.Error -> {
@@ -769,14 +896,16 @@ class AlbumFragment : Fragment() {
                     }
                 } else {
                     binding.tvAlbumEmpty.text = getString(R.string.album_no_media_in_this_category)
-                    binding.btnRefreshAlbum.text = getString(R.string.album_show_all_media)
+                    binding.btnRefreshAlbum.text = getString(if (isTimelineMode) R.string.album_view_grid else R.string.album_show_all_media)
                     binding.btnRefreshAlbum.visibility = View.VISIBLE
-                    binding.btnRefreshAlbum.setOnClickListener { selectFilter(FilterCategory.ALL) }
+                    binding.btnRefreshAlbum.setOnClickListener {
+                        if (isTimelineMode) binding.toggleViewMode.check(R.id.btn_mode_grid) else selectFilter(FilterCategory.ALL)
+                    }
                 }
             }
         } else {
             binding.layoutEmptyState.visibility = View.GONE
-            binding.rvAlbum.visibility = View.VISIBLE
+            binding.rvAlbum.visibility = if (isTimelineMode) View.GONE else View.VISIBLE
         }
     }
 
@@ -785,11 +914,11 @@ class AlbumFragment : Fragment() {
      */
     private fun openViewer(item: MediaItem, startOffsetMs: Long = 0L) {
         playbackCommandJob?.cancel()
-        if (remotePlayback) {
-            playbackStopJob = viewModel.viewModelScope.launch { viewModel.stopRemotePlayback() }
-        }
+        val wasRemotePlayback = remotePlayback
+        if (wasRemotePlayback) stopRemotePlaybackBeforeDecoderRelease()
         remotePlayback = false
         videoDurationMs = 0L
+        videoPositionMs = startOffsetMs
         seekingVideo = false
         previewStartedAt = android.os.SystemClock.elapsedRealtime()
         android.util.Log.i("AlbumFragment", "Open media index=${item.deviceIndex}, file=${item.fileName}")
@@ -817,7 +946,7 @@ class AlbumFragment : Fragment() {
         updateViewerDownloadButton(item)
 
         // Reset player & photo view
-        releasePlayer()
+        if (!wasRemotePlayback && playbackStopJob?.isActive != true) releasePlayer()
         releasePreviewProtection()
         binding.glVideoView.visibility = View.GONE
         binding.ivPhotoViewer.visibility = View.GONE
@@ -867,30 +996,9 @@ class AlbumFragment : Fragment() {
             if (startOffsetMs > 0L) Toast.makeText(context, getString(R.string.album_recorder_playback_starts_at_the_beginning), Toast.LENGTH_LONG).show()
             previewJob = viewLifecycleOwner.lifecycleScope.launch {
                 try {
-                    viewModel.requestStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
                     playbackStopJob?.join()
-                    val network = viewModel.wifiNetwork.value ?: error(getString(R.string.album_recorder_wi_fi_disconnected))
-                    val sent = kotlinx.coroutines.CompletableDeferred<Unit>()
-                    playbackCommandJob = viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-                        val result = runCatching {
-                            viewModel.restartStreaming().getOrThrow()
-                            viewModel.startRemotePlayback(item) { sent.complete(Unit) }.getOrThrow()
-                        }
-                        result.exceptionOrNull()?.let { error ->
-                            sent.completeExceptionally(error)
-                            withContext(Dispatchers.Main) {
-                                if (_binding != null && previewRequestId == currentToken) {
-                                    nativePlayer?.stop()
-                                    showPlaybackError(currentToken, error.message ?: getString(R.string.album_recorder_rejected_playback))
-                                }
-                            }
-                        }
-                    }
-                    kotlinx.coroutines.withTimeout(20_000L) { sent.await() }
-                    if (previewRequestId == currentToken) {
-                        nativePlayer?.start("rtsp://${viewModel.deviceHost.value}:8080/?action=stream",
-                            targetNetwork = network, knownDurationMs = item.durationSeconds.toLong() * 1000L)
-                    }
+                    val decoder = nativePlayer ?: error(getString(R.string.player_unavailable))
+                    viewModel.playbackSession.open(item, decoder)
                 } catch (cancelled: kotlinx.coroutines.CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
@@ -936,6 +1044,7 @@ class AlbumFragment : Fragment() {
     }
 
     private fun showPlaybackError(token: Long, message: String) {
+        if (remotePlayback) viewModel.playbackSession.interrupted()
         if (_binding == null || previewRequestId != token) return
         binding.viewerLoadingLayout.visibility = View.GONE
         if (isDeviceSource && currentViewingItem?.isVideo == true) {
@@ -1101,12 +1210,15 @@ class AlbumFragment : Fragment() {
     }
 
     private fun closeViewer() {
+        controlsHideJob?.cancel()
+        val wasRemotePlayback = remotePlayback
         playbackCommandJob?.cancel()
         ++previewRequestId // Invalidate any in-flight preview requests (R2)
         previewJob?.cancel()
         previewJob = null
         downloadJob = null
-        releasePlayer()
+        if (wasRemotePlayback) stopRemotePlaybackBeforeDecoderRelease()
+        else if (playbackStopJob?.isActive != true) releasePlayer()
         remotePlayback = false
         releasePreviewProtection()
         currentViewingItem = null
@@ -1114,14 +1226,18 @@ class AlbumFragment : Fragment() {
         binding.layoutMediaViewer.visibility = View.GONE
         backPressedCallback.isEnabled = false
 
-        if (isDeviceSource) {
-            playbackStopJob = viewModel.viewModelScope.launch {
-                val result = viewModel.stopRemotePlayback()
-                if (currentViewingItem == null) viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
-                if (result.isFailure && isAdded) Toast.makeText(context, getString(R.string.album_playback_closed_but_recording_resume_not, result.exceptionOrNull()?.message), Toast.LENGTH_LONG).show()
-            }
-        } else {
+        if (!wasRemotePlayback && playbackStopJob?.isActive != true) {
             viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
+        }
+    }
+
+    private fun stopRemotePlaybackBeforeDecoderRelease() {
+        val previousStop = playbackStopJob
+        playbackStopJob = viewModel.viewModelScope.launch {
+            previousStop?.join()
+            val result = viewModel.playbackSession.close()
+            if (result.isFailure && isAdded) Toast.makeText(context,
+                getString(R.string.album_playback_closed_but_recording_resume_not, result.exceptionOrNull()?.message), Toast.LENGTH_LONG).show()
         }
     }
 
@@ -1268,7 +1384,11 @@ class AlbumFragment : Fragment() {
         downloadJob = null
         currentViewingItem = null
         (activity as? MainActivity)?.setAlbumPreviewExpanded(false)
-        nativePlayer?.release()
+        val player = nativePlayer
+        val pendingStop = playbackStopJob
+        if (pendingStop?.isActive == true) {
+            viewModel.viewModelScope.launch { pendingStop.join(); player?.release() }
+        } else player?.release()
         nativePlayer = null
         releasePreviewProtection()
         _binding = null

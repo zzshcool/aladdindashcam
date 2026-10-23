@@ -41,6 +41,15 @@ sealed class GPSocketResponse {
 }
 
 object GPSocketProtocol {
+    /** GoPlus 縮圖的 TIME 欄位為 little-endian 秒數；缺少欄位時維持未知。 */
+    fun parseThumbnailDurationSeconds(header: ByteArray): Long {
+        if (header.size < 33 || header[25] != 'T'.code.toByte() ||
+            header[26] != 'I'.code.toByte() || header[27] != 'M'.code.toByte() ||
+            header[28] != 'E'.code.toByte()) return 0L
+        return (29..32).fold(0L) { value, index ->
+            value or ((header[index].toLong() and 0xffL) shl ((index - 29) * 8))
+        }
+    }
     private val TAG_BYTES = "GPSOCKET".toByteArray(Charsets.US_ASCII)
     const val TYPE_CMD: Short = 1
     const val TYPE_ACK: Short = 2

@@ -20,6 +20,11 @@ val mapsApiKey: String = System.getenv("MAPS_API_KEY")
 android {
     namespace = "com.aladdin.dashcam"
     compileSdk = 35
+    ndkVersion = "26.1.10909125"
+
+    externalNativeBuild {
+        cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "3.22.1" }
+    }
 
     defaultConfig {
         applicationId = "com.aladdin.dashcam"

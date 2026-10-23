@@ -26,7 +26,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
-    private val viewModel: DashCamViewModel by viewModels()
+    private val viewModel: DashCamViewModel by lazy { (application as com.aladdin.dashcam.AladdinApp).recorder }
 
     private var liveFragment: LiveFragment? = null
     private var albumFragment: AlbumFragment? = null
@@ -56,6 +56,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_AladdinDashCam)
         super.onCreate(savedInstanceState)
+        viewModel.resumeDownloads()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         viewModel.refreshLocalizedText()

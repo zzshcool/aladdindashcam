@@ -21,6 +21,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicBoolean
+import java.io.File
+import android.graphics.BitmapFactory
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -149,6 +151,7 @@ class NativeFfmpegPlayer(
                 var lastFrameCount = -1L
                 var lastProgressAt = SystemClock.elapsedRealtime()
                 var samples = 0
+                var furthestPositionMs = 0L
                 while (isActive && isCurrent(token)) {
                     delay(250)
                     if (paused) {
@@ -167,10 +170,12 @@ class NativeFfmpegPlayer(
                         lastProgressAt = SystemClock.elapsedRealtime()
                     }
                     val durationMs = if (sample.third > 0L) sample.third else knownDurationMs
+                    furthestPositionMs = maxOf(furthestPositionMs, sample.second)
                     onProgress?.invoke(sample.second.coerceAtLeast(0L), durationMs.coerceAtLeast(0L))
                     if (++samples % 8 == 0) Log.d(TAG, "Progress generation=$token frames=${sample.first} positionMs=${sample.second}")
-                    if (!streaming && durationMs > 0L && sample.second >= durationMs - 1000L &&
+                    if (firstFrameDrawn.get() && durationMs > 0L && furthestPositionMs >= durationMs - 1000L &&
                         SystemClock.elapsedRealtime() - lastProgressAt > 1000L) {
+                        onProgress?.invoke(durationMs, durationMs)
                         finishPlayback()
                         break
                     }
@@ -203,6 +208,37 @@ class NativeFfmpegPlayer(
         }
         paused = value
         glSurfaceView.renderMode = if (value) GLSurfaceView.RENDERMODE_WHEN_DIRTY else GLSurfaceView.RENDERMODE_CONTINUOUSLY
+    }
+
+    suspend fun saveSnapshot(file: File): Result<File> = withContext(Dispatchers.IO) {
+        val token = generation
+        try {
+            synchronized(nativeLock) {
+                check(isCurrent(token) && sourceReady && firstFrameDrawn.get()) { "No decoded video frame" }
+                check(ffmpegWrapper.naSaveSnapshot(file.absolutePath) == 0) { "FFmpeg snapshot failed" }
+            }
+            val deadline = SystemClock.elapsedRealtime() + 5000L
+            var previousLength = -1L
+            while (SystemClock.elapsedRealtime() < deadline) {
+                check(isCurrent(token)) { "Video source changed during snapshot" }
+                delay(100)
+                val length = file.length()
+                val completeJpeg = length >= 2 && length == previousLength && java.io.RandomAccessFile(file, "r").use {
+                    it.seek(length - 2); it.readUnsignedShort() == 0xffd9
+                }
+                if (completeJpeg) {
+                    val options = BitmapFactory.Options().apply { inSampleSize = 4 }
+                    val bitmap = BitmapFactory.decodeFile(file.absolutePath, options)
+                    if (bitmap != null) { bitmap.recycle(); return@withContext Result.success(file) }
+                }
+                previousLength = length
+            }
+            error("FFmpeg snapshot did not complete")
+        } catch (error: Exception) {
+            file.delete()
+            if (error is CancellationException) throw error
+            Result.failure(error)
+        }
     }
 
     private fun isCurrent(token: Long) = owner === this && active && generation == token

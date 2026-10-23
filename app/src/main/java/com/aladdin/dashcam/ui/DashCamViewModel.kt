@@ -69,13 +69,8 @@ sealed class ProbeStatus {
     data class Failed(val host: String, val reason: String?) : ProbeStatus()
 }
 
-enum class DownloadStatus {
-    PENDING,
-    DOWNLOADING,
-    COMPLETED,
-    FAILED,
-    CANCELLED
-}
+typealias DownloadStatus = com.aladdin.dashcam.media.DownloadStatus
+typealias DownloadTask = com.aladdin.dashcam.media.DownloadTask
 
 data class RtcSyncState(
     val lastAttemptTime: Long = 0L,
@@ -116,16 +111,6 @@ data class DashCamDeviceRecord(
     fun cacheDirectoryName(): String = java.util.Base64.getUrlEncoder().withoutPadding()
         .encodeToString(id.toByteArray(Charsets.UTF_8))
 }
-
-data class DownloadTask(
-    val id: String,
-    val mediaItem: MediaItem,
-    val status: DownloadStatus = DownloadStatus.PENDING,
-    val bytesRead: Long = 0L,
-    val totalBytes: Long = 0L,
-    val errorMessage: String? = null,
-    val localFile: File? = null
-)
 
 class DashCamViewModel(application: Application) : AndroidViewModel(application) {
     private var displayLocale = AppAppearance.localizedContext(application).resources.configuration.locales.toLanguageTags()
@@ -200,11 +185,11 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     private val _albumQueryState = MutableStateFlow<AlbumQueryState>(AlbumQueryState.Idle)
     val albumQueryState: StateFlow<AlbumQueryState> = _albumQueryState.asStateFlow()
 
-    private val _downloadTasks = MutableStateFlow<List<DownloadTask>>(emptyList())
+    private val downloadRepository = com.aladdin.dashcam.media.DownloadRepository(application, viewModelScope)
+    private val _downloadTasks = downloadRepository.tasks
     val downloadTasks: StateFlow<List<DownloadTask>> = _downloadTasks.asStateFlow()
-    private val activeDownloadJobs = java.util.concurrent.ConcurrentHashMap<String, kotlinx.coroutines.Job>()
-    private val downloadGenerations = java.util.concurrent.ConcurrentHashMap<String, Long>()
-    private val generationCounter = java.util.concurrent.atomic.AtomicLong(1L)
+    val downloadWorkCount = downloadRepository.workCount.asStateFlow()
+    private val downloadGenerations = downloadRepository.generations
 
     private val _openMediaItemEvent = MutableSharedFlow<MediaItem>(replay = 0, extraBufferCapacity = 1)
     val openMediaItemEvent: SharedFlow<MediaItem> = _openMediaItemEvent.asSharedFlow()
@@ -283,18 +268,22 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     enum class MediaStreamOwner {
         NONE,
         LIVE_PREVIEW,
-        ALBUM_PLAYBACK
+        ALBUM_PLAYBACK,
+        DOWNLOAD
     }
 
     private val _currentStreamOwner = MutableStateFlow(MediaStreamOwner.NONE)
     val currentStreamOwner: StateFlow<MediaStreamOwner> = _currentStreamOwner.asStateFlow()
 
-    fun requestStreamOwner(owner: MediaStreamOwner): Boolean {
+    @Synchronized fun requestStreamOwner(owner: MediaStreamOwner): Boolean {
+        val current = _currentStreamOwner.value
+        if (current != MediaStreamOwner.NONE && current != owner &&
+            !(current == MediaStreamOwner.LIVE_PREVIEW && owner != MediaStreamOwner.NONE)) return false
         _currentStreamOwner.value = owner
         return true
     }
 
-    fun releaseStreamOwner(owner: MediaStreamOwner) {
+    @Synchronized fun releaseStreamOwner(owner: MediaStreamOwner) {
         if (_currentStreamOwner.value == owner) {
             _currentStreamOwner.value = MediaStreamOwner.NONE
         }
@@ -305,6 +294,22 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
 
     private val _currentPlaybackItem = MutableStateFlow<MediaItem?>(null)
     val currentPlaybackItem: StateFlow<MediaItem?> = _currentPlaybackItem.asStateFlow()
+
+    val playbackSession = com.aladdin.dashcam.media.RemotePlaybackSession(
+        acquire = { requestStreamOwner(MediaStreamOwner.ALBUM_PLAYBACK) },
+        release = { releaseStreamOwner(MediaStreamOwner.ALBUM_PLAYBACK) },
+        network = { wifiNetwork.value },
+        duration = { item -> withContext(Dispatchers.IO) {
+            if (item.durationSeconds > 0) item.durationSeconds.toLong() * 1000L
+            else getOrFetchThumbnail(item)?.let { file -> runCatching {
+                val header = ByteArray(33)
+                java.io.DataInputStream(file.inputStream()).use { it.readFully(header) }
+                GPSocketProtocol.parseThumbnailDurationSeconds(header) * 1000L
+            }.getOrDefault(0L) } ?: 0L
+        } },
+        restart = { restartStreaming() }, start = { item, sent -> startRemotePlayback(item, sent) },
+        stop = { stopRemotePlayback() }, source = { "rtsp://${deviceHost.value}:8080/?action=stream" }
+    )
 
     @Volatile
     private var lastSyncedSessionId: Long = 0L
@@ -1427,54 +1432,64 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
      * Unified entry point for starting permanent downloads (F1 / Single Ownership).
      * Decoupled from Fragment callbacks (C4) with generation isolation (C2).
      */
-    private val downloadQueue = Mutex()
-    @Volatile private var activePermanentTransferKey: String? = null
-
     fun startPermanentDownload(item: MediaItem): Job {
-        activeDownloadJobs[item.storageKey]?.let { existing ->
-            if (existing.isActive) return existing
-        }
-        val gen = generationCounter.incrementAndGet()
-        downloadGenerations[item.storageKey] = gen
-        updateDownloadTask(DownloadTask(item.storageKey, item, status = DownloadStatus.PENDING, totalBytes = item.sizeBytes))
-
-        var ownedJob: Job? = null
-        val job = viewModelScope.launch(Dispatchers.IO, start = kotlinx.coroutines.CoroutineStart.LAZY) {
-            try {
-                downloadQueue.withLock {
-                    activePermanentTransferKey = item.storageKey
-                    try {
-                        val result = saveToPermanentStorage(item, generation = gen)
-                        if (result.isFailure && downloadGenerations[item.storageKey] == gen) {
-                            _downloadTasks.update { tasks -> tasks.map {
-                                if (it.id == item.storageKey) it.copy(status = DownloadStatus.FAILED, errorMessage = result.exceptionOrNull()?.message) else it
-                            } }
-                        }
-                    } finally { activePermanentTransferKey = null }
-                }
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) {
-                    if (downloadGenerations[item.storageKey] == gen) {
-                        _downloadTasks.update { tasks ->
-                            tasks.map { if (it.id == item.storageKey) it.copy(status = DownloadStatus.CANCELLED) else it }
-                        }
-                    }
-                } else {
-                    if (downloadGenerations[item.storageKey] == gen) {
-                        _downloadTasks.update { tasks ->
-                            tasks.map { if (it.id == item.storageKey) it.copy(status = DownloadStatus.FAILED, errorMessage = e.message) else it }
-                        }
+        val job = downloadRepository.enqueue(item, resolve = { saved ->
+            if (connectionStatus.value != ConnectionStatus.CONNECTED ||
+                saved.sourceDeviceId != currentMediaSourceId() ||
+                currentStreamOwner.value == MediaStreamOwner.ALBUM_PLAYBACK) null
+            else saved.copy(sourceEpoch = targetIdentity.value.epoch)
+        }, retryWhen = { connectionStatus.value != ConnectionStatus.CONNECTED }, transfer = { current, generation ->
+            if (!requestStreamOwner(MediaStreamOwner.DOWNLOAD)) Result.failure(IllegalStateException("Recorder busy"))
+            else {
+                val before = client.queryStatus()
+                var entered = false
+                try {
+                    check(before != null && before.mode != DeviceMode.UNKNOWN) { "Recorder mode unknown" }
+                    client.enterAlbumBrowsing(current.sourceEpoch).getOrThrow()
+                    entered = true
+                    val verified = client.getFileList(current.sourceEpoch).getOrThrow().firstOrNull {
+                        it.fileName == current.fileName && it.sizeBytes == current.sizeBytes
+                    } ?: error("Recording is no longer present on this device")
+                    saveToPermanentStorage(verified.copy(sourceDeviceId = current.sourceDeviceId, sourceEpoch = current.sourceEpoch), generation)
+                } catch (error: Exception) {
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    Result.failure(error)
+                } finally {
+                    withContext(kotlinx.coroutines.NonCancellable) {
+                        if (entered && before?.mode != DeviceMode.PLAYBACK) client.exitAlbumBrowsing(current.sourceEpoch)
+                        releaseStreamOwner(MediaStreamOwner.DOWNLOAD)
                     }
                 }
-            } finally {
-                ownedJob?.let { activeDownloadJobs.remove(item.storageKey, it) }
             }
+        })
+        try {
+            androidx.core.content.ContextCompat.startForegroundService(getApplication(),
+                android.content.Intent(getApplication(), com.aladdin.dashcam.media.DownloadService::class.java))
+        } catch (error: Exception) {
+            downloadRepository.cancel(DownloadTask(item.storageKey, item)) { client.abortActiveTransfer() }
+            com.aladdin.dashcam.media.Diagnostics.record("download.service", error.javaClass.simpleName)
         }
-        ownedJob = job
-        activeDownloadJobs[item.storageKey] = job
-        job.start()
         return job
     }
+
+    fun downloadEventWindow(item: MediaItem, eventTime: Long, seconds: Long = 30): Int {
+        if (!isCurrentMediaSource(item) || eventTime <= 0) return 0
+        val from = eventTime - seconds * 1000; val until = eventTime + seconds * 1000
+        val media = deviceMediaList.value.filter { it.isVideo && it.sourceDeviceId == item.sourceDeviceId && it.timestampMillis > 0 }
+        val previous = media.filter { it.timestampMillis < from }.maxByOrNull { it.timestampMillis }
+        val selected = media.filter {
+            it.timestampMillis in from..until ||
+                (it.durationSeconds > 0 && it.timestampMillis < from && it.timestampMillis + it.durationSeconds * 1000L > from) ||
+                (it.durationSeconds == 0 && it.id == previous?.id)
+        }.filter { !it.isDownloaded }
+        selected.forEach { startPermanentDownload(it) }
+        return selected.size
+    }
+
+    fun resumeDownloads() {
+        downloadTasks.value.filter { it.status == DownloadStatus.PENDING }.forEach { startPermanentDownload(it.mediaItem) }
+    }
+    fun pauseDownloads() = downloadRepository.pauseAll { client.abortActiveTransfer() }
 
     private fun updateDownloadTask(task: DownloadTask) {
         _downloadTasks.update { tasks ->
@@ -1507,16 +1522,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         startPermanentDownload(task.mediaItem)
     }
 
-    fun cancelDownload(task: DownloadTask) {
-        val job = activeDownloadJobs[task.id]
-        val currentGen = downloadGenerations[task.id] ?: 0L
-        downloadGenerations[task.id] = currentGen + 1
-        job?.cancel()
-        if (activePermanentTransferKey == task.id) client.abortActiveTransfer()
-        _downloadTasks.update { tasks ->
-            tasks.map { if (it.id == task.id) it.copy(status = DownloadStatus.CANCELLED) else it }
-        }
-    }
+    fun cancelDownload(task: DownloadTask) = downloadRepository.cancel(task) { client.abortActiveTransfer() }
 
     /**
      * Downloads real media item from dashcam to local app storage (M4 / P-02)
@@ -1625,103 +1631,12 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         return 0L
     }
 
-    private val thumbnailMutex = Mutex()
-
+    private val mediaRepository = com.aladdin.dashcam.media.MediaRepository(application, client, mediaCacheManager)
     fun getCachedThumbnailBitmap(item: MediaItem): Bitmap? = mediaCacheManager.getBitmap(item.storageKey)
     fun putCachedThumbnailBitmap(item: MediaItem, bitmap: Bitmap) = mediaCacheManager.putBitmap(item.storageKey, bitmap)
-
-    suspend fun getOrFetchThumbnail(item: MediaItem): File? = withContext(Dispatchers.IO) {
-        thumbnailMutex.withLock {
-        val app = getApplication<Application>()
-        val thumbDir = File(app.cacheDir, "thumbnails")
-        if (!thumbDir.exists()) thumbDir.mkdirs()
-        val cacheKey = java.security.MessageDigest.getInstance("SHA-256")
-            .digest(item.storageKey.toByteArray()).joinToString("") { "%02x".format(it) }
-        val thumbFile = File(thumbDir, "thumb_$cacheKey.jpg")
-        if (thumbFile.exists() && thumbFile.length() > 0) {
-            mediaCacheManager.touchFile(thumbFile)
-            return@withContext thumbFile
-        }
-
-        // 本機已下載或 LOCAL_ 項目直接於背景線程解碼，不發送遠端 GET（R10 閉合）
-        if (item.isDownloaded || item.id.startsWith("LOCAL_")) {
-            val localFile = getLocalMediaFile(item)
-            if (localFile != null && localFile.length() > 0) {
-                val ok = generateLocalThumbnail(localFile, thumbFile, item.isVideo)
-                if (ok) {
-                    mediaCacheManager.touchFile(thumbFile)
-                    mediaCacheManager.evictDirectoryIfExceeds(
-                        thumbDir,
-                        mediaCacheManager.thumbnailQuotaBytes,
-                        mediaCacheManager.thumbnailLowWatermarkBytes
-                    )
-                    return@withContext thumbFile
-                }
-            }
-            return@withContext null
-        }
-
-        if (!isCurrentMediaSource(item) || deviceStatus.value.mode != DeviceMode.PLAYBACK ||
-            currentStreamOwner.value == MediaStreamOwner.ALBUM_PLAYBACK) {
-            return@withContext null
-        }
-        val image = client.getThumbnail(item.deviceIndex, expectedEpoch = item.sourceEpoch).getOrNull()
-        if (image != null && image.size > 4 &&
-            image[0] == 0xFF.toByte() && image[1] == 0xD8.toByte() &&
-            image[image.lastIndex - 1] == 0xFF.toByte() && image[image.lastIndex] == 0xD9.toByte()
-        ) {
-            try {
-                thumbFile.writeBytes(image)
-                mediaCacheManager.touchFile(thumbFile)
-                mediaCacheManager.evictDirectoryIfExceeds(
-                    thumbDir,
-                    mediaCacheManager.thumbnailQuotaBytes,
-                    mediaCacheManager.thumbnailLowWatermarkBytes
-                )
-                return@withContext thumbFile
-            } catch (_: java.io.IOException) {
-                thumbFile.delete()
-            }
-        }
-        null
-        }
-    }
-
-    private fun generateLocalThumbnail(sourceFile: File, destThumbFile: File, isVideo: Boolean): Boolean {
-        return try {
-            val bitmap: android.graphics.Bitmap? = if (isVideo) {
-                var retriever: MediaMetadataRetriever? = null
-                try {
-                    retriever = MediaMetadataRetriever()
-                    retriever.setDataSource(sourceFile.absolutePath)
-                    if (android.os.Build.VERSION.SDK_INT >= 27) {
-                        retriever.getScaledFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, 320, 180)
-                    } else retriever.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-                } finally {
-                    retriever?.release()
-                }
-            } else {
-                val options = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                android.graphics.BitmapFactory.decodeFile(sourceFile.absolutePath, options)
-                options.inSampleSize = 1
-                while (options.outWidth / options.inSampleSize > 640 || options.outHeight / options.inSampleSize > 640) {
-                    options.inSampleSize *= 2
-                }
-                options.inJustDecodeBounds = false
-                android.graphics.BitmapFactory.decodeFile(sourceFile.absolutePath, options)
-            }
-            if (bitmap != null) {
-                java.io.FileOutputStream(destThumbFile).use { out ->
-                    bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, out)
-                }
-                bitmap.recycle()
-                true
-            } else {
-                false
-            }
-        } catch (_: Exception) {
-            false
-        }
+    suspend fun getOrFetchThumbnail(item: MediaItem): File? = mediaRepository.thumbnail(item, getLocalMediaFile(item)) {
+        isCurrentMediaSource(item) && deviceStatus.value.mode == DeviceMode.PLAYBACK &&
+            currentStreamOwner.value != MediaStreamOwner.ALBUM_PLAYBACK && currentStreamOwner.value != MediaStreamOwner.DOWNLOAD
     }
 
     /**

@@ -20,7 +20,7 @@ import kotlinx.coroutines.launch
 class HomeFragment : Fragment() {
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
-    private val viewModel: DashCamViewModel by activityViewModels()
+    private val viewModel: DashCamViewModel by lazy { (requireActivity().application as com.aladdin.dashcam.AladdinApp).recorder }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
@@ -44,6 +44,9 @@ class HomeFragment : Fragment() {
             (activity as? MainActivity)?.openLive(R.id.btn_mode_map)
         }
         // D07: Explicit local album routing
+        binding.btnHomeRides.setOnClickListener {
+            startActivity(android.content.Intent(requireContext(), RideHistoryActivity::class.java))
+        }
         binding.btnHomeLocalAlbum.setOnClickListener {
             (activity as? MainActivity)?.openLocalAlbum()
         }

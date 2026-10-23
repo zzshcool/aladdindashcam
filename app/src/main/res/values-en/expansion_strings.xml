@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="download_background">Background downloads</string>
+    <string name="download_waiting">%1$d tasks queued or downloading; waiting for the recorder when disconnected</string>
+    <string name="download_pause_all">Pause all</string>
+    <string name="diagnostics_export_hint">Long press to export diagnostics</string>
+    <string name="diagnostics_export">Export diagnostics</string>
+    <string name="ride_extended_summary">Moving %1$d min · %2$d stops · GPS coverage %3$d%% · Mean accuracy ±%4$s m</string>
+    <string name="sync_no_fix">No valid GPS at this time. Tap a route point to align it with the current frame.</string>
+    <string name="sync_position">%1$s km/h · GPS ±%2$d m</string>
+    <string name="event_export">Create event package</string>
+    <string name="event_window">Seconds before and after the event (1–300)</string>
+    <string name="event_local_coverage">Trim adjacent recordings downloaded from the same device and include available snapshots and GPX. Missing intervals are listed in event.json.</string>
+    <string name="event_no_media">No local recording covers this interval</string>
+    <string name="event_unknown_time">Recording time is unknown. Select an original recording with a timestamp.</string>
+    <string name="event_progress">Preparing clip %1$d of %2$d</string>
+    <string name="event_ready">Event package ready. Check event.json for missing intervals.</string>
+    <string name="event_share">Share event package</string>
+    <string name="event_download_neighbors">Download recordings around this event (±30s)</string>
+    <string name="event_queued">Queued %1$d recordings. Open local video tools after downloading to create the event package. The preceding recording is included when its duration is unknown.</string>
+    <string name="download_finishing">Finalizing transfer and restoring recorder state</string>
+</resources>
