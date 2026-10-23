@@ -79,10 +79,10 @@ class HomeFragment : Fragment() {
 
                         // Connection status semantics (D08: Truthful device status, no misleading stream loading)
                         binding.tvHomeConnection.text = when {
-                            isConnected -> "● 已連線 · 通用記錄器就緒"
+                            isConnected -> getString(R.string.home_connected_recorder_ready)
                             status == ConnectionStatus.CONNECTING -> getString(R.string.device_status_connecting)
                             status == ConnectionStatus.STREAM_INTERRUPTED -> getString(R.string.device_status_stream_interrupted)
-                            else -> "○ 未連線 · 請確認記錄器 Wi-Fi"
+                            else -> getString(R.string.home_offline_check_recorder_wi_fi)
                         }
                         binding.tvHomeConnection.setTextColor(
                             ContextCompat.getColor(
@@ -130,7 +130,7 @@ class HomeFragment : Fragment() {
                         val batteryText = if (devStatus.isCharging) {
                             "${getString(R.string.battery_charging_prefix)}${devStatus.batteryLevel}/4"
                         } else {
-                            "電量：${devStatus.batteryLevel}/4"
+                            getString(R.string.home_battery_s, devStatus.batteryLevel)
                         }
                         binding.tvHomeBattery.text = batteryText
                         val batteryDrawable = if (devStatus.isCharging) {
@@ -152,9 +152,9 @@ class HomeFragment : Fragment() {
                         }
                         binding.ivTelemetryBattery.setImageResource(batteryDrawable)
                         binding.tvHomeBattery.contentDescription = if (devStatus.isCharging) {
-                            "${getString(R.string.battery_cd_charging_prefix)}${devStatus.batteryLevel}格"
+                            getString(R.string.home_s_s_bars, getString(R.string.battery_cd_charging_prefix), devStatus.batteryLevel)
                         } else {
-                            "電量${devStatus.batteryLevel}格"
+                            getString(R.string.home_battery_s_bars, devStatus.batteryLevel)
                         }
 
                         // SD Storage & Remaining Recording Duration
@@ -162,7 +162,7 @@ class HomeFragment : Fragment() {
                         val capacity = if (storageEst.freeBytes >= 0 && storageEst.totalBytes > 0) {
                             val freeGb = storageEst.freeBytes / (1024.0 * 1024.0 * 1024.0)
                             val totalGb = storageEst.totalBytes / (1024.0 * 1024.0 * 1024.0)
-                            String.format(java.util.Locale.US, "可用 %.1f/%.0f GB", freeGb, totalGb)
+                            String.format(java.util.Locale.US, getString(R.string.home_free_f_f_gb), freeGb, totalGb)
                         } else {
                             storageEst.statusText
                         }
@@ -171,9 +171,9 @@ class HomeFragment : Fragment() {
                     } else {
                         // When offline, show graceful offline placeholder rather than blank
                         binding.layoutDeviceTelemetry.visibility = View.VISIBLE
-                        binding.tvHomeBattery.text = "電量：未知"
+                        binding.tvHomeBattery.text = getString(R.string.home_battery_unknown)
                         binding.ivTelemetryBattery.setImageResource(R.drawable.ic_battery_unknown)
-                        binding.tvHomeSd.text = "SD：離線待讀取"
+                        binding.tvHomeSd.text = getString(R.string.home_sd_offline)
                     }
                 }
             }

@@ -13,6 +13,9 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import com.aladdin.dashcam.databinding.FragmentDeviceBinding
 import com.aladdin.dashcam.model.ConnectionStatus
+import com.aladdin.dashcam.R
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import kotlinx.coroutines.launch
 
 class DeviceFragment : Fragment() {
@@ -35,7 +38,44 @@ class DeviceFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setupListeners()
+        setupAppearance()
         observeSettings()
+    }
+
+    private fun setupAppearance() {
+        val tags = arrayOf("", "zh-TW", "zh-CN", "en")
+        val languages = arrayOf(getString(R.string.appearance_system), getString(R.string.language_traditional_chinese), getString(R.string.language_simplified_chinese), "English")
+        val selectedLocale = AppCompatDelegate.getApplicationLocales().get(0)
+        val locale = when {
+            selectedLocale == null -> ""
+            selectedLocale.language == "en" -> "en"
+            selectedLocale.country == "TW" || selectedLocale.script == "Hant" -> "zh-TW"
+            selectedLocale.language == "zh" -> "zh-CN"
+            else -> ""
+        }
+        binding.tvAppLanguage.text = languages[tags.indexOf(locale).coerceAtLeast(0)]
+        binding.rowAppLanguage.setOnClickListener {
+            AlertDialog.Builder(requireContext())
+                .setTitle(R.string.appearance_language)
+                .setSingleChoiceItems(languages, tags.indexOf(locale)) { dialog, selected ->
+                    dialog.dismiss()
+                    AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tags[selected]))
+                }.setNegativeButton(android.R.string.cancel, null).show()
+        }
+        val modes = intArrayOf(AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM,
+            AppCompatDelegate.MODE_NIGHT_NO, AppCompatDelegate.MODE_NIGHT_YES)
+        val themes = arrayOf(getString(R.string.appearance_system), getString(R.string.appearance_light),
+            getString(R.string.appearance_dark))
+        val selected = modes.indexOf(AppAppearance.nightMode(requireContext())).coerceAtLeast(0)
+        binding.tvAppTheme.text = themes[selected]
+        binding.rowAppTheme.setOnClickListener {
+            AlertDialog.Builder(requireContext())
+                .setTitle(R.string.appearance_theme)
+                .setSingleChoiceItems(themes, selected) { dialog, index ->
+                    dialog.dismiss()
+                    AppAppearance.setNightMode(requireContext(), modes[index])
+                }.setNegativeButton(android.R.string.cancel, null).show()
+        }
     }
 
     private fun observeSettings() {
@@ -45,7 +85,7 @@ class DeviceFragment : Fragment() {
                     viewModel.isFormattingStorage.collect { busy ->
                         formatting = busy
                         binding.btnFormatSd.isEnabled = !busy
-                        binding.btnFormatSd.text = if (busy) "格式化中，請勿斷電…" else "格式化記錄器 SD 卡"
+                        binding.btnFormatSd.text = if (busy) getString(R.string.device_formatting_keep_power_connected) else getString(R.string.device_format_recorder_sd_card)
                     }
                 }
                 launch {
@@ -86,7 +126,11 @@ class DeviceFragment : Fragment() {
                 launch {
                     viewModel.audioRecordingDisplay.collect { audioText ->
                         binding.tvCurrentAudio.text = audioText
-                        binding.switchAudioRecord.isChecked = (audioText == "開啟")
+                    }
+                }
+                launch {
+                    viewModel.deviceStatus.collect { status ->
+                        binding.switchAudioRecord.isChecked = status.audioEnabled
                     }
                 }
                 launch {
@@ -101,7 +145,13 @@ class DeviceFragment : Fragment() {
                 }
                 launch {
                     viewModel.rtcSyncState.collect { rtcState ->
-                        binding.tvRtcStatus.text = "校時狀態：${rtcState.message}"
+                        val message = getString(when {
+                            rtcState.lastAttemptTime <= 0L -> R.string.rtc_not_synced
+                            !rtcState.isSuccess -> R.string.rtc_failed
+                            rtcState.isAuto -> R.string.recorder_time_synced_automatically
+                            else -> R.string.recorder_time_synced
+                        })
+                        binding.tvRtcStatus.text = getString(R.string.device_time_sync_s, message)
                     }
                 }
                 launch {
@@ -113,9 +163,9 @@ class DeviceFragment : Fragment() {
                     viewModel.targetIdentity.collect { identity ->
                         val isSwitching = identity.state == com.aladdin.dashcam.network.TargetState.CONNECTING
                         binding.tvDeviceHost.text = if (isSwitching) {
-                            "連線目標切換中... (${identity.requestedHost})"
+                            getString(R.string.device_switching_recorder_s, identity.requestedHost)
                         } else {
-                            "連線目標：${identity.requestedHost} (點擊可切換 Host)"
+                            getString(R.string.device_target_s_tap_to_change_host, identity.requestedHost)
                         }
                     }
                 }
@@ -123,10 +173,10 @@ class DeviceFragment : Fragment() {
                     viewModel.hostSwitchEvent.collect { event ->
                         when (event) {
                             is HostSwitchEvent.Success -> {
-                                Toast.makeText(requireContext(), "已切換連線目標至 ${event.host} (epoch: ${event.epoch})", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(requireContext(), getString(R.string.device_connected_to_s_epoch_s, event.host, event.epoch), Toast.LENGTH_SHORT).show()
                             }
                             is HostSwitchEvent.Failure -> {
-                                Toast.makeText(requireContext(), "切換失敗: ${event.error}", Toast.LENGTH_LONG).show()
+                                Toast.makeText(requireContext(), getString(R.string.device_unable_to_switch_s, event.error), Toast.LENGTH_LONG).show()
                             }
                         }
                     }
@@ -139,15 +189,15 @@ class DeviceFragment : Fragment() {
         binding.btnPowerOff.setOnClickListener {
             if (poweringOff) return@setOnClickListener
             if (viewModel.connectionStatus.value != ConnectionStatus.CONNECTED) {
-                Toast.makeText(requireContext(), "請先連線記錄器", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.device_connect_to_the_recorder_first), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             val epoch = viewModel.targetIdentity.value.epoch
             AlertDialog.Builder(requireContext())
-                .setTitle("關閉記錄器？")
-                .setMessage("記錄器將停止錄影並關閉，Wi-Fi 連線會中斷。請確認記錄器不是正在行車使用。")
-                .setNegativeButton("取消", null)
-                .setPositiveButton("確定關機") { _, _ ->
+                .setTitle(getString(R.string.device_power_off_recorder_037))
+                .setMessage(getString(R.string.device_recording_will_stop_and_wi_fi))
+                .setNegativeButton(getString(R.string.album_cancel), null)
+                .setPositiveButton(getString(R.string.device_power_off)) { _, _ ->
                     poweringOff = true
                     binding.btnPowerOff.isEnabled = false
                     viewLifecycleOwner.lifecycleScope.launch {
@@ -156,37 +206,37 @@ class DeviceFragment : Fragment() {
                         poweringOff = false
                         binding.btnPowerOff.isEnabled = true
                         AlertDialog.Builder(requireContext())
-                            .setTitle(if (result.isSuccess) "關機命令已接受" else "關機狀態未確認")
-                            .setMessage(if (result.isSuccess) "記錄器已接受關機命令，Wi-Fi 將中斷。" else
-                                "命令可能已送出，但未收到確認。請查看記錄器指示燈；不要立即重複操作。\n${result.exceptionOrNull()?.message.orEmpty()}")
-                            .setPositiveButton("知道了", null).show()
+                            .setTitle(if (result.isSuccess) getString(R.string.device_power_off_command_accepted) else getString(R.string.device_power_off_state_not_confirmed))
+                            .setMessage(if (result.isSuccess) getString(R.string.device_the_recorder_accepted_the_power_off) else
+                                getString(R.string.device_the_command_may_have_been_sent, result.exceptionOrNull()?.message.orEmpty()))
+                            .setPositiveButton(getString(R.string.device_ok), null).show()
                     }
                 }.show()
         }
         binding.btnFormatSd.setOnClickListener {
             if (formatting) return@setOnClickListener
             if (viewModel.connectionStatus.value != ConnectionStatus.CONNECTED) {
-                Toast.makeText(requireContext(), "請先連線記錄器", Toast.LENGTH_SHORT).show()
+                Toast.makeText(requireContext(), getString(R.string.device_connect_to_the_recorder_first), Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             val epoch = viewModel.targetIdentity.value.epoch
             AlertDialog.Builder(requireContext())
-                .setTitle("格式化記錄器 SD 卡？")
-                .setMessage("將永久刪除目前記錄器內所有影片、照片及緊急鎖檔，無法復原。請先備份重要檔案。")
-                .setNegativeButton("取消", null)
-                .setPositiveButton("繼續確認") { _, _ ->
+                .setTitle(getString(R.string.device_format_recorder_sd_card_045))
+                .setMessage(getString(R.string.device_all_videos_photos_and_protected_files))
+                .setNegativeButton(getString(R.string.album_cancel), null)
+                .setPositiveButton(getString(R.string.device_continue)) { _, _ ->
                     AlertDialog.Builder(requireContext())
-                        .setTitle("最後確認：清空記錄器記憶卡")
-                        .setMessage("目標：${viewModel.deviceHost.value}\n格式化期間會暫停錄影，請保持供電與 Wi-Fi 連線。確定已完成備份？")
-                        .setNegativeButton("取消", null)
-                        .setPositiveButton("確定格式化") { _, _ ->
+                        .setTitle(getString(R.string.device_final_confirmation_erase_recorder_card))
+                        .setMessage(getString(R.string.device_target_s_nrecording_pauses_during_formatting, viewModel.deviceHost.value))
+                        .setNegativeButton(getString(R.string.album_cancel), null)
+                        .setPositiveButton(getString(R.string.device_format)) { _, _ ->
                             viewLifecycleOwner.lifecycleScope.launch {
                                 val result = viewModel.formatRecorderStorage(epoch)
                                 if (_binding == null) return@launch
                                 AlertDialog.Builder(requireContext())
-                                    .setTitle(if (result.isSuccess) "格式化完成" else "格式化未確認完成")
-                                    .setMessage(if (result.isSuccess) "已回讀確認記憶卡清空。" else result.exceptionOrNull()?.message ?: "請檢查記錄器狀態")
-                                    .setPositiveButton("知道了", null).show()
+                                    .setTitle(if (result.isSuccess) getString(R.string.device_formatting_complete) else getString(R.string.device_formatting_not_confirmed))
+                                    .setMessage(if (result.isSuccess) getString(R.string.device_the_card_was_read_back_and) else result.exceptionOrNull()?.message ?: getString(R.string.device_check_the_recorder))
+                                    .setPositiveButton(getString(R.string.device_ok), null).show()
                             }
                         }.show()
                 }.show()
@@ -196,10 +246,10 @@ class DeviceFragment : Fragment() {
             val isCurrentlyVisible = binding.layoutDiagnosticsContent.visibility == View.VISIBLE
             if (isCurrentlyVisible) {
                 binding.layoutDiagnosticsContent.visibility = View.GONE
-                binding.tvDiagnosticsArrow.text = "點擊展開 ▼"
+                binding.tvDiagnosticsArrow.text = getString(R.string.device_expand)
             } else {
                 binding.layoutDiagnosticsContent.visibility = View.VISIBLE
-                binding.tvDiagnosticsArrow.text = "點擊收合 ▲"
+                binding.tvDiagnosticsArrow.text = getString(R.string.device_collapse)
             }
         }
 
@@ -207,29 +257,29 @@ class DeviceFragment : Fragment() {
             val input = android.widget.EditText(requireContext())
             input.setText(viewModel.deviceHost.value)
             AlertDialog.Builder(requireContext())
-                .setTitle("進階診斷：切換連線目標 Host")
-                .setMessage("【注意】此為進階通訊診斷功能。\n一般新增或切換設備，請至首頁以 Wi-Fi 自動辨識。\n手動指定 IP 將終止舊 Session，並重新對目標進行協定探測：")
+                .setTitle(getString(R.string.device_advanced_diagnostics_change_host))
+                .setMessage(getString(R.string.device_advanced_connection_diagnostics_nnormally_add_or))
                 .setView(input)
-                .setPositiveButton("確認切換") { _, _ ->
+                .setPositiveButton(getString(R.string.device_switch)) { _, _ ->
                     val newHost = input.text.toString().trim()
                     if (newHost.isNotEmpty()) {
                         viewModel.setDeviceHost(newHost)
                     }
                 }
-                .setNegativeButton("取消", null)
+                .setNegativeButton(getString(R.string.album_cancel), null)
                 .show()
         }
 
         // Photo Resolution dialog
         binding.rowCaptureResolution.setOnClickListener {
             val options = com.aladdin.dashcam.model.DashCamSettingMappings.CAPTURE_RESOLUTIONS
-            val itemNames = options.map { it.displayName }.toTypedArray()
+            val itemNames = options.map { it.localizedName(requireContext()) }.toTypedArray()
             AlertDialog.Builder(requireContext())
-                .setTitle("圖片解析度")
+                .setTitle(getString(R.string.device_photo_resolution))
                 .setItems(itemNames) { _, which ->
                     val selected = options[which]
                     viewLifecycleOwner.lifecycleScope.launch {
-                        viewModel.setCaptureResolution(selected.rawValue, selected.displayName)
+                        viewModel.setCaptureResolution(selected.rawValue, selected.localizedName(requireContext()))
                     }
                 }
                 .show()
@@ -238,13 +288,13 @@ class DeviceFragment : Fragment() {
         // Photo Quality dialog
         binding.rowCaptureQuality.setOnClickListener {
             val options = com.aladdin.dashcam.model.DashCamSettingMappings.CAPTURE_QUALITIES
-            val itemNames = options.map { it.displayName }.toTypedArray()
+            val itemNames = options.map { it.localizedName(requireContext()) }.toTypedArray()
             AlertDialog.Builder(requireContext())
-                .setTitle("圖片畫質")
+                .setTitle(getString(R.string.device_photo_quality))
                 .setItems(itemNames) { _, which ->
                     val selected = options[which]
                     viewLifecycleOwner.lifecycleScope.launch {
-                        viewModel.setCaptureQuality(selected.rawValue, selected.displayName)
+                        viewModel.setCaptureQuality(selected.rawValue, selected.localizedName(requireContext()))
                     }
                 }
                 .show()
@@ -253,13 +303,13 @@ class DeviceFragment : Fragment() {
         // Video Resolution dialog
         binding.rowResolution.setOnClickListener {
             val options = com.aladdin.dashcam.model.DashCamSettingMappings.VIDEO_RESOLUTIONS
-            val itemNames = options.map { it.displayName }.toTypedArray()
+            val itemNames = options.map { it.localizedName(requireContext()) }.toTypedArray()
             AlertDialog.Builder(requireContext())
-                .setTitle("影像解析度")
+                .setTitle(getString(R.string.device_video_resolution))
                 .setItems(itemNames) { _, which ->
                     val selected = options[which]
                     viewLifecycleOwner.lifecycleScope.launch {
-                        viewModel.setResolution(selected.rawValue, selected.displayName)
+                        viewModel.setResolution(selected.rawValue, selected.localizedName(requireContext()))
                     }
                 }
                 .show()
@@ -268,13 +318,13 @@ class DeviceFragment : Fragment() {
         // Loop Duration dialog
         binding.rowLoopRecording.setOnClickListener {
             val options = com.aladdin.dashcam.model.DashCamSettingMappings.LOOP_RECORDINGS
-            val itemNames = options.map { it.displayName }.toTypedArray()
+            val itemNames = options.map { it.localizedName(requireContext()) }.toTypedArray()
             AlertDialog.Builder(requireContext())
-                .setTitle("影片長度")
+                .setTitle(getString(R.string.device_clip_duration))
                 .setItems(itemNames) { _, which ->
                     val selected = options[which]
                     viewLifecycleOwner.lifecycleScope.launch {
-                        viewModel.setLoopDuration(selected.rawValue, selected.displayName)
+                        viewModel.setLoopDuration(selected.rawValue, selected.localizedName(requireContext()))
                     }
                 }
                 .show()
@@ -304,13 +354,13 @@ class DeviceFragment : Fragment() {
         // Watermark dialog
         binding.rowWatermark.setOnClickListener {
             val options = com.aladdin.dashcam.model.DashCamSettingMappings.WATERMARKS
-            val itemNames = options.map { it.displayName }.toTypedArray()
+            val itemNames = options.map { it.localizedName(requireContext()) }.toTypedArray()
             AlertDialog.Builder(requireContext())
-                .setTitle("時間浮水印")
+                .setTitle(getString(R.string.device_time_stamp))
                 .setItems(itemNames) { _, which ->
                     val selected = options[which]
                     viewLifecycleOwner.lifecycleScope.launch {
-                        viewModel.setWatermark(selected.rawValue, selected.displayName)
+                        viewModel.setWatermark(selected.rawValue, selected.localizedName(requireContext()))
                     }
                 }
                 .show()
@@ -328,16 +378,16 @@ class DeviceFragment : Fragment() {
         // Wi-Fi Password guidance dialog
         binding.rowWifiPassword.setOnClickListener {
             AlertDialog.Builder(requireContext())
-                .setTitle("記錄器 Wi-Fi 密碼")
-                .setMessage("預設密碼為 12345678。\n如需修改，完成後請至系統 [Wi-Fi] 設定，重新輸入新密碼以連線。")
-                .setPositiveButton("確定", null)
+                .setTitle(getString(R.string.device_recorder_wi_fi_password_059))
+                .setMessage(getString(R.string.device_the_default_password_is_nafter_changing))
+                .setPositiveButton(getString(R.string.device_ok_061), null)
                 .show()
         }
 
         // Manual RTC Sync
         binding.btnSyncRtc.setOnClickListener {
             viewModel.syncRtcManual()
-            Toast.makeText(requireContext(), "已發送校時命令", Toast.LENGTH_SHORT).show()
+            Toast.makeText(requireContext(), getString(R.string.device_time_sync_command_sent), Toast.LENGTH_SHORT).show()
         }
     }
 

@@ -30,7 +30,7 @@
             android:background="@drawable/bg_status_badge"
             android:paddingHorizontal="8dp"
             android:paddingVertical="2dp"
-            android:text="0 項進行中"
+            android:text="@string/downloads_active"
             android:textColor="@color/accent_teal"
             android:textSize="12sp" />
     </LinearLayout>
@@ -77,7 +77,7 @@
                 android:layout_height="48dp"
                 android:layout_marginTop="16dp"
                 android:backgroundTint="@color/surface_elevated"
-                android:text="前往相簿"
+                android:text="@string/downloads_go_to_album"
                 android:textColor="@color/accent_teal"
                 android:textSize="14sp"
                 app:cornerRadius="@dimen/radius_button" />

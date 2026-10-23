@@ -6,6 +6,7 @@ import android.util.Log
 class AladdinApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        com.aladdin.dashcam.ui.AppAppearance.apply(this)
         Log.i(TAG, "AladdinDashCam application initialized")
     }
 

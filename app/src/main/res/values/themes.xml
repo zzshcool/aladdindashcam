@@ -17,7 +17,9 @@
 
         <!-- Status & Navigation Bar (Graphite Dark) -->
         <item name="android:statusBarColor">@color/bg_dark</item>
-        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightStatusBar">@bool/light_system_bars</item>
+        <item name="android:windowLightNavigationBar">@bool/light_system_bars</item>
+        <item name="android:windowActionModeOverlay">true</item>
         <item name="android:navigationBarColor">@color/bg_dark</item>
 
         <!-- Background & Surface -->

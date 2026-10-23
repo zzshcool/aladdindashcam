@@ -462,12 +462,39 @@ class DashCamClient(
     /**
      * Takes a photo with proper NAK error handling (C01)
      */
-    suspend fun takePhoto(): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun takePhoto(expectedEpoch: Long = targetEpoch): Result<Unit> = withContext(Dispatchers.IO) {
         synchronized(commandLock) {
+            if (expectedEpoch != targetEpoch) {
+                return@withContext Result.failure(IllegalStateException("Device changed before capture"))
+            }
             try {
                 ensureConnected()
+                check(expectedEpoch == targetEpoch) { "Device changed while opening capture session" }
+                val before = queryStatusInternal() ?: error("Cannot verify recorder state before capture")
+                check(before.mode == DeviceMode.RECORD || before.mode == DeviceMode.CAPTURE) { "Recorder is not in a capture-compatible mode" }
                 val req = GPSocketProtocol.buildCapturePacket()
-                val resp = sendAndReceive(GPSocketProtocol.MODE_CAPTURE, GPSocketProtocol.CMD_CAPTURE_PHOTO, req)
+                var resp = sendAndReceive(GPSocketProtocol.MODE_CAPTURE, GPSocketProtocol.CMD_CAPTURE_PHOTO, req)
+                if (resp is GPSocketResponse.Nak && resp.errorCode == GPSocketProtocol.ERR_MODE_ERROR && before.mode == DeviceMode.RECORD) {
+                    check(before.recordingStatus != RecordingStatus.UNKNOWN) { "Cannot switch to capture with unknown recording state" }
+                    val wasRecording = before.recordingStatus == RecordingStatus.RECORDING
+                    Log.i(TAG, "Capture requires photo work mode; recording=$wasRecording")
+                    try {
+                        if (wasRecording) setRecordingInternal(false)
+                        setWorkModeInternal(DeviceMode.CAPTURE)
+                        resp = sendAndReceive(GPSocketProtocol.MODE_CAPTURE, GPSocketProtocol.CMD_CAPTURE_PHOTO, req)
+                        if (resp is GPSocketResponse.Ack) Thread.sleep(500)
+                    } finally {
+                        try {
+                            check(expectedEpoch == targetEpoch) { "Device changed during capture" }
+                            val current = queryStatusInternal() ?: error("Cannot read recorder state after capture")
+                            if (current.mode != before.mode) setWorkModeInternal(before.mode)
+                            if (wasRecording) resumeRecordingInternal() else setRecordingInternal(false)
+                            Log.i(TAG, "Capture state restored: mode=${_deviceStatus.value.mode}, recording=${_deviceStatus.value.recordingStatus}")
+                        } catch (restoreError: Exception) {
+                            throw IllegalStateException("Photo may have been saved, but recording restoration is unconfirmed. Check the recorder.", restoreError)
+                        }
+                    }
+                }
 
                 when (resp) {
                     is GPSocketResponse.Ack -> {

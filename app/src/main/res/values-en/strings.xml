@@ -1,0 +1,441 @@
+<resources>
+    <string name="app_name" formatted="false">AladdinDashCam</string>
+    <string name="tab_live" formatted="false">Recorder</string>
+    <string name="tab_album" formatted="false">Album</string>
+    <string name="tab_downloads" formatted="false">Downloads</string>
+    <string name="tab_device" formatted="false">Settings</string>
+    <string name="live_title" formatted="false">Live view</string>
+    <string name="live_expand" formatted="false">Expand preview</string>
+    <string name="live_pip" formatted="false">Navigation window</string>
+    <string name="device_status_connected" formatted="false">Connected</string>
+    <string name="device_status_connecting" formatted="false">Connecting…</string>
+    <string name="device_status_disconnected" formatted="false">Disconnected</string>
+    <string name="device_status_stream_interrupted" formatted="false">Stream interrupted</string>
+    <string name="recording_active" formatted="false">Recording</string>
+    <string name="recording_elapsed" formatted="false">Recording %1$02d:%2$02d:%3$02d</string>
+    <string name="recording_stopped" formatted="false">Recording stopped</string>
+    <string name="recording_unknown" formatted="false">Recording status unknown</string>
+    <string name="hud_speed_unit" formatted="false">km/h</string>
+    <string name="hud_gps_searching" formatted="false">Searching for GPS…</string>
+    <string name="hud_gps_locked" formatted="false">GPS locked</string>
+    <string name="hud_gps_disabled" formatted="false">GPS disabled</string>
+    <string name="btn_start_recording" formatted="false">Start recording</string>
+    <string name="btn_stop_recording" formatted="false">Stop recording</string>
+    <string name="btn_stop_recording_compact" formatted="false">Stop</string>
+    <string name="btn_start_recording_compact" formatted="false">Record</string>
+    <string name="btn_take_photo" formatted="false">Photo</string>
+    <string name="btn_more_options" formatted="false">More</string>
+    <string name="btn_protect_event" formatted="false">Protect event</string>
+    <string name="btn_navigation_mode" formatted="false">Navigation PiP</string>
+    <string name="btn_retry_connect" formatted="false">Reconnect</string>
+    <string name="action_enter_fullscreen" formatted="false">Full screen</string>
+    <string name="action_exit_fullscreen" formatted="false">Exit full screen</string>
+    <string name="action_pip_mode" formatted="false">Navigation window (PiP)</string>
+    <string name="stream_loading" formatted="false">Loading live video…</string>
+    <string name="stream_stalled" formatted="false">Video has stalled. Reconnect to retry.</string>
+    <string name="stream_connection_interrupted" formatted="false">Video unavailable. Reconnect to retry.</string>
+    <string name="stream_first_frame_rendered" formatted="false">Live video ready</string>
+    <string name="album_source_device" formatted="false">Recorder</string>
+    <string name="album_source_local" formatted="false">On device</string>
+    <string name="album_filter_all" formatted="false">All</string>
+    <string name="album_filter_video" formatted="false">Video</string>
+    <string name="album_filter_photo" formatted="false">Photos</string>
+    <string name="album_filter_emergency" formatted="false">Protected</string>
+    <string name="album_view_grid" formatted="false">Grid view</string>
+    <string name="album_view_timeline" formatted="false">Timeline</string>
+    <string name="album_empty" formatted="false">No media yet</string>
+    <string name="album_loading" formatted="false">Loading files…</string>
+    <string name="downloads_title" formatted="false">Downloads</string>
+    <string name="downloads_empty" formatted="false">No downloads yet</string>
+    <string name="device_title" formatted="false">Recorder &amp; settings</string>
+    <string name="setting_resolution" formatted="false">Video resolution</string>
+    <string name="setting_loop" formatted="false">Loop duration</string>
+    <string name="setting_audio" formatted="false">Recorder audio</string>
+    <string name="setting_exposure" formatted="false">Exposure</string>
+    <string name="setting_watermark" formatted="false">Date &amp; time stamp</string>
+    <string name="setting_rtc_sync" formatted="false">Sync recorder time</string>
+    <string name="setting_diagnostics" formatted="false">Connection diagnostics</string>
+    <string name="setting_danger_zone" formatted="false">Device maintenance</string>
+    <string name="setting_format_sd" formatted="false">Format memory card</string>
+    <string name="setting_factory_reset" formatted="false">Factory reset</string>
+    <string name="battery_level_4" formatted="false">Battery full (4/4)</string>
+    <string name="battery_level_3" formatted="false">Battery good (3/4)</string>
+    <string name="battery_level_2" formatted="false">Battery medium (2/4)</string>
+    <string name="battery_level_1" formatted="false">Battery low (1/4)</string>
+    <string name="battery_level_0" formatted="false">Battery critical (0/4)</string>
+    <string name="battery_unknown" formatted="false">Battery unknown</string>
+    <string name="battery_charging_prefix" formatted="false">Charging · </string>
+    <string name="downloads_guide" formatted="false">Open a video or photo in the album to download it</string>
+    <string name="battery_cd_level_4" formatted="false">Battery full, four bars</string>
+    <string name="battery_cd_level_3" formatted="false">Battery good, three bars</string>
+    <string name="battery_cd_level_2" formatted="false">Battery medium, two bars</string>
+    <string name="battery_cd_level_1" formatted="false">Battery low, please charge</string>
+    <string name="battery_cd_level_0" formatted="false">Battery critical, charge soon</string>
+    <string name="battery_cd_unknown" formatted="false">Battery unknown</string>
+    <string name="battery_cd_charging_prefix" formatted="false">Charging, </string>
+    <string name="sd_remaining_format" formatted="false">About %d min left</string>
+    <string name="sd_remaining_detail_format" formatted="false">Recording time remaining: about %d minutes</string>
+    <string name="sd_remaining_unknown" formatted="false">Recording time unknown</string>
+    <string name="btn_stopping_recording" formatted="false">Stopping…</string>
+    <string name="btn_starting_recording" formatted="false">Starting…</string>
+    <string name="stream_error_format" formatted="false">Stream interrupted (%s). Tap to retry.</string>
+    <string name="diag_title" formatted="false">Diagnostics</string>
+    <string name="diag_transport" formatted="false">Control: GPSOCKET TCP 8081</string>
+    <string name="diag_rtsp" formatted="false">Stream: rtsp://192.168.25.1:8080/?action=stream</string>
+    <string name="diag_wifi_bound" formatted="false">Dedicated Wi-Fi binding</string>
+    <string name="diag_cellular_route" formatted="false">Mobile internet connection</string>
+    <string name="home_title_my_dashcam" formatted="false">My recorder ▾</string>
+    <string name="home_action_add_recorder" formatted="false">＋</string>
+    <string name="home_action_add_recorder_desc" formatted="false">Add recorder</string>
+    <string name="home_hero_desc" formatted="false">Dash camera</string>
+    <string name="home_headline_ready" formatted="false">Every journey, recorded</string>
+    <string name="home_subhead_guide" formatted="false">Connect to recorder Wi-Fi to get started</string>
+    <string name="home_device_none" formatted="false">No recorder added</string>
+    <string name="home_device_none_desc" formatted="false">Add a recorder to view its connection status</string>
+    <string name="home_status_connected" formatted="false">● Recorder connected</string>
+    <string name="home_status_stream_ready" formatted="false">● Streaming</string>
+    <string name="home_status_stream_loading" formatted="false">○ Loading video…</string>
+    <string name="home_status_stream_interrupted" formatted="false">▲ Video interrupted</string>
+    <string name="home_status_disconnected" formatted="false">○ Offline · Connect to recorder Wi-Fi</string>
+    <string name="home_action_open_live" formatted="false">Live view</string>
+    <string name="home_action_connect" formatted="false">Connect recorder</string>
+    <string name="home_action_add" formatted="false">Add recorder</string>
+    <string name="home_map_title" formatted="false">Ride map</string>
+    <string name="home_map_desc" formatted="false">Phone GPS · Route</string>
+    <string name="home_quick_album" formatted="false">Saved media</string>
+    <string name="home_quick_album_desc" formatted="false">Watch downloaded videos and photos offline</string>
+    <string name="home_quick_downloads" formatted="false">Downloads</string>
+    <string name="home_brand_footer" formatted="false">Aladdin DashCam · Your journey companion</string>
+    <string name="album_select" formatted="false">Select</string>
+    <string name="album_recording_paused_resumes_when_you_leave" formatted="false">Recording paused · Resumes when you leave the recorder album</string>
+    <string name="album_select_all" formatted="false">Select all</string>
+    <string name="album_selected_mb" formatted="false">0 selected (0 MB)</string>
+    <string name="album_done" formatted="false">Done</string>
+    <string name="album_loop_recordings" formatted="false">Loop recordings</string>
+    <string name="album_protected_events" formatted="false">Protected events</string>
+    <string name="album_drag_the_timeline_to_find_a" formatted="false">Drag the timeline to find a video</string>
+    <string name="album_no_video_here_jumping_to_the" formatted="false">No video here. Jumping to the next segment.</string>
+    <string name="album_recorder_connected_load_the_video_list" formatted="false">Recorder connected. Load the video list to browse.</string>
+    <string name="album_load_recorder_videos" formatted="false">Load recorder videos</string>
+    <string name="album_download_selected" formatted="false">Download selected</string>
+    <string name="album_delete_selected" formatted="false">Delete selected</string>
+    <string name="album_photo_viewer" formatted="false">Photo viewer</string>
+    <string name="album_nearby_video_segments" formatted="false">Nearby video segments</string>
+    <string name="album_pause" formatted="false">Pause</string>
+    <string name="album_local_video_position" formatted="false">Local video position</string>
+    <string name="album_back_to_album" formatted="false">Back to album</string>
+    <string name="album_recorded" formatted="false">Recorded: 2026-10-21 14:32:05</string>
+    <string name="album_download" formatted="false">Download</string>
+    <string name="album_loading_preview" formatted="false">Loading preview…</string>
+    <string name="album_unable_to_load_media" formatted="false">Unable to load media</string>
+    <string name="album_retry" formatted="false">Retry</string>
+    <string name="device_photo_resolution" formatted="false">Photo resolution</string>
+    <string name="device_photo_quality" formatted="false">Photo quality</string>
+    <string name="device_fine" formatted="false">Fine</string>
+    <string name="device_video_resolution" formatted="false">Video resolution</string>
+    <string name="device_clip_duration" formatted="false">Clip duration</string>
+    <string name="device_minutes" formatted="false">5 minutes</string>
+    <string name="device_length_of_each_clip_when_the" formatted="false">Length of each clip. When the card is full, the oldest videos are overwritten.</string>
+    <string name="device_image_audio" formatted="false">Image &amp; audio</string>
+    <string name="device_time_stamp" formatted="false">Time stamp</string>
+    <string name="device_on" formatted="false">On</string>
+    <string name="device_normal" formatted="false">Normal</string>
+    <string name="device_recorder_wi_fi_name" formatted="false">Recorder Wi-Fi name</string>
+    <string name="device_recorder_wi_fi_password" formatted="false">Recorder Wi-Fi password</string>
+    <string name="device_after_changing_the_password_update_it" formatted="false">After changing the password, update it in your phone Wi-Fi settings to reconnect.</string>
+    <string name="device_firmware" formatted="false">Firmware</string>
+    <string name="device_storage_time" formatted="false">Storage &amp; time</string>
+    <string name="device_loop_recording_calculating_remaining_time" formatted="false">Loop recording · Calculating remaining time…</string>
+    <string name="device_time_sync_automatically_synced" formatted="false">Time sync: automatically synced</string>
+    <string name="device_sync_now" formatted="false">Sync now</string>
+    <string name="device_expand" formatted="false">Expand ▼</string>
+    <string name="device_target_tap_to_change_host" formatted="false">Target: 192.168.25.1 (tap to change host)</string>
+    <string name="device_control_gpsocket_tcp_nstream_rtsp_action" formatted="false">Control: 192.168.25.1:8081 (GPSOCKET TCP)\nStream: rtsp://192.168.25.1:8080/?action=stream\nProtocol: Generalplus / GoPlus (B1)\nRouting: dedicated Wi-Fi process/socket binding</string>
+    <string name="device_device_maintenance" formatted="false">Device maintenance</string>
+    <string name="device_format_recorder_sd_card" formatted="false">Format recorder SD card</string>
+    <string name="device_power_off_recorder" formatted="false">Power off recorder</string>
+    <string name="device_factory_reset_requires_using_the_recorder" formatted="false">Factory reset requires using the recorder itself</string>
+    <string name="device_formatting_deletes_all_videos_photos_and" formatted="false">Formatting deletes all videos, photos and protected files. Back up first and keep power connected. Use the recorder itself for a factory reset.</string>
+    <string name="downloads_active" formatted="false">0 active</string>
+    <string name="downloads_go_to_album" formatted="false">Go to album</string>
+    <string name="live_connecting_to_stream_no_video_yet" formatted="false">Connecting to stream / No video yet</string>
+    <string name="live_recording_indicator" formatted="false">Recording indicator</string>
+    <string name="live_not_recording" formatted="false">Not recording</string>
+    <string name="live_video" formatted="false">Video</string>
+    <string name="live_split" formatted="false">Split</string>
+    <string name="live_map" formatted="false">Map</string>
+    <string name="live_ride" formatted="false">Ride</string>
+    <string name="live_source_phone_gps" formatted="false">Source: phone GPS</string>
+    <string name="live_altitude" formatted="false">Altitude</string>
+    <string name="live_ascent" formatted="false">Ascent</string>
+    <string name="live_heading" formatted="false">Heading</string>
+    <string name="live_total_g_with_gravity" formatted="false">Total G (with gravity)</string>
+    <string name="live_satellite" formatted="false">Satellite</string>
+    <string name="live_phone_gps_not_frame_synced_with" formatted="false">Phone GPS (not frame-synced with video)</string>
+    <string name="live_speed_km_h_accuracy_m" formatted="false">Speed: -- km/h · Accuracy: -- m</string>
+    <string name="live_reset_route" formatted="false">Reset route</string>
+    <string name="live_my_location" formatted="false">My location</string>
+    <string name="live_recorder_uses_wi_fi_maps_need" formatted="false">Maps need internet · Speed comes from phone GPS</string>
+    <string name="item_media_card_media_thumbnail" formatted="false">Media thumbnail</string>
+    <string name="item_media_card_downloaded" formatted="false">Downloaded</string>
+    <string name="item_media_card_loop_video" formatted="false">Loop video</string>
+    <string name="item_viewer_strip_segment_thumbnail" formatted="false">Segment thumbnail</string>
+    <string name="live_clear_route" formatted="false">Clear route</string>
+    <string name="album_s_selected_s_mb" formatted="false">%1$s selected (%2$s MB)</string>
+    <string name="album_opening_recorder_album_recording_will_pause" formatted="false">Opening recorder album · Recording will pause</string>
+    <string name="album_unable_to_open_recorder_album_s" formatted="false">Unable to open recorder album: %1$s</string>
+    <string name="album_loaded_s_files" formatted="false">Loaded %1$s files</string>
+    <string name="album_unable_to_load_videos_s" formatted="false">Unable to load videos: %1$s</string>
+    <string name="album_recorder_offline_recording_status_unknown" formatted="false">Recorder offline · Recording status unknown</string>
+    <string name="album_recording_status_unknown_waiting_for_recorder" formatted="false">Recording status unknown · Waiting for recorder</string>
+    <string name="album_recorder_is_recording_album_mode_interrupted" formatted="false">Recorder is recording · Album mode interrupted</string>
+    <string name="album_recorder_is_in_playback_mode_recording" formatted="false">Recorder is in playback mode · Recording paused</string>
+    <string name="album_recorder_is_not_recording" formatted="false">Recorder is not recording</string>
+    <string name="album_recording_resume_not_confirmed_s" formatted="false">Recording resume not confirmed: %1$s</string>
+    <string name="album_s_recorder_playback_download_to_seek" formatted="false">%1$s · Recorder playback (download to seek)</string>
+    <string name="album_duration_unknown" formatted="false">Duration unknown</string>
+    <string name="album_s_s" formatted="false">%1$s / %2$s</string>
+    <string name="album_replay" formatted="false">Replay</string>
+    <string name="album_the_recorder_ended_the_paused_stream" formatted="false">The recorder ended the paused stream. Restarting from the beginning.</string>
+    <string name="album_play" formatted="false">Play</string>
+    <string name="album_pause_state_unknown_reopen_the_video" formatted="false">Pause state unknown. Reopen the video.</string>
+    <string name="album_unable_to_seek_this_video" formatted="false">Unable to seek this video</string>
+    <string name="album_downloading_s_files" formatted="false">Downloading %1$s files</string>
+    <string name="album_delete_files" formatted="false">Delete files?</string>
+    <string name="album_recorder_sd_card" formatted="false">Recorder SD card</string>
+    <string name="album_phone_storage" formatted="false">Phone storage</string>
+    <string name="album_delete_s_selected_files_from_s" formatted="false">Delete %2$s selected files from %1$s? This cannot be undone.</string>
+    <string name="album_delete" formatted="false">Delete</string>
+    <string name="album_cancel" formatted="false">Cancel</string>
+    <string name="album_video_found_s_s" formatted="false">Video found: %1$s (%2$s)</string>
+    <string name="album_no_recordings_at_this_time_s" formatted="false">No recordings at this time (%1$s)</string>
+    <string name="album_deleted_s_of_s_files" formatted="false">Deleted %1$s of %2$s files</string>
+    <string name="album_time_unknown" formatted="false">Time unknown</string>
+    <string name="album_today_s" formatted="false">Today (%1$s)</string>
+    <string name="album_yesterday_s" formatted="false">Yesterday (%1$s)</string>
+    <string name="album_no_video_segments_available" formatted="false">No video segments available</string>
+    <string name="album_position_s_s_segments" formatted="false">Position: %1$s (%2$s segments)</string>
+    <string name="album_no_files_on_the_recorder_memory" formatted="false">No files on the recorder memory card</string>
+    <string name="album_refresh" formatted="false">Refresh</string>
+    <string name="album_no_media_in_this_category" formatted="false">No media in this category</string>
+    <string name="album_show_all_media" formatted="false">Show all media</string>
+    <string name="album_unable_to_read_recorder_files" formatted="false">Unable to read recorder files</string>
+    <string name="album_retry_063" formatted="false">Retry</string>
+    <string name="album_no_videos_downloaded_yet" formatted="false">No videos downloaded yet</string>
+    <string name="album_open_recorder_album" formatted="false">Open recorder album</string>
+    <string name="album_recorded_s" formatted="false">Recorded: %1$s</string>
+    <string name="album_captured_s" formatted="false">Captured: %1$s</string>
+    <string name="album_opening_recording_recording_pauses_during_playback" formatted="false">Opening recording (recording pauses during playback)…</string>
+    <string name="album_recorder_playback_starts_at_the_beginning" formatted="false">Recorder playback starts at the beginning. Download the video to seek.</string>
+    <string name="album_recorder_wi_fi_disconnected" formatted="false">Recorder Wi-Fi disconnected</string>
+    <string name="album_recorder_rejected_playback" formatted="false">Recorder rejected playback</string>
+    <string name="album_video_transfer_interrupted" formatted="false">Video transfer interrupted</string>
+    <string name="album_reading_file" formatted="false">Reading file…</string>
+    <string name="album_loading_s" formatted="false">Loading: %1$s%%</string>
+    <string name="album_loading_075" formatted="false">Loading…</string>
+    <string name="album_unable_to_load_s" formatted="false">Unable to load: %1$s</string>
+    <string name="album_retry_077" formatted="false">Retry</string>
+    <string name="album_playback_failed_s" formatted="false">Playback failed: %1$s</string>
+    <string name="album_opening_local_video" formatted="false">Opening local video…</string>
+    <string name="album_unable_to_decode_photo" formatted="false">Unable to decode photo</string>
+    <string name="album_unable_to_load_photo_s" formatted="false">Unable to load photo: %1$s</string>
+    <string name="album_downloading" formatted="false">Downloading…</string>
+    <string name="album_playback_closed_but_recording_resume_not" formatted="false">Playback closed, but recording resume not confirmed: %1$s</string>
+    <string name="album_recorder_disconnected_reconnect_and_retry" formatted="false">Recorder disconnected. Reconnect and retry.</string>
+    <string name="album_downloading_s" formatted="false">Downloading %1$s%%</string>
+    <string name="album_waiting_to_download" formatted="false">Waiting to download…</string>
+    <string name="language_traditional_chinese" formatted="false">繁體中文</string>
+    <string name="language_simplified_chinese" formatted="false">简体中文</string>
+    <string name="device_formatting_keep_power_connected" formatted="false">Formatting. Keep power connected…</string>
+    <string name="device_time_sync_s" formatted="false">Time sync: %1$s</string>
+    <string name="device_switching_recorder_s" formatted="false">Switching recorder… (%1$s)</string>
+    <string name="device_target_s_tap_to_change_host" formatted="false">Target: %1$s (tap to change host)</string>
+    <string name="device_connected_to_s_epoch_s" formatted="false">Connected to %1$s (epoch: %2$s)</string>
+    <string name="device_unable_to_switch_s" formatted="false">Unable to switch: %1$s</string>
+    <string name="device_connect_to_the_recorder_first" formatted="false">Connect to the recorder first</string>
+    <string name="device_power_off_recorder_037" formatted="false">Power off recorder?</string>
+    <string name="device_recording_will_stop_and_wi_fi" formatted="false">Recording will stop and Wi-Fi will disconnect. Make sure the recorder is not in use on the road.</string>
+    <string name="device_power_off" formatted="false">Power off</string>
+    <string name="device_power_off_command_accepted" formatted="false">Power-off command accepted</string>
+    <string name="device_power_off_state_not_confirmed" formatted="false">Power-off state not confirmed</string>
+    <string name="device_the_recorder_accepted_the_power_off" formatted="false">The recorder accepted the power-off command. Wi-Fi will disconnect.</string>
+    <string name="device_the_command_may_have_been_sent" formatted="false">The command may have been sent, but no confirmation arrived. Check the recorder indicator. Do not immediately repeat the operation.\n%1$s</string>
+    <string name="device_ok" formatted="false">OK</string>
+    <string name="device_format_recorder_sd_card_045" formatted="false">Format recorder SD card?</string>
+    <string name="device_all_videos_photos_and_protected_files" formatted="false">All videos, photos and protected files on this recorder will be permanently deleted. Back up important files first.</string>
+    <string name="device_continue" formatted="false">Continue</string>
+    <string name="device_final_confirmation_erase_recorder_card" formatted="false">Final confirmation: erase recorder card</string>
+    <string name="device_target_s_nrecording_pauses_during_formatting" formatted="false">Target: %1$s\nRecording pauses during formatting. Keep power and Wi-Fi connected. Have you backed up your files?</string>
+    <string name="device_format" formatted="false">Format</string>
+    <string name="device_formatting_complete" formatted="false">Formatting complete</string>
+    <string name="device_formatting_not_confirmed" formatted="false">Formatting not confirmed</string>
+    <string name="device_the_card_was_read_back_and" formatted="false">The card was read back and confirmed empty.</string>
+    <string name="device_check_the_recorder" formatted="false">Check the recorder</string>
+    <string name="device_collapse" formatted="false">Collapse ▲</string>
+    <string name="device_advanced_diagnostics_change_host" formatted="false">Advanced diagnostics: change host</string>
+    <string name="device_advanced_connection_diagnostics_nnormally_add_or" formatted="false">Advanced connection diagnostics.\nNormally, add or switch recorders from the home screen using Wi-Fi detection.\nA manual IP change ends the current session and probes the new target:</string>
+    <string name="device_switch" formatted="false">Switch</string>
+    <string name="device_recorder_wi_fi_password_059" formatted="false">Recorder Wi-Fi password</string>
+    <string name="device_the_default_password_is_nafter_changing" formatted="false">The default password is 12345678.\nAfter changing it, enter the new password in your phone Wi-Fi settings to reconnect.</string>
+    <string name="device_ok_061" formatted="false">OK</string>
+    <string name="device_time_sync_command_sent" formatted="false">Time sync command sent</string>
+    <string name="downloads_download_cancelled" formatted="false">Download cancelled</string>
+    <string name="downloads_downloading_again" formatted="false">Downloading again…</string>
+    <string name="downloads_s_active" formatted="false">%1$s active</string>
+    <string name="download_task_adapter_downloading_s_s_s" formatted="false">Downloading %1$s%% (%2$s / %3$s)</string>
+    <string name="download_task_adapter_downloading_s" formatted="false">Downloading… (%1$s)</string>
+    <string name="download_task_adapter_downloaded_s" formatted="false">Downloaded (%1$s)</string>
+    <string name="download_task_adapter_connection_timed_out" formatted="false">Connection timed out</string>
+    <string name="download_task_adapter_download_failed_s" formatted="false">Download failed: %1$s</string>
+    <string name="download_task_adapter_download_again" formatted="false">Download again</string>
+    <string name="download_task_adapter_waiting" formatted="false">Waiting</string>
+    <string name="home_connected_recorder_ready" formatted="false">● Connected · Recorder ready</string>
+    <string name="home_offline_check_recorder_wi_fi" formatted="false">○ Offline · Check recorder Wi-Fi</string>
+    <string name="home_battery_s" formatted="false">Battery: %1$s/4</string>
+    <string name="home_s_s_bars" formatted="false">%1$s%2$s bars</string>
+    <string name="home_battery_s_bars" formatted="false">Battery: %1$s bars</string>
+    <string name="home_free_f_f_gb" formatted="false">Free %.1f/%.0f GB</string>
+    <string name="home_battery_unknown" formatted="false">Battery: unknown</string>
+    <string name="home_sd_offline" formatted="false">SD: offline</string>
+    <string name="live_standard_map" formatted="false">Standard map</string>
+    <string name="live_map_loaded_phone_gps" formatted="false">Map loaded · Phone GPS</string>
+    <string name="live_map_unavailable_check_your_internet_connection" formatted="false">Map unavailable. Check your internet connection and map service settings.</string>
+    <string name="live_follow_my_location" formatted="false">Follow my location</string>
+    <string name="live_recorder_offline_nphone_maps_are_still" formatted="false">Recorder offline\nPhone maps are still available</string>
+    <string name="live_unable_to_read_recorder_status_reconnect" formatted="false">Unable to read recorder status. Reconnect to retry.</string>
+    <string name="live_recorder_is_not_in_rtsp_mode" formatted="false">Recorder is not in RTSP mode</string>
+    <string name="live_recording_did_not_stop_or_the" formatted="false">Recording did not stop or the state did not change</string>
+    <string name="live_recording_did_not_start" formatted="false">Recording did not start</string>
+    <string name="live_photo_captured" formatted="false">Capture command completed. Check the device album.</string>
+    <string name="live_photo_in_progress">Capturing…</string>
+    <string name="live_photo_failed_s" formatted="false">Capture incomplete: %1$s</string>
+    <string name="live_connect_to_recorder_wi_fi_first" formatted="false">Connect to recorder Wi-Fi first</string>
+    <string name="live_recorder_offline_memory_card_details_unavailable" formatted="false">Recorder offline. Memory card details unavailable.</string>
+    <string name="live_total_f_gb_nused_f_gb" formatted="false">Total: %.1f GB\nUsed: %.1f GB\nFree: %.1f GB\n\n%s</string>
+    <string name="live_memory_card" formatted="false">Memory card</string>
+    <string name="live_following_your_current_location" formatted="false">Following your current location</string>
+    <string name="live_phone_location_unavailable" formatted="false">Phone location unavailable</string>
+    <string name="live_clear_this_route" formatted="false">Clear this route?</string>
+    <string name="live_only_the_route_shown_on_this" formatted="false">Only the route shown on this phone will be cleared. Recorder videos are unaffected.</string>
+    <string name="live_clear" formatted="false">Clear</string>
+    <string name="live_google_maps_is_not_installed_opening" formatted="false">Google Maps is not installed. Opening PiP.</string>
+    <string name="live_pip_is_not_supported_on_this" formatted="false">PiP is not supported on this Android version</string>
+    <string name="live_sd_f_f_gb_free" formatted="false">SD: %.1f / %.1f GB free</string>
+    <string name="live_sd_ready_files_f_mb" formatted="false">SD ready · Files %.0f MB</string>
+    <string name="live_sd_ready_recording" formatted="false">SD ready · Recording</string>
+    <string name="live_memory_card_error" formatted="false">Memory card error</string>
+    <string name="live_no_memory_card_detected" formatted="false">No memory card detected</string>
+    <string name="live_n" formatted="false">N</string>
+    <string name="live_ne" formatted="false">NE</string>
+    <string name="live_e" formatted="false">E</string>
+    <string name="live_se" formatted="false">SE</string>
+    <string name="live_s" formatted="false">S</string>
+    <string name="live_sw" formatted="false">SW</string>
+    <string name="live_w" formatted="false">W</string>
+    <string name="live_nw" formatted="false">NW</string>
+    <string name="live_source_s_gps_locked" formatted="false">Source: %1$s (GPS locked)</string>
+    <string name="live_location_permission_required_tap_the_speed" formatted="false">Location permission required. Tap the speed display to enable.</string>
+    <string name="live_source_s_searching_for_satellites" formatted="false">Source: %1$s (searching for satellites…)</string>
+    <string name="live_album_is_playing_a_video_live" formatted="false">Album is playing a video. Live preview paused.</string>
+    <string name="live_stopped" formatted="false">Stopped</string>
+    <string name="live_unknown" formatted="false">Unknown</string>
+    <string name="live_phone_location" formatted="false">Phone location</string>
+    <string name="live_speed_s_km_h" formatted="false">Speed: %1$s km/h</string>
+    <string name="live_location_disabled" formatted="false">Location disabled</string>
+    <string name="live_searching_for_gps" formatted="false">Searching for GPS</string>
+    <string name="live_km_h_accuracy_unknown" formatted="false">-- km/h · Accuracy unknown</string>
+    <string name="main_activity_my_recorders" formatted="false">My recorders</string>
+    <string name="main_activity_close" formatted="false">Close</string>
+    <string name="main_activity_no_recorder_yet_connect_to_recorder" formatted="false">No recorder yet. Connect to recorder Wi-Fi to begin.</string>
+    <string name="main_activity_unavailable" formatted="false">Unavailable</string>
+    <string name="main_activity_no_successful_connection_yet" formatted="false">No successful connection yet</string>
+    <string name="main_activity_firmware_s_nlast_connected_s" formatted="false">Firmware: %1$s\nLast connected: %2$s</string>
+    <string name="main_activity_selected" formatted="false">Selected</string>
+    <string name="main_activity_select_recorder" formatted="false">Select recorder</string>
+    <string name="main_activity_remove" formatted="false">Remove</string>
+    <string name="main_activity_remove_local_record_for_s" formatted="false">Remove local record for %1$s</string>
+    <string name="main_activity_remove_this_recorder" formatted="false">Remove this recorder?</string>
+    <string name="main_activity_only_the_local_device_record_will" formatted="false">Only the local device record will be removed. Videos and recorder settings remain unchanged.</string>
+    <string name="main_activity_add_recorder" formatted="false">＋ Add recorder</string>
+    <string name="main_activity_recorder_wi_fi_verified_ngateway_s" formatted="false">Recorder Wi-Fi verified.\nGateway: %1$s (%2$s)\n\nConnect and add this recorder now?</string>
+    <string name="main_activity_connect_now" formatted="false">Connect now</string>
+    <string name="main_activity_connecting_to_recorder_s" formatted="false">Connecting to recorder (%1$s)…</string>
+    <string name="main_activity_identifying_recorder" formatted="false">Identifying recorder</string>
+    <string name="main_activity_connected_to_wi_fi_checking_the" formatted="false">Connected to Wi-Fi. Checking the recorder protocol at %1$s. Please wait…</string>
+    <string name="main_activity_incompatible_recorder" formatted="false">Incompatible recorder</string>
+    <string name="main_activity_the_wi_fi_device_at_s" formatted="false">The Wi-Fi device at %1$s does not use the GPSOCK protocol.\nCheck that you are connected to recorder Wi-Fi (for example, B1-xxxxxx).</string>
+    <string name="main_activity_wi_fi_settings" formatted="false">Wi-Fi settings</string>
+    <string name="main_activity_recorder_detection_incomplete" formatted="false">Recorder detection incomplete</string>
+    <string name="main_activity_no_response" formatted="false">No response</string>
+    <string name="main_activity_recorder_detection_at_s_timed_out" formatted="false">Recorder detection at %1$s timed out or failed: %2$s\nRetry or reconnect to recorder Wi-Fi.</string>
+    <string name="main_activity_retry_detection" formatted="false">Retry detection</string>
+    <string name="main_activity_identify_recorder" formatted="false">Identify recorder</string>
+    <string name="main_activity_gateway_s_nprotocol_handshake_incomplete_try" formatted="false">Gateway: %1$s\nProtocol handshake incomplete. Try connecting now?</string>
+    <string name="main_activity_try_connecting" formatted="false">Try connecting</string>
+    <string name="main_activity_recorder_wi_fi_not_connected" formatted="false">Recorder Wi-Fi not connected</string>
+    <string name="main_activity_no_ip_address_entry_is_needed" formatted="false">No IP address entry is needed.\nConnect to recorder Wi-Fi (for example, B1-xxxxxx) in your phone Wi-Fi settings. The app will detect and add it automatically.</string>
+    <string name="media_adapter_protected_event" formatted="false">Protected event</string>
+    <string name="recorder_time_synced_automatically" formatted="false">Time synced automatically</string>
+    <string name="recorder_automatic_time_sync_failed_s" formatted="false">Automatic time sync failed: %1$s</string>
+    <string name="recorder_time_synced" formatted="false">Time synced</string>
+    <string name="recorder_time_sync_failed_s" formatted="false">Time sync failed: %1$s</string>
+    <string name="recorder_continuous_recording_no_loop" formatted="false">Continuous recording (no loop)</string>
+    <string name="recorder_loop_recording_min" formatted="false">Loop recording (1 min)</string>
+    <string name="recorder_loop_recording_min_007" formatted="false">Loop recording (2 min)</string>
+    <string name="recorder_loop_recording_min_008" formatted="false">Loop recording (3 min)</string>
+    <string name="recorder_loop_recording_min_009" formatted="false">Loop recording (5 min)</string>
+    <string name="recorder_recording_mode_loop_setting_unconfirmed" formatted="false">Recording mode (loop setting unconfirmed)</string>
+    <string name="recorder_memory_card_error_or_formatting_required" formatted="false">Memory card error or formatting required (code %1$s)</string>
+    <string name="recorder_memory_card_not_ready_or_missing" formatted="false">Memory card not ready or missing</string>
+    <string name="recorder_s_card_ready_listed_media_f" formatted="false">%s · Card ready · Listed media: %.1f MB</string>
+    <string name="recorder_s_card_ready_loop_recording" formatted="false">%s · Card ready (loop recording)</string>
+    <string name="recorder_s_f_gb_free_calculating_time" formatted="false">%s · %.1f GB free (calculating time)</string>
+    <string name="recorder_s_overwrite_in_about_d_min" formatted="false">%s · Overwrite in about %d min · Retention about %.1f hours</string>
+    <string name="recorder_s_about_d_min_recording_time" formatted="false">%s · About %d min recording time left</string>
+    <string name="recorder_not_read_yet" formatted="false">Not read yet</string>
+    <string name="recorder_unable_to_switch" formatted="false">Unable to switch</string>
+    <string name="recorder_s_confirming" formatted="false">%1$s (confirming…)</string>
+    <string name="recorder_read_back_mismatch_s" formatted="false">Read-back mismatch: %1$s</string>
+    <string name="recorder_s_sent_read_back_failed" formatted="false">%1$s (sent, read-back failed)</string>
+    <string name="recorder_setting_failed_s" formatted="false">Setting failed: %1$s</string>
+    <string name="recorder_read_back_s" formatted="false">Read back: %1$s</string>
+    <string name="recorder_video_source_changed" formatted="false">Video source changed</string>
+    <string name="recorder_formatting_in_progress_do_not_repeat" formatted="false">Formatting in progress. Do not repeat.</string>
+    <string name="recorder_recorder_changed_please_confirm_again" formatted="false">Recorder changed. Please confirm again.</string>
+    <string name="recorder_reading" formatted="false">Reading…</string>
+    <string name="recorder_unable_to_read" formatted="false">Unable to read</string>
+    <string name="recorder_unknown" formatted="false">Unknown</string>
+    <string name="recorder_unknown_not_read_yet" formatted="false">Unknown (not read yet)</string>
+    <string name="recorder_unable_to_read_recorder_videos" formatted="false">Unable to read recorder videos</string>
+    <string name="recorder_video_source_changed_reopen_the_album" formatted="false">Video source changed. Reopen the album.</string>
+    <string name="recorder_unable_to_cache_preview" formatted="false">Unable to cache preview</string>
+    <string name="recorder_unable_to_save_file" formatted="false">Unable to save file</string>
+    <string name="setting_fine" formatted="false">Fine</string>
+    <string name="setting_normal" formatted="false">Normal</string>
+    <string name="setting_economical" formatted="false">Economical</string>
+    <string name="setting_minute" formatted="false">1 minute</string>
+    <string name="setting_minutes" formatted="false">2 minutes</string>
+    <string name="setting_minutes_006" formatted="false">3 minutes</string>
+    <string name="setting_date_time" formatted="false">Date &amp; time</string>
+    <string name="setting_date_only" formatted="false">Date only</string>
+    <string name="setting_unknown_s" formatted="false">Unknown (%1$s)</string>
+    <string name="appearance_title" formatted="false">App</string>
+    <string name="appearance_language" formatted="false">Language</string>
+    <string name="appearance_theme" formatted="false">Theme</string>
+    <string name="appearance_system" formatted="false">System default</string>
+    <string name="appearance_light" formatted="false">Light</string>
+    <string name="appearance_dark" formatted="false">Dark</string>
+    <string name="viewer_segments" formatted="false">Show or hide nearby segments</string>
+    <string name="rtc_not_synced" formatted="false">Not synced yet</string>
+    <string name="gps_phone_source" formatted="false">Phone GPS</string>
+    <string name="gps_network_source" formatted="false">Phone network location</string>
+    <string name="setting_off">Off</string>
+    <string name="action_open">Open</string>
+    <string name="rtc_failed">Time sync failed</string>
+    <string name="player_render_failed">Unable to render video: %1$s</string>
+    <string name="player_unavailable">Unable to load the FFmpeg player on this device</string>
+    <string name="player_wifi_failed">Unable to bind to recorder Wi-Fi</string>
+    <string name="player_open_failed_code">FFmpeg could not open the video: %1$s</string>
+    <string name="player_stalled">Video has stalled. Reopen it to retry.</string>
+    <string name="player_open_failed">Unable to open video</string>
+</resources>

@@ -22,7 +22,7 @@
                 android:id="@+id/iv_thumbnail"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:contentDescription="媒體縮圖"
+                android:contentDescription="@string/item_media_card_media_thumbnail"
                 android:scaleType="centerCrop" />
 
             <!-- Duration Badge (Hidden by default, shown only when real duration is known) -->
@@ -49,7 +49,7 @@
                 android:background="@color/accent_blue"
                 android:paddingHorizontal="6dp"
                 android:paddingVertical="2dp"
-                android:text="已下載"
+                android:text="@string/item_media_card_downloaded"
                 android:textColor="@color/accent_blue_dark"
                 android:textSize="@dimen/text_size_caption"
                 android:textStyle="bold"
@@ -121,7 +121,7 @@
                     android:id="@+id/tv_media_type"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="常規錄影"
+                    android:text="@string/item_media_card_loop_video"
                     android:textColor="@color/accent_teal"
                     android:textSize="11sp" />
             </LinearLayout>

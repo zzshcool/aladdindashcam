@@ -1,34 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Neutral Graphite + Cool Blue Design System Tokens (Review Section 3) -->
-    <color name="bg_dark">#101214</color>
-    <color name="surface_dark">#191C20</color>
-    <color name="surface_elevated">#24282E</color>
-    <color name="border_subtle">#2F353E</color>
+    <color name="bg_dark">#F4F6F8</color>
+    <color name="surface_dark">#FFFFFF</color>
+    <color name="surface_elevated">#E9EDF2</color>
+    <color name="border_subtle">#D5DCE5</color>
 
-    <color name="text_primary">#F5F7FA</color>
-    <color name="text_secondary">#AFB7C3</color>
-    <color name="text_disabled">#636C78</color>
+    <color name="text_primary">#18212D</color>
+    <color name="text_secondary">#536174</color>
+    <color name="text_disabled">#687587</color>
 
     <!-- Cool Blue Accent & Interactions -->
-    <color name="accent_blue">#7AA7FF</color>
-    <color name="accent_blue_dark">#122442</color>
-    <color name="accent_blue_subtle">#1A2538</color>
+    <color name="accent_blue">#245BA8</color>
+    <color name="accent_blue_dark">#FFFFFF</color>
+    <color name="accent_blue_subtle">#E5EEFB</color>
 
     <!-- Semantic Status Indicators -->
-    <color name="status_green">#80CFA9</color>
-    <color name="warning_yellow">#EBC47A</color>
-    <color name="error_red">#FF8585</color>
-    <color name="record_active_red">#FF8585</color>
+    <color name="status_green">#216848</color>
+    <color name="warning_yellow">#805600</color>
+    <color name="error_red">#B82939</color>
+    <color name="record_active_red">#BE3041</color>
 
     <!-- Backward Compatibility Aliases -->
-    <color name="accent_teal">#7AA7FF</color>
-    <color name="accent_teal_dark">#122442</color>
+    <color name="accent_teal">#245BA8</color>
+    <color name="accent_teal_dark">#FFFFFF</color>
 
     <!-- Standard UI Helpers -->
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     <color name="transparent">#00000000</color>
     <color name="hud_scrim">#99000000</color>
-    <color name="card_stroke_focused">#5082E6</color>
+    <color name="card_stroke_focused">#5D83B7</color>
 </resources>

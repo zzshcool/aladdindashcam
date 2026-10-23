@@ -1,5 +1,6 @@
 package com.aladdin.dashcam.media
 
+import com.aladdin.dashcam.R
 import android.net.ConnectivityManager
 import android.net.Network
 import android.opengl.GLSurfaceView
@@ -81,7 +82,7 @@ class NativeFfmpegPlayer(
 
                     override fun onDrawFrame(gl: GL10) {
                         val token = generation
-                        if (owner !== this@NativeFfmpegPlayer || !active || !sourceReady || paused) return
+                        if (owner !== this@NativeFfmpegPlayer || !active || !sourceReady) return
                         try {
                             ffmpegWrapper.naDrawFrame()
                             val frames = ffmpegWrapper.naGetFrameCnt()
@@ -94,7 +95,7 @@ class NativeFfmpegPlayer(
                                 }
                             }
                         } catch (error: Throwable) {
-                            viewHandler.post { if (isCurrent(token)) fail("影片渲染失敗：${error.message}") }
+                            viewHandler.post { if (isCurrent(token)) fail(glSurfaceView.context.getString(R.string.player_render_failed, error.message)) }
                         }
                     }
                 })
@@ -110,7 +111,7 @@ class NativeFfmpegPlayer(
     suspend fun start(source: String, streaming: Boolean = true, targetNetwork: Network? = null,
                       startPositionMs: Long = 0L, knownDurationMs: Long = 0L) = withContext(Dispatchers.Main.immediate) {
         if (released || !isSupported || !rendererReady) {
-            onError?.invoke("此裝置無法載入 FFmpeg 播放引擎")
+            onError?.invoke(glSurfaceView.context.getString(R.string.player_unavailable))
             return@withContext
         }
         owner?.stop()
@@ -123,10 +124,11 @@ class NativeFfmpegPlayer(
         try {
             if (targetNetwork != null) {
                 previousNetwork = connectivity.boundNetworkForProcess
-                check(connectivity.bindProcessToNetwork(targetNetwork)) { "無法綁定記錄器 Wi-Fi" }
+                check(connectivity.bindProcessToNetwork(targetNetwork)) { glSurfaceView.context.getString(R.string.player_wifi_failed) }
                 network = targetNetwork
             }
             ffmpegWrapper.getInstance().SetViewHandler(viewHandler)
+            glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
             glSurfaceView.onResume()
             val result = withContext(Dispatchers.IO) {
                 synchronized(nativeLock) {
@@ -139,7 +141,7 @@ class NativeFfmpegPlayer(
                 }
             }
             if (!isCurrent(token)) return@withContext
-            check(result == ffmpegWrapper.eFFMPEG_ERRCODE.FFMPEGPLAYER_NOERROR.ordinal) { "FFmpeg 開啟失敗：$result" }
+            check(result == ffmpegWrapper.eFFMPEG_ERRCODE.FFMPEGPLAYER_NOERROR.ordinal) { glSurfaceView.context.getString(R.string.player_open_failed_code, result) }
             sourceReady = true
             if (!streaming && startPositionMs > 0L) seekTo(startPositionMs)
             Log.i(TAG, "FFmpeg source opened: streaming=$streaming, generation=$token")
@@ -173,7 +175,7 @@ class NativeFfmpegPlayer(
                         break
                     }
                     if (SystemClock.elapsedRealtime() - lastProgressAt > 10_000L) {
-                        fail("影片影格已中斷，請重新播放")
+                        fail(glSurfaceView.context.getString(R.string.player_stalled))
                     }
                 }
             }
@@ -181,7 +183,7 @@ class NativeFfmpegPlayer(
             if (isCurrent(token)) stop()
             throw cancelled
         } catch (error: Throwable) {
-            if (isCurrent(token)) fail(error.message ?: "影片開啟失敗")
+            if (isCurrent(token)) fail(error.message ?: glSurfaceView.context.getString(R.string.player_open_failed))
         }
     }
 
@@ -200,6 +202,7 @@ class NativeFfmpegPlayer(
             if (value) ffmpegWrapper.naPause() else ffmpegWrapper.naResume()
         }
         paused = value
+        glSurfaceView.renderMode = if (value) GLSurfaceView.RENDERMODE_WHEN_DIRTY else GLSurfaceView.RENDERMODE_CONTINUOUSLY
     }
 
     private fun isCurrent(token: Long) = owner === this && active && generation == token

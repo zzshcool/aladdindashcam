@@ -1,0 +1,334 @@
+<resources>
+    <string name="album_select" formatted="false">選取</string>
+    <string name="album_recording_paused_resumes_when_you_leave" formatted="false">錄影已暫停 · 離開裝置相簿會自動恢復</string>
+    <string name="album_select_all" formatted="false">全選</string>
+    <string name="album_selected_mb" formatted="false">已選取 0 項 (0 MB)</string>
+    <string name="album_done" formatted="false">完成</string>
+    <string name="album_loop_recordings" formatted="false">常規循環錄影</string>
+    <string name="album_protected_events" formatted="false">緊急鎖檔事件</string>
+    <string name="album_drag_the_timeline_to_find_a" formatted="false">拖曳時間軸游標以定位影片</string>
+    <string name="album_no_video_here_jumping_to_the" formatted="false">此時段無影片，跳至下一段</string>
+    <string name="album_recorder_connected_load_the_video_list" formatted="false">已連接記錄器，尚未讀取影片清單</string>
+    <string name="album_load_recorder_videos" formatted="false">讀取記錄器影片清單</string>
+    <string name="album_download_selected" formatted="false">批次下載</string>
+    <string name="album_delete_selected" formatted="false">刪除所選</string>
+    <string name="album_photo_viewer" formatted="false">照片檢視</string>
+    <string name="album_nearby_video_segments" formatted="false">相鄰錄影片段快速切換</string>
+    <string name="album_pause" formatted="false">暫停</string>
+    <string name="album_local_video_position" formatted="false">本機影片播放位置</string>
+    <string name="album_back_to_album" formatted="false">返回相簿</string>
+    <string name="album_recorded" formatted="false">錄製時間：2026-10-21 14:32:05</string>
+    <string name="album_download" formatted="false">下載到本機</string>
+    <string name="album_loading_preview" formatted="false">載入媒體預覽中...</string>
+    <string name="album_unable_to_load_media" formatted="false">媒體載入失敗</string>
+    <string name="album_retry" formatted="false">重試載入</string>
+    <string name="device_photo_resolution" formatted="false">圖片解析度</string>
+    <string name="device_photo_quality" formatted="false">圖片畫質</string>
+    <string name="device_fine" formatted="false">優質</string>
+    <string name="device_video_resolution" formatted="false">影像解析度</string>
+    <string name="device_clip_duration" formatted="false">影片長度</string>
+    <string name="device_minutes" formatted="false">5 分鐘</string>
+    <string name="device_length_of_each_clip_when_the" formatted="false">每段影片的時長，記憶卡滿會自動從時間最早的影片開始覆蓋。</string>
+    <string name="device_image_audio" formatted="false">圖片與聲音</string>
+    <string name="device_time_stamp" formatted="false">時間浮水印</string>
+    <string name="device_on" formatted="false">開啟</string>
+    <string name="device_normal" formatted="false">一般</string>
+    <string name="device_recorder_wi_fi_name" formatted="false">記錄器Wi-Fi名稱</string>
+    <string name="device_recorder_wi_fi_password" formatted="false">記錄器Wi-Fi密碼</string>
+    <string name="device_after_changing_the_password_update_it" formatted="false">修改密碼後，需要到系統[Wi-Fi]設置，[修改密碼]重新輸入新密碼</string>
+    <string name="device_firmware" formatted="false">韌體版本</string>
+    <string name="device_storage_time" formatted="false">儲存與維護</string>
+    <string name="device_loop_recording_calculating_remaining_time" formatted="false">循環錄影中 · 距覆寫估算中...</string>
+    <string name="device_time_sync_automatically_synced" formatted="false">校時狀態：已自動校時</string>
+    <string name="device_sync_now" formatted="false">手動立即校時</string>
+    <string name="device_expand" formatted="false">點擊展開 ▼</string>
+    <string name="device_target_tap_to_change_host" formatted="false">連線目標：192.168.25.1 (點擊可切換 Host)</string>
+    <string name="device_control_gpsocket_tcp_nstream_rtsp_action" formatted="false">控制通道：192.168.25.1:8081 (GPSOCKET TCP)\n串流端點：rtsp://192.168.25.1:8080/?action=stream\n通訊家族：Generalplus / GoPlus (B1樣機)\n網路路由：Wi-Fi 專屬 Process/Socket 綁定</string>
+    <string name="device_device_maintenance" formatted="false">裝置維護</string>
+    <string name="device_format_recorder_sd_card" formatted="false">格式化記錄器 SD 卡</string>
+    <string name="device_power_off_recorder" formatted="false">關閉記錄器</string>
+    <string name="device_factory_reset_requires_using_the_recorder" formatted="false">不支援遠端恢復原廠 (請於機身操作)</string>
+    <string name="device_formatting_deletes_all_videos_photos_and" formatted="false">格式化會刪除記錄器內所有影片、照片與鎖檔；請先備份並保持供電。恢復原廠設定仍請於機身操作。</string>
+    <string name="downloads_active" formatted="false">0 項進行中</string>
+    <string name="downloads_go_to_album" formatted="false">前往相簿</string>
+    <string name="live_connecting_to_stream_no_video_yet" formatted="false">即時串流連線中 / 暫無影像</string>
+    <string name="live_recording_indicator" formatted="false">HUD錄影指示</string>
+    <string name="live_not_recording" formatted="false">未錄影</string>
+    <string name="live_video" formatted="false">直播</string>
+    <string name="live_split" formatted="false">分割</string>
+    <string name="live_map" formatted="false">地圖</string>
+    <string name="live_ride" formatted="false">騎乘</string>
+    <string name="live_source_phone_gps" formatted="false">資料來源：手機 GPS 定位</string>
+    <string name="live_altitude" formatted="false">目前海拔</string>
+    <string name="live_ascent" formatted="false">累積爬升</string>
+    <string name="live_heading" formatted="false">方位航向</string>
+    <string name="live_total_g_with_gravity" formatted="false">總 G 值（含重力）</string>
+    <string name="live_satellite" formatted="false">衛星地圖</string>
+    <string name="live_phone_gps_not_frame_synced_with" formatted="false">手機定位 (與影像非毫秒級對齊)</string>
+    <string name="live_speed_km_h_accuracy_m" formatted="false">速度: -- km/h · 精度: -- m</string>
+    <string name="live_reset_route" formatted="false">重設軌跡</string>
+    <string name="live_my_location" formatted="false">回到目前位置</string>
+    <string name="live_recorder_uses_wi_fi_maps_need" formatted="false">地圖需網際網路 · 速度來自手機定位</string>
+    <string name="item_media_card_media_thumbnail" formatted="false">媒體縮圖</string>
+    <string name="item_media_card_downloaded" formatted="false">已下載</string>
+    <string name="item_media_card_loop_video" formatted="false">常規錄影</string>
+    <string name="item_viewer_strip_segment_thumbnail" formatted="false">片段縮圖</string>
+    <string name="live_clear_route" formatted="false">清除軌跡</string>
+    <string name="album_s_selected_s_mb" formatted="false">已選取 %1$s 項 (%2$s MB)</string>
+    <string name="album_opening_recorder_album_recording_will_pause" formatted="false">切換裝置相簿中 · 錄影將暫停</string>
+    <string name="album_unable_to_open_recorder_album_s" formatted="false">無法進入裝置相簿：%1$s</string>
+    <string name="album_loaded_s_files" formatted="false">成功取得記錄器清單: %1$s 筆</string>
+    <string name="album_unable_to_load_videos_s" formatted="false">取得影片清單失敗: %1$s</string>
+    <string name="album_recorder_offline_recording_status_unknown" formatted="false">記錄器未連線 · 錄影狀態未知</string>
+    <string name="album_recording_status_unknown_waiting_for_recorder" formatted="false">錄影狀態未知 · 等待設備回報</string>
+    <string name="album_recorder_is_recording_album_mode_interrupted" formatted="false">記錄器錄影中 · 裝置相簿模式已中斷</string>
+    <string name="album_recorder_is_in_playback_mode_recording" formatted="false">設備處於回放模式 · 錄影已暫停</string>
+    <string name="album_recorder_is_not_recording" formatted="false">記錄器目前未錄影</string>
+    <string name="album_recording_resume_not_confirmed_s" formatted="false">未確認恢復錄影：%1$s</string>
+    <string name="album_s_recorder_playback_download_to_seek" formatted="false">%1$s · 裝置回放（精確跳轉需先下載）</string>
+    <string name="album_duration_unknown" formatted="false">時長未知</string>
+    <string name="album_s_s" formatted="false">%1$s / %2$s</string>
+    <string name="album_replay" formatted="false">重播</string>
+    <string name="album_the_recorder_ended_the_paused_stream" formatted="false">設備已結束暫停的串流，將從片頭重新播放</string>
+    <string name="album_play" formatted="false">播放</string>
+    <string name="album_pause_state_unknown_reopen_the_video" formatted="false">暫停狀態未確認，請重新開啟影片</string>
+    <string name="album_unable_to_seek_this_video" formatted="false">無法跳轉此影片</string>
+    <string name="album_downloading_s_files" formatted="false">開始批次下載 %1$s 個檔案</string>
+    <string name="album_delete_files" formatted="false">確認刪除檔案</string>
+    <string name="album_recorder_sd_card" formatted="false">記錄器 SD 卡</string>
+    <string name="album_phone_storage" formatted="false">本機儲存空間</string>
+    <string name="album_delete_s_selected_files_from_s" formatted="false">確定要從 %1$s 刪除選取的 %2$s 個檔案？此操作無法還原。</string>
+    <string name="album_delete" formatted="false">確定刪除</string>
+    <string name="album_cancel" formatted="false">取消</string>
+    <string name="album_video_found_s_s" formatted="false">定位到影片：%1$s (%2$s)</string>
+    <string name="album_no_recordings_at_this_time_s" formatted="false">此時段無錄影片段 (%1$s)</string>
+    <string name="album_deleted_s_of_s_files" formatted="false">成功刪除 %1$s / %2$s 個檔案</string>
+    <string name="album_time_unknown" formatted="false">時間未知</string>
+    <string name="album_today_s" formatted="false">今天 (%1$s)</string>
+    <string name="album_yesterday_s" formatted="false">昨天 (%1$s)</string>
+    <string name="album_no_video_segments_available" formatted="false">無可用錄影片段</string>
+    <string name="album_position_s_s_segments" formatted="false">當前定位時刻：%1$s (共 %2$s 個片段)</string>
+    <string name="album_no_files_on_the_recorder_memory" formatted="false">記錄器記憶卡內無檔案</string>
+    <string name="album_refresh" formatted="false">重新整理</string>
+    <string name="album_no_media_in_this_category" formatted="false">此分類尚無符合之媒體檔案</string>
+    <string name="album_show_all_media" formatted="false">查看全部媒體</string>
+    <string name="album_unable_to_read_recorder_files" formatted="false">讀取記錄器清單失敗</string>
+    <string name="album_retry_063" formatted="false">重試讀取</string>
+    <string name="album_no_videos_downloaded_yet" formatted="false">本機尚未下載任何影片</string>
+    <string name="album_open_recorder_album" formatted="false">切換至記錄器相簿</string>
+    <string name="album_recorded_s" formatted="false">錄製時間：%1$s</string>
+    <string name="album_captured_s" formatted="false">拍攝時間：%1$s</string>
+    <string name="album_opening_recording_recording_pauses_during_playback" formatted="false">正在開啟錄影檔（回放時暫停錄影）…</string>
+    <string name="album_recorder_playback_starts_at_the_beginning" formatted="false">裝置回放從片頭開始；精確跳轉請先下載影片</string>
+    <string name="album_recorder_wi_fi_disconnected" formatted="false">記錄器 Wi-Fi 已中斷</string>
+    <string name="album_recorder_rejected_playback" formatted="false">記錄器拒絕回放</string>
+    <string name="album_video_transfer_interrupted" formatted="false">錄影檔傳輸中斷</string>
+    <string name="album_reading_file" formatted="false">正在讀取此檔案...</string>
+    <string name="album_loading_s" formatted="false">讀取中: %1$s%%</string>
+    <string name="album_loading_075" formatted="false">正在讀取...</string>
+    <string name="album_unable_to_load_s" formatted="false">載入失敗：%1$s</string>
+    <string name="album_retry_077" formatted="false">重試</string>
+    <string name="album_playback_failed_s" formatted="false">回放失敗：%1$s</string>
+    <string name="album_opening_local_video" formatted="false">正在開啟本機影片…</string>
+    <string name="album_unable_to_decode_photo" formatted="false">無法解析照片檔案</string>
+    <string name="album_unable_to_load_photo_s" formatted="false">照片載入失敗：%1$s</string>
+    <string name="album_downloading" formatted="false">下載中...</string>
+    <string name="album_playback_closed_but_recording_resume_not" formatted="false">回放已關閉，但未確認恢復錄影：%1$s</string>
+    <string name="album_recorder_disconnected_reconnect_and_retry" formatted="false">記錄器連線已中斷，請重新連線後再試</string>
+    <string name="album_downloading_s" formatted="false">下載中 %1$s%%</string>
+    <string name="album_waiting_to_download" formatted="false">等待下載...</string>
+    <string name="language_traditional_chinese" formatted="false">繁體中文</string>
+    <string name="language_simplified_chinese" formatted="false">简体中文</string>
+    <string name="device_formatting_keep_power_connected" formatted="false">格式化中，請勿斷電…</string>
+    <string name="device_time_sync_s" formatted="false">校時狀態：%1$s</string>
+    <string name="device_switching_recorder_s" formatted="false">連線目標切換中... (%1$s)</string>
+    <string name="device_target_s_tap_to_change_host" formatted="false">連線目標：%1$s (點擊可切換 Host)</string>
+    <string name="device_connected_to_s_epoch_s" formatted="false">已切換連線目標至 %1$s (epoch: %2$s)</string>
+    <string name="device_unable_to_switch_s" formatted="false">切換失敗: %1$s</string>
+    <string name="device_connect_to_the_recorder_first" formatted="false">請先連線記錄器</string>
+    <string name="device_power_off_recorder_037" formatted="false">關閉記錄器？</string>
+    <string name="device_recording_will_stop_and_wi_fi" formatted="false">記錄器將停止錄影並關閉，Wi-Fi 連線會中斷。請確認記錄器不是正在行車使用。</string>
+    <string name="device_power_off" formatted="false">確定關機</string>
+    <string name="device_power_off_command_accepted" formatted="false">關機命令已接受</string>
+    <string name="device_power_off_state_not_confirmed" formatted="false">關機狀態未確認</string>
+    <string name="device_the_recorder_accepted_the_power_off" formatted="false">記錄器已接受關機命令，Wi-Fi 將中斷。</string>
+    <string name="device_the_command_may_have_been_sent" formatted="false">命令可能已送出，但未收到確認。請查看記錄器指示燈；不要立即重複操作。\n%1$s</string>
+    <string name="device_ok" formatted="false">知道了</string>
+    <string name="device_format_recorder_sd_card_045" formatted="false">格式化記錄器 SD 卡？</string>
+    <string name="device_all_videos_photos_and_protected_files" formatted="false">將永久刪除目前記錄器內所有影片、照片及緊急鎖檔，無法復原。請先備份重要檔案。</string>
+    <string name="device_continue" formatted="false">繼續確認</string>
+    <string name="device_final_confirmation_erase_recorder_card" formatted="false">最後確認：清空記錄器記憶卡</string>
+    <string name="device_target_s_nrecording_pauses_during_formatting" formatted="false">目標：%1$s\n格式化期間會暫停錄影，請保持供電與 Wi-Fi 連線。確定已完成備份？</string>
+    <string name="device_format" formatted="false">確定格式化</string>
+    <string name="device_formatting_complete" formatted="false">格式化完成</string>
+    <string name="device_formatting_not_confirmed" formatted="false">格式化未確認完成</string>
+    <string name="device_the_card_was_read_back_and" formatted="false">已回讀確認記憶卡清空。</string>
+    <string name="device_check_the_recorder" formatted="false">請檢查記錄器狀態</string>
+    <string name="device_collapse" formatted="false">點擊收合 ▲</string>
+    <string name="device_advanced_diagnostics_change_host" formatted="false">進階診斷：切換連線目標 Host</string>
+    <string name="device_advanced_connection_diagnostics_nnormally_add_or" formatted="false">【注意】此為進階通訊診斷功能。\n一般新增或切換設備，請至首頁以 Wi-Fi 自動辨識。\n手動指定 IP 將終止舊 Session，並重新對目標進行協定探測：</string>
+    <string name="device_switch" formatted="false">確認切換</string>
+    <string name="device_recorder_wi_fi_password_059" formatted="false">記錄器 Wi-Fi 密碼</string>
+    <string name="device_the_default_password_is_nafter_changing" formatted="false">預設密碼為 12345678。\n如需修改，完成後請至系統 [Wi-Fi] 設定，重新輸入新密碼以連線。</string>
+    <string name="device_ok_061" formatted="false">確定</string>
+    <string name="device_time_sync_command_sent" formatted="false">已發送校時命令</string>
+    <string name="downloads_download_cancelled" formatted="false">已取消下載</string>
+    <string name="downloads_downloading_again" formatted="false">正在重新下載...</string>
+    <string name="downloads_s_active" formatted="false">%1$s 項進行中</string>
+    <string name="download_task_adapter_downloading_s_s_s" formatted="false">下載中 %1$s%% (%2$s / %3$s)</string>
+    <string name="download_task_adapter_downloading_s" formatted="false">下載中... (%1$s)</string>
+    <string name="download_task_adapter_downloaded_s" formatted="false">已下載完成 (%1$s)</string>
+    <string name="download_task_adapter_connection_timed_out" formatted="false">連線逾時</string>
+    <string name="download_task_adapter_download_failed_s" formatted="false">下載失敗: %1$s</string>
+    <string name="download_task_adapter_download_again" formatted="false">重新下載</string>
+    <string name="download_task_adapter_waiting" formatted="false">等待</string>
+    <string name="home_connected_recorder_ready" formatted="false">● 已連線 · 通用記錄器就緒</string>
+    <string name="home_offline_check_recorder_wi_fi" formatted="false">○ 未連線 · 請確認記錄器 Wi-Fi</string>
+    <string name="home_battery_s" formatted="false">電量：%1$s/4</string>
+    <string name="home_s_s_bars" formatted="false">%1$s%2$s格</string>
+    <string name="home_battery_s_bars" formatted="false">電量%1$s格</string>
+    <string name="home_free_f_f_gb" formatted="false">可用 %.1f/%.0f GB</string>
+    <string name="home_battery_unknown" formatted="false">電量：未知</string>
+    <string name="home_sd_offline" formatted="false">SD：離線待讀取</string>
+    <string name="live_standard_map" formatted="false">一般地圖</string>
+    <string name="live_map_loaded_phone_gps" formatted="false">地圖已載入 · 定位來自手機</string>
+    <string name="live_map_unavailable_check_your_internet_connection" formatted="false">地圖尚未載入，請檢查網路與地圖服務設定</string>
+    <string name="live_follow_my_location" formatted="false">回到目前位置並跟隨</string>
+    <string name="live_recorder_offline_nphone_maps_are_still" formatted="false">記錄器未連線\n手機地圖仍可使用</string>
+    <string name="live_unable_to_read_recorder_status_reconnect" formatted="false">無法讀取記錄器狀態，請重試連線</string>
+    <string name="live_recorder_is_not_in_rtsp_mode" formatted="false">設備回報非 RTSP 串流模式</string>
+    <string name="live_recording_did_not_stop_or_the" formatted="false">停止錄影未執行或狀態未變更</string>
+    <string name="live_recording_did_not_start" formatted="false">開始錄影未執行</string>
+    <string name="live_photo_captured" formatted="false">拍照指令已完成，請至裝置相簿查看</string>
+    <string name="live_photo_in_progress">拍照中…</string>
+    <string name="live_photo_failed_s" formatted="false">拍照未完成：%1$s</string>
+    <string name="live_connect_to_recorder_wi_fi_first" formatted="false">尚未連接行車記錄器專用 Wi-Fi</string>
+    <string name="live_recorder_offline_memory_card_details_unavailable" formatted="false">記錄器未連線，尚無目前的記憶卡資訊。</string>
+    <string name="live_total_f_gb_nused_f_gb" formatted="false">總容量：%.1f GB\n已用：%.1f GB\n可用：%.1f GB\n\n%s</string>
+    <string name="live_memory_card" formatted="false">記憶卡資訊</string>
+    <string name="live_following_your_current_location" formatted="false">已回到目前位置並開啟跟隨</string>
+    <string name="live_phone_location_unavailable" formatted="false">尚未取得手機定位座標</string>
+    <string name="live_clear_this_route" formatted="false">清除本次軌跡？</string>
+    <string name="live_only_the_route_shown_on_this" formatted="false">只清除手機目前顯示的騎乘軌跡，不影響記錄器影片。</string>
+    <string name="live_clear" formatted="false">清除</string>
+    <string name="live_google_maps_is_not_installed_opening" formatted="false">未安裝 Google Maps，直接開啟 PiP 浮窗</string>
+    <string name="live_pip_is_not_supported_on_this" formatted="false">此 Android 版本不支援 PiP</string>
+    <string name="live_sd_f_f_gb_free" formatted="false">SD: 餘 %.1f / 總 %.1f GB</string>
+    <string name="live_sd_ready_files_f_mb" formatted="false">SD 正常 · 檔案 %.0fMB</string>
+    <string name="live_sd_ready_recording" formatted="false">SD 正常 · 錄影中</string>
+    <string name="live_memory_card_error" formatted="false">記憶卡異常</string>
+    <string name="live_no_memory_card_detected" formatted="false">未偵測到記憶卡</string>
+    <string name="live_n" formatted="false">北</string>
+    <string name="live_ne" formatted="false">東北</string>
+    <string name="live_e" formatted="false">東</string>
+    <string name="live_se" formatted="false">東南</string>
+    <string name="live_s" formatted="false">南</string>
+    <string name="live_sw" formatted="false">西南</string>
+    <string name="live_w" formatted="false">西</string>
+    <string name="live_nw" formatted="false">西北</string>
+    <string name="live_source_s_gps_locked" formatted="false">資料來源：%1$s (定位正常)</string>
+    <string name="live_location_permission_required_tap_the_speed" formatted="false">未授權位置權限，點擊上方 HUD 開啟</string>
+    <string name="live_source_s_searching_for_satellites" formatted="false">資料來源：%1$s (衛星搜尋中...)</string>
+    <string name="live_album_is_playing_a_video_live" formatted="false">相簿正在回放影片，即時預覽已暫停</string>
+    <string name="live_stopped" formatted="false">已停錄</string>
+    <string name="live_unknown" formatted="false">狀態未知</string>
+    <string name="live_phone_location" formatted="false">手機目前位置</string>
+    <string name="live_speed_s_km_h" formatted="false">速度: %1$s km/h</string>
+    <string name="live_location_disabled" formatted="false">尚未開啟定位</string>
+    <string name="live_searching_for_gps" formatted="false">GPS 搜尋中</string>
+    <string name="live_km_h_accuracy_unknown" formatted="false">-- km/h · 精度未知</string>
+    <string name="main_activity_my_recorders" formatted="false">我的記錄器</string>
+    <string name="main_activity_close" formatted="false">關閉</string>
+    <string name="main_activity_no_recorder_yet_connect_to_recorder" formatted="false">尚未新增設備，連上記錄器 Wi-Fi 即可開始。</string>
+    <string name="main_activity_unavailable" formatted="false">尚未取得</string>
+    <string name="main_activity_no_successful_connection_yet" formatted="false">尚無成功連線紀錄</string>
+    <string name="main_activity_firmware_s_nlast_connected_s" formatted="false">韌體版本：%1$s\n最近連線：%2$s</string>
+    <string name="main_activity_selected" formatted="false">目前選取</string>
+    <string name="main_activity_select_recorder" formatted="false">選取設備</string>
+    <string name="main_activity_remove" formatted="false">移除</string>
+    <string name="main_activity_remove_local_record_for_s" formatted="false">移除 %1$s 的本機記錄</string>
+    <string name="main_activity_remove_this_recorder" formatted="false">移除此設備？</string>
+    <string name="main_activity_only_the_local_device_record_will" formatted="false">只移除本機設備記錄，不會刪除影片或重設記錄器。</string>
+    <string name="main_activity_add_recorder" formatted="false">＋ 新增記錄器</string>
+    <string name="main_activity_recorder_wi_fi_verified_ngateway_s" formatted="false">已偵測並成功驗證記錄器 Wi-Fi！\n設備閘道位址：%1$s (%2$s)\n\n是否立即自動綁定並建立連線？</string>
+    <string name="main_activity_connect_now" formatted="false">立即自動連線</string>
+    <string name="main_activity_connecting_to_recorder_s" formatted="false">正在連線至記錄器 (%1$s)...</string>
+    <string name="main_activity_identifying_recorder" formatted="false">正在辨識設備</string>
+    <string name="main_activity_connected_to_wi_fi_checking_the" formatted="false">已連線至 Wi-Fi，正在探測設備閘道 (%1$s) 之記錄器通訊協定，請稍候片刻...</string>
+    <string name="main_activity_incompatible_recorder" formatted="false">非相容行車記錄器</string>
+    <string name="main_activity_the_wi_fi_device_at_s" formatted="false">當前連線之 Wi-Fi (%1$s) 經安全協定探測非相容行車記錄器（非 GPSOCK 協定）。\n請確認已連線至記錄器 Wi-Fi AP（例如 B1-xxxxxx）。</string>
+    <string name="main_activity_wi_fi_settings" formatted="false">前往 Wi-Fi 設定</string>
+    <string name="main_activity_recorder_detection_incomplete" formatted="false">設備探測未完成</string>
+    <string name="main_activity_no_response" formatted="false">無回應</string>
+    <string name="main_activity_recorder_detection_at_s_timed_out" formatted="false">當前 Wi-Fi (%1$s) 探測記錄器回應逾時或失敗：%2$s\n若確認為記錄器，請稍候重試或重新連接 Wi-Fi。</string>
+    <string name="main_activity_retry_detection" formatted="false">重試探測</string>
+    <string name="main_activity_identify_recorder" formatted="false">辨識行車記錄器</string>
+    <string name="main_activity_gateway_s_nprotocol_handshake_incomplete_try" formatted="false">設備閘道：%1$s\n尚未完成通訊協定握手，是否立即嘗試連線？</string>
+    <string name="main_activity_try_connecting" formatted="false">嘗試連線</string>
+    <string name="main_activity_recorder_wi_fi_not_connected" formatted="false">未連線至記錄器 Wi-Fi</string>
+    <string name="main_activity_no_ip_address_entry_is_needed" formatted="false">新增設備無需手動輸入 IP。\n請先於手機「Wi-Fi 設定」中連線至記錄器 Wi-Fi AP（例如 B1-xxxxxx），連線後 App 將自動辨識並完成新增。</string>
+    <string name="media_adapter_protected_event" formatted="false">緊急事件</string>
+    <string name="recorder_time_synced_automatically" formatted="false">連線自動校時成功</string>
+    <string name="recorder_automatic_time_sync_failed_s" formatted="false">自動校時失敗: %1$s</string>
+    <string name="recorder_time_synced" formatted="false">手動校時成功</string>
+    <string name="recorder_time_sync_failed_s" formatted="false">手動校時失敗: %1$s</string>
+    <string name="recorder_continuous_recording_no_loop" formatted="false">單次連續錄影 (不循環)</string>
+    <string name="recorder_loop_recording_min" formatted="false">循環錄影 (1分)</string>
+    <string name="recorder_loop_recording_min_007" formatted="false">循環錄影 (2分)</string>
+    <string name="recorder_loop_recording_min_008" formatted="false">循環錄影 (3分)</string>
+    <string name="recorder_loop_recording_min_009" formatted="false">循環錄影 (5分)</string>
+    <string name="recorder_recording_mode_loop_setting_unconfirmed" formatted="false">錄影模式 (循環設定待確認)</string>
+    <string name="recorder_memory_card_error_or_formatting_required" formatted="false">記憶卡異常或需格式化 (代碼 %1$s)</string>
+    <string name="recorder_memory_card_not_ready_or_missing" formatted="false">記憶卡未就緒或無卡</string>
+    <string name="recorder_s_card_ready_listed_media_f" formatted="false">%s · 記憶卡正常 · 已列舉媒體大小: %.1f MB</string>
+    <string name="recorder_s_card_ready_loop_recording" formatted="false">%s · 記憶卡正常 (循環錄影中)</string>
+    <string name="recorder_s_f_gb_free_calculating_time" formatted="false">%s · 可用空間 %.1f GB (時間估算中)</string>
+    <string name="recorder_s_overwrite_in_about_d_min" formatted="false">%s · 距循環覆蓋約 %d 分鐘 · 總保存約 %.1f 小時</string>
+    <string name="recorder_s_about_d_min_recording_time" formatted="false">%s · 剩餘可錄約 %d 分鐘</string>
+    <string name="recorder_not_read_yet" formatted="false">未讀取</string>
+    <string name="recorder_unable_to_switch" formatted="false">切換失敗</string>
+    <string name="recorder_s_confirming" formatted="false">%1$s (確認中...)</string>
+    <string name="recorder_read_back_mismatch_s" formatted="false">回讀值不符: %1$s</string>
+    <string name="recorder_s_sent_read_back_failed" formatted="false">%1$s (已送出，回讀失敗)</string>
+    <string name="recorder_setting_failed_s" formatted="false">設定失敗: %1$s</string>
+    <string name="recorder_read_back_s" formatted="false">回讀值: %1$s</string>
+    <string name="recorder_video_source_changed" formatted="false">影片來源已切換</string>
+    <string name="recorder_formatting_in_progress_do_not_repeat" formatted="false">格式化處理中，請勿重複操作</string>
+    <string name="recorder_recorder_changed_please_confirm_again" formatted="false">設備已切換，請重新確認</string>
+    <string name="recorder_reading" formatted="false">讀取中...</string>
+    <string name="recorder_unable_to_read" formatted="false">讀取失敗</string>
+    <string name="recorder_unknown" formatted="false">未知</string>
+    <string name="recorder_unknown_not_read_yet" formatted="false">未知 (待讀取)</string>
+    <string name="recorder_unable_to_read_recorder_videos" formatted="false">無法取得記錄器影片清單</string>
+    <string name="recorder_video_source_changed_reopen_the_album" formatted="false">影片來源已切換，請重新開啟相簿</string>
+    <string name="recorder_unable_to_cache_preview" formatted="false">下載預覽暫存失敗</string>
+    <string name="recorder_unable_to_save_file" formatted="false">永久儲存失敗</string>
+    <string name="setting_fine" formatted="false">精細 (Fine)</string>
+    <string name="setting_normal" formatted="false">一般 (Normal)</string>
+    <string name="setting_economical" formatted="false">經濟 (Economical)</string>
+    <string name="setting_minute" formatted="false">1 分鐘</string>
+    <string name="setting_minutes" formatted="false">2 分鐘</string>
+    <string name="setting_minutes_006" formatted="false">3 分鐘</string>
+    <string name="setting_date_time" formatted="false">開啟 (日期與時間)</string>
+    <string name="setting_date_only" formatted="false">僅日期 (Date)</string>
+    <string name="setting_unknown_s" formatted="false">未知 (%1$s)</string>
+    <string name="appearance_title" formatted="false">應用程式</string>
+    <string name="appearance_language" formatted="false">語言</string>
+    <string name="appearance_theme" formatted="false">外觀主題</string>
+    <string name="appearance_system" formatted="false">跟隨系統</string>
+    <string name="appearance_light" formatted="false">淺色</string>
+    <string name="appearance_dark" formatted="false">深色</string>
+    <string name="viewer_segments" formatted="false">顯示或收起相鄰片段</string>
+    <string name="rtc_not_synced" formatted="false">尚未校時</string>
+    <string name="gps_phone_source" formatted="false">手機 GPS</string>
+    <string name="gps_network_source" formatted="false">手機網路定位</string>
+    <string name="setting_off">關閉</string>
+    <string name="action_open">開啟</string>
+    <string name="rtc_failed">校時未成功</string>
+    <string name="player_render_failed">影片渲染失敗：%1$s</string>
+    <string name="player_unavailable">此裝置無法載入 FFmpeg 播放引擎</string>
+    <string name="player_wifi_failed">無法綁定記錄器 Wi-Fi</string>
+    <string name="player_open_failed_code">FFmpeg 開啟失敗：%1$s</string>
+    <string name="player_stalled">影片影格已中斷，請重新播放</string>
+    <string name="player_open_failed">影片開啟失敗</string>
+</resources>

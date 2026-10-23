@@ -68,6 +68,7 @@ class SpeedGaugeView @JvmOverloads constructor(
     }
 
     fun setSpeed(speedKmh: Int?) {
+        if (currentSpeed == speedKmh?.toFloat()) return
         currentSpeed = speedKmh?.toFloat()
         invalidate()
     }

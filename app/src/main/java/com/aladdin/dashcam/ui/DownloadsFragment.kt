@@ -49,11 +49,11 @@ class DownloadsFragment : Fragment() {
                 }
                 DownloadStatus.DOWNLOADING -> {
                     viewModel.cancelDownload(task)
-                    Toast.makeText(requireContext(), "已取消下載", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), getString(R.string.downloads_download_cancelled), Toast.LENGTH_SHORT).show()
                 }
                 DownloadStatus.FAILED, DownloadStatus.CANCELLED -> {
                     viewModel.retryDownload(task)
-                    Toast.makeText(requireContext(), "正在重新下載...", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(requireContext(), getString(R.string.downloads_downloading_again), Toast.LENGTH_SHORT).show()
                 }
                 DownloadStatus.PENDING -> {
                     // Waiting in queue
@@ -77,7 +77,7 @@ class DownloadsFragment : Fragment() {
                     val activeCount = tasks.count {
                         it.status == DownloadStatus.DOWNLOADING || it.status == DownloadStatus.PENDING
                     }
-                    binding.tvActiveTaskCount.text = "$activeCount 項進行中"
+                    binding.tvActiveTaskCount.text = getString(R.string.downloads_s_active, activeCount)
 
                     if (tasks.isEmpty()) {
                         binding.layoutEmptyDownloads.visibility = View.VISIBLE

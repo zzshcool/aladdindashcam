@@ -58,6 +58,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        viewModel.refreshLocalizedText()
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
             val immersive = isFullscreen || isInPictureInPictureMode
@@ -83,6 +84,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
+        updateTopBarVisibility()
         ViewCompat.requestApplyInsets(binding.root)
     }
 
@@ -120,7 +122,6 @@ class MainActivity : AppCompatActivity() {
             requestedOrientation = orientationBeforeFullscreen
             systemBars.show(WindowInsetsCompat.Type.systemBars())
             updateTopBarVisibility()
-            binding.bottomNav.visibility = View.VISIBLE
             liveFragment?.updateFullscreenLayout(false)
             ViewCompat.requestApplyInsets(binding.root)
         }
@@ -216,7 +217,8 @@ class MainActivity : AppCompatActivity() {
     private fun updateTopBarVisibility() {
         val landscapeLive = activeFragment == liveFragment &&
             resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-        binding.topBar.visibility = if (activeFragment == homeFragment || landscapeLive || albumPreviewExpanded) View.GONE else View.VISIBLE
+        binding.topBar.visibility = if (activeFragment == homeFragment || activeFragment == liveFragment || albumPreviewExpanded) View.GONE else View.VISIBLE
+        binding.bottomNav.visibility = if (landscapeLive || isFullscreen || isInPictureInPictureMode || albumPreviewExpanded) View.GONE else View.VISIBLE
     }
 
     private fun setupTopBarActions() {
@@ -258,11 +260,11 @@ class MainActivity : AppCompatActivity() {
         }
         val heading = android.widget.LinearLayout(this).apply { gravity = android.view.Gravity.CENTER_VERTICAL }
         heading.addView(android.widget.TextView(this).apply {
-            text = "我的記錄器"; textSize = 22f
+            text = getString(R.string.main_activity_my_recorders); textSize = 22f
             setTextColor(ContextCompat.getColor(context, R.color.text_primary))
         }, android.widget.LinearLayout.LayoutParams(0, dp(48), 1f))
         heading.addView(com.google.android.material.button.MaterialButton(this).apply {
-            text = "關閉"; textSize = 13f
+            text = getString(R.string.main_activity_close); textSize = 13f
             backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.TRANSPARENT)
             setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             setOnClickListener { sheet.dismiss() }
@@ -270,7 +272,7 @@ class MainActivity : AppCompatActivity() {
         content.addView(heading)
         val list = android.widget.LinearLayout(this).apply { orientation = android.widget.LinearLayout.VERTICAL }
         if (devices.isEmpty()) list.addView(android.widget.TextView(this).apply {
-            text = "尚未新增設備，連上記錄器 Wi-Fi 即可開始。"
+            text = getString(R.string.main_activity_no_recorder_yet_connect_to_recorder)
             setPadding(0, dp(24), 0, dp(24))
             setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
         })
@@ -291,29 +293,29 @@ class MainActivity : AppCompatActivity() {
                 setTextColor(ContextCompat.getColor(context, R.color.text_primary))
             })
             row.addView(android.widget.TextView(this).apply {
-                val firmware = device.firmwareVersion.takeUnless { it.startsWith("讀取") || it == "未連線" } ?: "尚未取得"
-                text = "韌體版本：$firmware\n最近連線：${device.lastConnectedTime.ifBlank { "尚無成功連線紀錄" }}"
+                val firmware = device.firmwareVersion.takeUnless { it.startsWith("讀取") || it == "未連線" } ?: getString(R.string.main_activity_unavailable)
+                text = getString(R.string.main_activity_firmware_s_nlast_connected_s, firmware, device.lastConnectedTime.ifBlank { getString(R.string.main_activity_no_successful_connection_yet) })
                 textSize = 12f; setPadding(0, dp(8), 0, dp(8))
                 setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
             })
             val actions = android.widget.LinearLayout(this)
             actions.addView(com.google.android.material.button.MaterialButton(this).apply {
-                text = if (device.isSelected) "目前選取" else "選取設備"
+                text = if (device.isSelected) getString(R.string.main_activity_selected) else getString(R.string.main_activity_select_recorder)
                 textSize = 13f; isEnabled = !device.isSelected
                 setOnClickListener { viewModel.selectDevice(device); sheet.dismiss() }
             }, android.widget.LinearLayout.LayoutParams(0, dp(48), 1f))
             actions.addView(com.google.android.material.button.MaterialButton(this).apply {
-                text = "移除"; contentDescription = "移除 ${device.name} 的本機記錄"
+                text = getString(R.string.main_activity_remove); contentDescription = getString(R.string.main_activity_remove_local_record_for_s, device.name)
                 textSize = 13f
                 backgroundTintList = android.content.res.ColorStateList.valueOf(ContextCompat.getColor(context, R.color.surface_elevated))
                 setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
                 setOnClickListener {
                     androidx.appcompat.app.AlertDialog.Builder(this@MainActivity)
-                        .setTitle("移除此設備？")
-                        .setMessage("只移除本機設備記錄，不會刪除影片或重設記錄器。")
-                        .setPositiveButton("移除") { _, _ ->
+                        .setTitle(getString(R.string.main_activity_remove_this_recorder))
+                        .setMessage(getString(R.string.main_activity_only_the_local_device_record_will))
+                        .setPositiveButton(getString(R.string.main_activity_remove)) { _, _ ->
                             viewModel.removeDevice(device.id); sheet.dismiss(); showMyDashCamDialog()
-                        }.setNegativeButton("取消", null).show()
+                        }.setNegativeButton(getString(R.string.album_cancel), null).show()
                 }
             }, android.widget.LinearLayout.LayoutParams(0, dp(48), 1f).apply { marginStart = dp(8) })
             row.addView(actions); card.addView(row)
@@ -322,7 +324,7 @@ class MainActivity : AppCompatActivity() {
         content.addView(android.widget.ScrollView(this).apply { addView(list) },
             android.widget.LinearLayout.LayoutParams(-1, minOf(dp(320), resources.displayMetrics.heightPixels / 2)))
         content.addView(com.google.android.material.button.MaterialButton(this).apply {
-            text = "＋ 新增記錄器"
+            text = getString(R.string.main_activity_add_recorder)
             setOnClickListener { sheet.dismiss(); promptAddDevice() }
         })
         sheet.setContentView(content)
@@ -338,65 +340,65 @@ class MainActivity : AppCompatActivity() {
             when (probe) {
                 is ProbeStatus.Success -> {
                     androidx.appcompat.app.AlertDialog.Builder(this)
-                        .setTitle("新增行車記錄器")
-                        .setMessage("已偵測並成功驗證記錄器 Wi-Fi！\n設備閘道位址：$detectedGateway (${probe.protocolHeader})\n\n是否立即自動綁定並建立連線？")
-                        .setPositiveButton("立即自動連線") { _, _ ->
+                        .setTitle(getString(R.string.home_action_add_recorder_desc))
+                        .setMessage(getString(R.string.main_activity_recorder_wi_fi_verified_ngateway_s, detectedGateway, probe.protocolHeader))
+                        .setPositiveButton(getString(R.string.main_activity_connect_now)) { _, _ ->
                             viewModel.autoMatchOrAddDeviceForHost(detectedGateway, probe.protocolHeader)
-                            android.widget.Toast.makeText(this, "正在連線至記錄器 ($detectedGateway)...", android.widget.Toast.LENGTH_SHORT).show()
+                            android.widget.Toast.makeText(this, getString(R.string.main_activity_connecting_to_recorder_s, detectedGateway), android.widget.Toast.LENGTH_SHORT).show()
                         }
-                        .setNegativeButton("取消", null)
+                        .setNegativeButton(getString(R.string.album_cancel), null)
                         .show()
                 }
                 is ProbeStatus.Probing -> {
                     androidx.appcompat.app.AlertDialog.Builder(this)
-                        .setTitle("正在辨識設備")
-                        .setMessage("已連線至 Wi-Fi，正在探測設備閘道 ($detectedGateway) 之記錄器通訊協定，請稍候片刻...")
-                        .setPositiveButton("確定", null)
+                        .setTitle(getString(R.string.main_activity_identifying_recorder))
+                        .setMessage(getString(R.string.main_activity_connected_to_wi_fi_checking_the, detectedGateway))
+                        .setPositiveButton(getString(R.string.device_ok_061), null)
                         .show()
                 }
                 is ProbeStatus.NotDashCam -> {
                     androidx.appcompat.app.AlertDialog.Builder(this)
-                        .setTitle("非相容行車記錄器")
-                        .setMessage("當前連線之 Wi-Fi ($detectedGateway) 經安全協定探測非相容行車記錄器（非 GPSOCK 協定）。\n請確認已連線至記錄器 Wi-Fi AP（例如 B1-xxxxxx）。")
-                        .setPositiveButton("前往 Wi-Fi 設定") { _, _ ->
+                        .setTitle(getString(R.string.main_activity_incompatible_recorder))
+                        .setMessage(getString(R.string.main_activity_the_wi_fi_device_at_s, detectedGateway))
+                        .setPositiveButton(getString(R.string.main_activity_wi_fi_settings)) { _, _ ->
                             try {
                                 startActivity(android.content.Intent(android.provider.Settings.ACTION_WIFI_SETTINGS))
                             } catch (_: Exception) {}
                         }
-                        .setNegativeButton("關閉", null)
+                        .setNegativeButton(getString(R.string.main_activity_close), null)
                         .show()
                 }
                 is ProbeStatus.Failed -> {
                     androidx.appcompat.app.AlertDialog.Builder(this)
-                        .setTitle("設備探測未完成")
-                        .setMessage("當前 Wi-Fi ($detectedGateway) 探測記錄器回應逾時或失敗：${probe.reason ?: "無回應"}\n若確認為記錄器，請稍候重試或重新連接 Wi-Fi。")
-                        .setPositiveButton("重試探測") { _, _ ->
+                        .setTitle(getString(R.string.main_activity_recorder_detection_incomplete))
+                        .setMessage(getString(R.string.main_activity_recorder_detection_at_s_timed_out, detectedGateway, probe.reason ?: getString(R.string.main_activity_no_response)))
+                        .setPositiveButton(getString(R.string.main_activity_retry_detection)) { _, _ ->
                             viewModel.networkMonitor.startMonitoring()
                         }
-                        .setNegativeButton("關閉", null)
+                        .setNegativeButton(getString(R.string.main_activity_close), null)
                         .show()
                 }
                 is ProbeStatus.Idle -> {
                     androidx.appcompat.app.AlertDialog.Builder(this)
-                        .setTitle("辨識行車記錄器")
-                        .setMessage("設備閘道：$detectedGateway\n尚未完成通訊協定握手，是否立即嘗試連線？")
-                        .setPositiveButton("嘗試連線") { _, _ ->
+                        .setTitle(getString(R.string.main_activity_identify_recorder))
+                        .setMessage(getString(R.string.main_activity_gateway_s_nprotocol_handshake_incomplete_try, detectedGateway))
+                        .setPositiveButton(getString(R.string.main_activity_try_connecting)) { _, _ ->
                             viewModel.autoMatchOrAddDeviceForHost(detectedGateway)
                         }
-                        .setNegativeButton("取消", null)
+                        .setNegativeButton(getString(R.string.album_cancel), null)
                         .show()
                 }
             }
         } else {
             androidx.appcompat.app.AlertDialog.Builder(this)
-                .setTitle("未連線至記錄器 Wi-Fi")
-                .setMessage("新增設備無需手動輸入 IP。\n請先於手機「Wi-Fi 設定」中連線至記錄器 Wi-Fi AP（例如 B1-xxxxxx），連線後 App 將自動辨識並完成新增。")
-                .setPositiveButton("前往 Wi-Fi 設定") { _, _ ->
+                .setTitle(getString(R.string.main_activity_recorder_wi_fi_not_connected))
+                .setMessage(getString(R.string.main_activity_no_ip_address_entry_is_needed))
+                .setPositiveButton(getString(R.string.main_activity_wi_fi_settings)) { _, _ ->
                     try {
                         startActivity(android.content.Intent(android.provider.Settings.ACTION_WIFI_SETTINGS))
                     } catch (_: Exception) {}
                 }
-                .setNegativeButton("關閉", null)
+                .setNegativeButton(getString(R.string.main_activity_close), null)
                 .show()
         }
     }
@@ -472,7 +474,6 @@ class MainActivity : AppCompatActivity() {
             }
         } else {
             updateTopBarVisibility()
-            binding.bottomNav.visibility = if (isFullscreen) View.GONE else View.VISIBLE
             liveFragment?.updatePipLayout(false)
         }
         ViewCompat.requestApplyInsets(binding.root)

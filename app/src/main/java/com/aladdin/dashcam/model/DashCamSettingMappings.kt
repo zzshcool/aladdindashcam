@@ -1,6 +1,9 @@
 package com.aladdin.dashcam.model
 
-data class SettingOption(val rawValue: Int, val displayName: String)
+data class SettingOption(val rawValue: Int, val displayName: String, val labelRes: Int = 0) {
+    fun localizedName(context: android.content.Context?): String =
+        if (context != null && labelRes != 0) context.getString(labelRes) else displayName
+}
 
 /**
  * Unified setting option mappings shared between UI and Socket Protocol (N04/N05).
@@ -28,31 +31,31 @@ object DashCamSettingMappings {
 
     // Menu.xml ID 0x00000102: Quality
     val CAPTURE_QUALITIES = listOf(
-        SettingOption(0, "精細 (Fine)"),
-        SettingOption(1, "一般 (Normal)"),
-        SettingOption(2, "經濟 (Economical)")
+        SettingOption(0, "精細 (Fine)", com.aladdin.dashcam.R.string.setting_fine),
+        SettingOption(1, "一般 (Normal)", com.aladdin.dashcam.R.string.setting_normal),
+        SettingOption(2, "經濟 (Economical)", com.aladdin.dashcam.R.string.setting_economical)
     )
 
     // Menu.xml ID 0x00000003: Loop Recording
     val LOOP_RECORDINGS = listOf(
-        SettingOption(1, "1 分鐘"),
-        SettingOption(2, "2 分鐘"),
-        SettingOption(3, "3 分鐘"),
-        SettingOption(4, "5 分鐘"),
-        SettingOption(0, "關閉")
+        SettingOption(1, "1 分鐘", com.aladdin.dashcam.R.string.setting_minute),
+        SettingOption(2, "2 分鐘", com.aladdin.dashcam.R.string.setting_minutes),
+        SettingOption(3, "3 分鐘", com.aladdin.dashcam.R.string.setting_minutes_006),
+        SettingOption(4, "5 分鐘", com.aladdin.dashcam.R.string.device_minutes),
+        SettingOption(0, "關閉", com.aladdin.dashcam.R.string.setting_off)
     )
 
     // Menu.xml ID 0x00000107: Date/Time Stamp
     val WATERMARKS = listOf(
-        SettingOption(2, "開啟 (日期與時間)"),
-        SettingOption(1, "僅日期 (Date)"),
-        SettingOption(0, "關閉")
+        SettingOption(2, "開啟 (日期與時間)", com.aladdin.dashcam.R.string.setting_date_time),
+        SettingOption(1, "僅日期 (Date)", com.aladdin.dashcam.R.string.setting_date_only),
+        SettingOption(0, "關閉", com.aladdin.dashcam.R.string.setting_off)
     )
 
     // Menu.xml ID 0x00000005: Record Audio
     val RECORD_AUDIOS = listOf(
-        SettingOption(1, "開啟"),
-        SettingOption(0, "關閉")
+        SettingOption(1, "開啟", com.aladdin.dashcam.R.string.device_on),
+        SettingOption(0, "關閉", com.aladdin.dashcam.R.string.setting_off)
     )
 
     // Menu.xml ID 0x00000001: Exposure
@@ -74,26 +77,26 @@ object DashCamSettingMappings {
         SettingOption(0x00, "+2.0")
     )
 
-    fun getVideoResolutionName(raw: Int): String =
-        VIDEO_RESOLUTIONS.find { it.rawValue == raw }?.displayName ?: "未知 ($raw)"
+    fun getVideoResolutionName(raw: Int, context: android.content.Context? = null): String =
+        VIDEO_RESOLUTIONS.find { it.rawValue == raw }?.localizedName(context) ?: (context?.getString(com.aladdin.dashcam.R.string.setting_unknown_s, raw) ?: "未知 ($raw)")
 
-    fun getCaptureResolutionName(raw: Int): String =
-        CAPTURE_RESOLUTIONS.find { it.rawValue == raw }?.displayName ?: "未知 ($raw)"
+    fun getCaptureResolutionName(raw: Int, context: android.content.Context? = null): String =
+        CAPTURE_RESOLUTIONS.find { it.rawValue == raw }?.localizedName(context) ?: (context?.getString(com.aladdin.dashcam.R.string.setting_unknown_s, raw) ?: "未知 ($raw)")
 
-    fun getCaptureQualityName(raw: Int): String =
-        CAPTURE_QUALITIES.find { it.rawValue == raw }?.displayName ?: "未知 ($raw)"
+    fun getCaptureQualityName(raw: Int, context: android.content.Context? = null): String =
+        CAPTURE_QUALITIES.find { it.rawValue == raw }?.localizedName(context) ?: (context?.getString(com.aladdin.dashcam.R.string.setting_unknown_s, raw) ?: "未知 ($raw)")
 
-    fun getLoopRecordingName(raw: Int): String =
-        LOOP_RECORDINGS.find { it.rawValue == raw }?.displayName ?: if (raw == 5) "5 分鐘" else "未知 ($raw)"
+    fun getLoopRecordingName(raw: Int, context: android.content.Context? = null): String =
+        LOOP_RECORDINGS.find { it.rawValue == raw }?.localizedName(context) ?: if (raw == 5) (context?.getString(com.aladdin.dashcam.R.string.device_minutes) ?: "5 分鐘") else (context?.getString(com.aladdin.dashcam.R.string.setting_unknown_s, raw) ?: "未知 ($raw)")
 
-    fun getWatermarkName(raw: Int): String =
-        WATERMARKS.find { it.rawValue == raw }?.displayName ?: "未知 ($raw)"
+    fun getWatermarkName(raw: Int, context: android.content.Context? = null): String =
+        WATERMARKS.find { it.rawValue == raw }?.localizedName(context) ?: (context?.getString(com.aladdin.dashcam.R.string.setting_unknown_s, raw) ?: "未知 ($raw)")
 
-    fun getExposureName(raw: Int): String =
-        EXPOSURE_OPTIONS.find { it.rawValue == raw }?.displayName ?: if (raw in 0x00..0x0C) {
+    fun getExposureName(raw: Int, context: android.content.Context? = null): String =
+        EXPOSURE_OPTIONS.find { it.rawValue == raw }?.localizedName(context) ?: if (raw in 0x00..0x0C) {
             val progress = (12 - raw).coerceIn(0, 12)
             EXPOSURE_OPTIONS[progress].displayName
-        } else "未知 ($raw)"
+        } else (context?.getString(com.aladdin.dashcam.R.string.setting_unknown_s, raw) ?: "未知 ($raw)")
 
     fun exposureProgressToRaw(progress: Int): Int = (12 - progress.coerceIn(0, 12))
 

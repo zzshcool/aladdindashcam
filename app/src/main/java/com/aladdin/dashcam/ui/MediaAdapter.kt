@@ -182,7 +182,7 @@ class MediaAdapter(
                 if (media.timestampMillis > 0L) {
                     binding.tvRecordTime.text = TIME_FORMAT.format(Date(media.timestampMillis))
                 } else {
-                    binding.tvRecordTime.text = "時間未知"
+                    binding.tvRecordTime.text = binding.root.context.getString(R.string.album_time_unknown)
                 }
 
                 // Secondary: File name
@@ -199,7 +199,7 @@ class MediaAdapter(
 
                 // Media type and duration
                 if (media.isVideo) {
-                    binding.tvMediaType.text = if (media.isEmergency) "緊急事件" else "常規錄影"
+                    binding.tvMediaType.text = if (media.isEmergency) binding.root.context.getString(R.string.media_adapter_protected_event) else binding.root.context.getString(R.string.item_media_card_loop_video)
                     if (media.durationSeconds > 0) {
                         val min = media.durationSeconds / 60
                         val sec = media.durationSeconds % 60
@@ -209,7 +209,7 @@ class MediaAdapter(
                         binding.tvDurationBadge.visibility = View.GONE
                     }
                 } else {
-                    binding.tvMediaType.text = "照片"
+                    binding.tvMediaType.text = binding.root.context.getString(R.string.album_filter_photo)
                     binding.tvDurationBadge.visibility = View.GONE
                 }
 

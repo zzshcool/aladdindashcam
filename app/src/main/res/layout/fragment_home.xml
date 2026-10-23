@@ -151,12 +151,12 @@
                     android:id="@+id/layout_device_telemetry"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_16"
                     android:background="@drawable/bg_status_badge"
                     android:paddingHorizontal="@dimen/space_12"
-                    android:paddingVertical="@dimen/space_8"
                     android:gravity="center_vertical"
-                    android:orientation="vertical">
+                    android:orientation="vertical"
+                    android:layout_marginTop="8dp"
+                    android:paddingVertical="4dp">
 
                     <!-- Battery info with clean text & accessibility (D09) -->
                     <LinearLayout
@@ -221,12 +221,17 @@
                     android:layout_height="@dimen/button_height_primary"
                     android:layout_marginTop="@dimen/space_16"
                     android:text="@string/home_action_add"
-                    android:textAllCaps="false"
                     android:textSize="@dimen/text_size_body"
                     android:textStyle="bold"
                     app:cornerRadius="@dimen/radius_button"
-                    android:backgroundTint="@color/accent_blue"
-                    android:textColor="@color/accent_blue_dark" />
+                    android:backgroundTint="@color/transparent"
+                    android:textColor="@color/accent_blue"
+                    app:strokeWidth="0dp"
+                    android:textAllCaps="false"
+                    android:stateListAnimator="@null"
+                    android:elevation="0dp"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:paddingHorizontal="8dp" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

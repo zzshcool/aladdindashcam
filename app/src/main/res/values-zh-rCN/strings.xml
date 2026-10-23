@@ -1,0 +1,441 @@
+<resources>
+    <string name="app_name" formatted="false">AladdinDashCam</string>
+    <string name="tab_live" formatted="false">记录器</string>
+    <string name="tab_album" formatted="false">相册</string>
+    <string name="tab_downloads" formatted="false">下载</string>
+    <string name="tab_device" formatted="false">设置</string>
+    <string name="live_title" formatted="false">即时影像</string>
+    <string name="live_expand" formatted="false">放大预览</string>
+    <string name="live_pip" formatted="false">导航浮窗</string>
+    <string name="device_status_connected" formatted="false">已连接</string>
+    <string name="device_status_connecting" formatted="false">连接中…</string>
+    <string name="device_status_disconnected" formatted="false">未连接</string>
+    <string name="device_status_stream_interrupted" formatted="false">画面已中断</string>
+    <string name="recording_active" formatted="false">正在录像</string>
+    <string name="recording_elapsed" formatted="false">录像中 %1$02d:%2$02d:%3$02d</string>
+    <string name="recording_stopped" formatted="false">已停止录像</string>
+    <string name="recording_unknown" formatted="false">录像状态未知</string>
+    <string name="hud_speed_unit" formatted="false">km/h</string>
+    <string name="hud_gps_searching" formatted="false">搜索 GPS…</string>
+    <string name="hud_gps_locked" formatted="false">GPS 已定位</string>
+    <string name="hud_gps_disabled" formatted="false">GPS 未启用</string>
+    <string name="btn_start_recording" formatted="false">开始录像</string>
+    <string name="btn_stop_recording" formatted="false">停止录像</string>
+    <string name="btn_stop_recording_compact" formatted="false">停录</string>
+    <string name="btn_start_recording_compact" formatted="false">录像</string>
+    <string name="btn_take_photo" formatted="false">拍照</string>
+    <string name="btn_more_options" formatted="false">更多</string>
+    <string name="btn_protect_event" formatted="false">事件锁定</string>
+    <string name="btn_navigation_mode" formatted="false">启动导航 PiP</string>
+    <string name="btn_retry_connect" formatted="false">重试连接</string>
+    <string name="action_enter_fullscreen" formatted="false">全萤幕检视</string>
+    <string name="action_exit_fullscreen" formatted="false">结束全萤幕</string>
+    <string name="action_pip_mode" formatted="false">开启导航浮窗 (PiP)</string>
+    <string name="stream_loading" formatted="false">即时影像读取中…</string>
+    <string name="stream_stalled" formatted="false">影像暂停更新，请重试连接</string>
+    <string name="stream_connection_interrupted" formatted="false">暂时无法显示影像，请重试连接</string>
+    <string name="stream_first_frame_rendered" formatted="false">即时串流正常</string>
+    <string name="album_source_device" formatted="false">装置相册</string>
+    <string name="album_source_local" formatted="false">本机媒体</string>
+    <string name="album_filter_all" formatted="false">全部</string>
+    <string name="album_filter_video" formatted="false">影片</string>
+    <string name="album_filter_photo" formatted="false">照片</string>
+    <string name="album_filter_emergency" formatted="false">紧急锁定</string>
+    <string name="album_view_grid" formatted="false">网格检视</string>
+    <string name="album_view_timeline" formatted="false">时间轴</string>
+    <string name="album_empty" formatted="false">尚无媒体文件</string>
+    <string name="album_loading" formatted="false">读取文件清单中…</string>
+    <string name="downloads_title" formatted="false">下载中心</string>
+    <string name="downloads_empty" formatted="false">目前没有下载任务</string>
+    <string name="device_title" formatted="false">装置与设置</string>
+    <string name="setting_resolution" formatted="false">录像解析度</string>
+    <string name="setting_loop" formatted="false">循环录像片长</string>
+    <string name="setting_audio" formatted="false">记录器录音</string>
+    <string name="setting_exposure" formatted="false">曝光补偿</string>
+    <string name="setting_watermark" formatted="false">日期时间水印</string>
+    <string name="setting_rtc_sync" formatted="false">校正记录器时间</string>
+    <string name="setting_diagnostics" formatted="false">通讯与系统诊断</string>
+    <string name="setting_danger_zone" formatted="false">危险操作区</string>
+    <string name="setting_format_sd" formatted="false">格式化存储卡</string>
+    <string name="setting_factory_reset" formatted="false">恢复原厂设置</string>
+    <string name="battery_level_4" formatted="false">电量充足 (4/4)</string>
+    <string name="battery_level_3" formatted="false">电量良好 (3/4)</string>
+    <string name="battery_level_2" formatted="false">电量中等 (2/4)</string>
+    <string name="battery_level_1" formatted="false">电量偏低 (1/4)</string>
+    <string name="battery_level_0" formatted="false">电量极低 (0/4)</string>
+    <string name="battery_unknown" formatted="false">电量未知</string>
+    <string name="battery_charging_prefix" formatted="false">充电中 · </string>
+    <string name="downloads_guide" formatted="false">开启相册中的影片或照片，再选择下载</string>
+    <string name="battery_cd_level_4" formatted="false">电量充足，四格</string>
+    <string name="battery_cd_level_3" formatted="false">电量良好，三格</string>
+    <string name="battery_cd_level_2" formatted="false">电量中等，二格</string>
+    <string name="battery_cd_level_1" formatted="false">电量偏低，请充电</string>
+    <string name="battery_cd_level_0" formatted="false">电量极低，请尽速充电</string>
+    <string name="battery_cd_unknown" formatted="false">电量未知</string>
+    <string name="battery_cd_charging_prefix" formatted="false">充电中，</string>
+    <string name="sd_remaining_format" formatted="false">可录约 %d 分</string>
+    <string name="sd_remaining_detail_format" formatted="false">存储卡可录：约 %d 分钟</string>
+    <string name="sd_remaining_unknown" formatted="false">可录时间未知</string>
+    <string name="btn_stopping_recording" formatted="false">停止中…</string>
+    <string name="btn_starting_recording" formatted="false">启动中…</string>
+    <string name="stream_error_format" formatted="false">画面中断 (%s)，点击重试</string>
+    <string name="diag_title" formatted="false">诊断资讯</string>
+    <string name="diag_transport" formatted="false">传输通道：GPSOCKET TCP 8081</string>
+    <string name="diag_rtsp" formatted="false">串流端点：rtsp://192.168.25.1:8080/?action=stream</string>
+    <string name="diag_wifi_bound" formatted="false">Wi-Fi 网路专属绑定状态</string>
+    <string name="diag_cellular_route" formatted="false">行动数据网际网路状态</string>
+    <string name="home_title_my_dashcam" formatted="false">我的记录器 ▾</string>
+    <string name="home_action_add_recorder" formatted="false">＋</string>
+    <string name="home_action_add_recorder_desc" formatted="false">新增行车记录器</string>
+    <string name="home_hero_desc" formatted="false">通用行车记录器识别</string>
+    <string name="home_headline_ready" formatted="false">准备好，记录每段旅程</string>
+    <string name="home_subhead_guide" formatted="false">连上记录器 Wi-Fi，即可自动辨识</string>
+    <string name="home_device_none" formatted="false">尚未新增记录器</string>
+    <string name="home_device_none_desc" formatted="false">新增後即可查看设备与连接状态</string>
+    <string name="home_status_connected" formatted="false">● 记录器已连接</string>
+    <string name="home_status_stream_ready" formatted="false">● 串流传输中</string>
+    <string name="home_status_stream_loading" formatted="false">○ 影像载入中…</string>
+    <string name="home_status_stream_interrupted" formatted="false">▲ 影像中断</string>
+    <string name="home_status_disconnected" formatted="false">○ 未连接 · 请开启记录器 Wi-Fi</string>
+    <string name="home_action_open_live" formatted="false">开启即时影像</string>
+    <string name="home_action_connect" formatted="false">连接记录器</string>
+    <string name="home_action_add" formatted="false">新增记录器</string>
+    <string name="home_map_title" formatted="false">骑乘地图</string>
+    <string name="home_map_desc" formatted="false">手机定位 · 骑乘轨迹</string>
+    <string name="home_quick_album" formatted="false">本机媒体相册</string>
+    <string name="home_quick_album_desc" formatted="false">离线检视已下载之影片与照片</string>
+    <string name="home_quick_downloads" formatted="false">下载管理</string>
+    <string name="home_brand_footer" formatted="false">Aladdin DashCam · 通用记录器管理平台</string>
+    <string name="album_select" formatted="false">选取</string>
+    <string name="album_recording_paused_resumes_when_you_leave" formatted="false">录像已暂停 · 离开装置相册会自动恢复</string>
+    <string name="album_select_all" formatted="false">全选</string>
+    <string name="album_selected_mb" formatted="false">已选取 0 项 (0 MB)</string>
+    <string name="album_done" formatted="false">完成</string>
+    <string name="album_loop_recordings" formatted="false">常规循环录像</string>
+    <string name="album_protected_events" formatted="false">紧急锁定事件</string>
+    <string name="album_drag_the_timeline_to_find_a" formatted="false">拖曳时间轴游标以定位影片</string>
+    <string name="album_no_video_here_jumping_to_the" formatted="false">此时段无影片，跳至下一段</string>
+    <string name="album_recorder_connected_load_the_video_list" formatted="false">已连接记录器，尚未读取影片清单</string>
+    <string name="album_load_recorder_videos" formatted="false">读取记录器影片清单</string>
+    <string name="album_download_selected" formatted="false">批次下载</string>
+    <string name="album_delete_selected" formatted="false">删除所选</string>
+    <string name="album_photo_viewer" formatted="false">照片检视</string>
+    <string name="album_nearby_video_segments" formatted="false">相邻录像片段快速切换</string>
+    <string name="album_pause" formatted="false">暂停</string>
+    <string name="album_local_video_position" formatted="false">本机影片播放位置</string>
+    <string name="album_back_to_album" formatted="false">返回相册</string>
+    <string name="album_recorded" formatted="false">录制时间：2026-10-21 14:32:05</string>
+    <string name="album_download" formatted="false">下载到本机</string>
+    <string name="album_loading_preview" formatted="false">载入媒体预览中...</string>
+    <string name="album_unable_to_load_media" formatted="false">媒体载入失败</string>
+    <string name="album_retry" formatted="false">重试载入</string>
+    <string name="device_photo_resolution" formatted="false">图片解析度</string>
+    <string name="device_photo_quality" formatted="false">图片画质</string>
+    <string name="device_fine" formatted="false">优质</string>
+    <string name="device_video_resolution" formatted="false">影像解析度</string>
+    <string name="device_clip_duration" formatted="false">影片长度</string>
+    <string name="device_minutes" formatted="false">5 分钟</string>
+    <string name="device_length_of_each_clip_when_the" formatted="false">每段影片的时长，存储卡满会自动从时间最早的影片开始覆盖。</string>
+    <string name="device_image_audio" formatted="false">图片与声音</string>
+    <string name="device_time_stamp" formatted="false">时间水印</string>
+    <string name="device_on" formatted="false">开启</string>
+    <string name="device_normal" formatted="false">一般</string>
+    <string name="device_recorder_wi_fi_name" formatted="false">记录器Wi-Fi名称</string>
+    <string name="device_recorder_wi_fi_password" formatted="false">记录器Wi-Fi密码</string>
+    <string name="device_after_changing_the_password_update_it" formatted="false">修改密码後，需要到系统[Wi-Fi]设置，[修改密码]重新输入新密码</string>
+    <string name="device_firmware" formatted="false">固件版本</string>
+    <string name="device_storage_time" formatted="false">储存与维护</string>
+    <string name="device_loop_recording_calculating_remaining_time" formatted="false">循环录像中 · 距覆写估算中...</string>
+    <string name="device_time_sync_automatically_synced" formatted="false">校时状态：已自动校时</string>
+    <string name="device_sync_now" formatted="false">手动立即校时</string>
+    <string name="device_expand" formatted="false">点击展开 ▼</string>
+    <string name="device_target_tap_to_change_host" formatted="false">连接目标：192.168.25.1 (点击可切换 Host)</string>
+    <string name="device_control_gpsocket_tcp_nstream_rtsp_action" formatted="false">控制通道：192.168.25.1:8081 (GPSOCKET TCP)\n串流端点：rtsp://192.168.25.1:8080/?action=stream\n通讯家族：Generalplus / GoPlus (B1样机)\n网路路由：Wi-Fi 专属 Process/Socket 绑定</string>
+    <string name="device_device_maintenance" formatted="false">装置维护</string>
+    <string name="device_format_recorder_sd_card" formatted="false">格式化记录器 SD 卡</string>
+    <string name="device_power_off_recorder" formatted="false">关闭记录器</string>
+    <string name="device_factory_reset_requires_using_the_recorder" formatted="false">不支援远端恢复原厂 (请於机身操作)</string>
+    <string name="device_formatting_deletes_all_videos_photos_and" formatted="false">格式化会删除记录器内所有影片、照片与锁定；请先备份并保持供电。恢复原厂设置仍请於机身操作。</string>
+    <string name="downloads_active" formatted="false">0 项进行中</string>
+    <string name="downloads_go_to_album" formatted="false">前往相册</string>
+    <string name="live_connecting_to_stream_no_video_yet" formatted="false">即时串流连接中 / 暂无影像</string>
+    <string name="live_recording_indicator" formatted="false">HUD录像指示</string>
+    <string name="live_not_recording" formatted="false">未录像</string>
+    <string name="live_video" formatted="false">直播</string>
+    <string name="live_split" formatted="false">分割</string>
+    <string name="live_map" formatted="false">地图</string>
+    <string name="live_ride" formatted="false">骑乘</string>
+    <string name="live_source_phone_gps" formatted="false">资料来源：手机 GPS 定位</string>
+    <string name="live_altitude" formatted="false">目前海拔</string>
+    <string name="live_ascent" formatted="false">累积爬升</string>
+    <string name="live_heading" formatted="false">方位航向</string>
+    <string name="live_total_g_with_gravity" formatted="false">总 G 值（含重力）</string>
+    <string name="live_satellite" formatted="false">卫星地图</string>
+    <string name="live_phone_gps_not_frame_synced_with" formatted="false">手机定位 (与影像非毫秒级对齐)</string>
+    <string name="live_speed_km_h_accuracy_m" formatted="false">速度: -- km/h · 精度: -- m</string>
+    <string name="live_reset_route" formatted="false">重设轨迹</string>
+    <string name="live_my_location" formatted="false">回到目前位置</string>
+    <string name="live_recorder_uses_wi_fi_maps_need" formatted="false">地图需要互联网 · 速度来自手机定位</string>
+    <string name="item_media_card_media_thumbnail" formatted="false">媒体缩图</string>
+    <string name="item_media_card_downloaded" formatted="false">已下载</string>
+    <string name="item_media_card_loop_video" formatted="false">常规录像</string>
+    <string name="item_viewer_strip_segment_thumbnail" formatted="false">片段缩图</string>
+    <string name="live_clear_route" formatted="false">清除轨迹</string>
+    <string name="album_s_selected_s_mb" formatted="false">已选取 %1$s 项 (%2$s MB)</string>
+    <string name="album_opening_recorder_album_recording_will_pause" formatted="false">切换装置相册中 · 录像将暂停</string>
+    <string name="album_unable_to_open_recorder_album_s" formatted="false">无法进入装置相册：%1$s</string>
+    <string name="album_loaded_s_files" formatted="false">成功取得记录器清单: %1$s 笔</string>
+    <string name="album_unable_to_load_videos_s" formatted="false">取得影片清单失败: %1$s</string>
+    <string name="album_recorder_offline_recording_status_unknown" formatted="false">记录器未连接 · 录像状态未知</string>
+    <string name="album_recording_status_unknown_waiting_for_recorder" formatted="false">录像状态未知 · 等待设备回报</string>
+    <string name="album_recorder_is_recording_album_mode_interrupted" formatted="false">记录器录像中 · 装置相册模式已中断</string>
+    <string name="album_recorder_is_in_playback_mode_recording" formatted="false">设备处於回放模式 · 录像已暂停</string>
+    <string name="album_recorder_is_not_recording" formatted="false">记录器目前未录像</string>
+    <string name="album_recording_resume_not_confirmed_s" formatted="false">未确认恢复录像：%1$s</string>
+    <string name="album_s_recorder_playback_download_to_seek" formatted="false">%1$s · 装置回放（精确跳转需先下载）</string>
+    <string name="album_duration_unknown" formatted="false">时长未知</string>
+    <string name="album_s_s" formatted="false">%1$s / %2$s</string>
+    <string name="album_replay" formatted="false">重播</string>
+    <string name="album_the_recorder_ended_the_paused_stream" formatted="false">设备已结束暂停的串流，将从片头重新播放</string>
+    <string name="album_play" formatted="false">播放</string>
+    <string name="album_pause_state_unknown_reopen_the_video" formatted="false">暂停状态未确认，请重新开启影片</string>
+    <string name="album_unable_to_seek_this_video" formatted="false">无法跳转此影片</string>
+    <string name="album_downloading_s_files" formatted="false">开始批次下载 %1$s 个文件</string>
+    <string name="album_delete_files" formatted="false">确认删除文件</string>
+    <string name="album_recorder_sd_card" formatted="false">记录器 SD 卡</string>
+    <string name="album_phone_storage" formatted="false">本机储存空间</string>
+    <string name="album_delete_s_selected_files_from_s" formatted="false">确定要从 %1$s 删除选取的 %2$s 个文件？此操作无法还原。</string>
+    <string name="album_delete" formatted="false">确定删除</string>
+    <string name="album_cancel" formatted="false">取消</string>
+    <string name="album_video_found_s_s" formatted="false">定位到影片：%1$s (%2$s)</string>
+    <string name="album_no_recordings_at_this_time_s" formatted="false">此时段无录像片段 (%1$s)</string>
+    <string name="album_deleted_s_of_s_files" formatted="false">成功删除 %1$s / %2$s 个文件</string>
+    <string name="album_time_unknown" formatted="false">时间未知</string>
+    <string name="album_today_s" formatted="false">今天 (%1$s)</string>
+    <string name="album_yesterday_s" formatted="false">昨天 (%1$s)</string>
+    <string name="album_no_video_segments_available" formatted="false">无可用录像片段</string>
+    <string name="album_position_s_s_segments" formatted="false">当前定位时刻：%1$s (共 %2$s 个片段)</string>
+    <string name="album_no_files_on_the_recorder_memory" formatted="false">记录器存储卡内无文件</string>
+    <string name="album_refresh" formatted="false">重新整理</string>
+    <string name="album_no_media_in_this_category" formatted="false">此分类尚无符合之媒体文件</string>
+    <string name="album_show_all_media" formatted="false">查看全部媒体</string>
+    <string name="album_unable_to_read_recorder_files" formatted="false">读取记录器清单失败</string>
+    <string name="album_retry_063" formatted="false">重试读取</string>
+    <string name="album_no_videos_downloaded_yet" formatted="false">本机尚未下载任何影片</string>
+    <string name="album_open_recorder_album" formatted="false">切换至记录器相册</string>
+    <string name="album_recorded_s" formatted="false">录制时间：%1$s</string>
+    <string name="album_captured_s" formatted="false">拍摄时间：%1$s</string>
+    <string name="album_opening_recording_recording_pauses_during_playback" formatted="false">正在开启录像档（回放时暂停录像）…</string>
+    <string name="album_recorder_playback_starts_at_the_beginning" formatted="false">装置回放从片头开始；精确跳转请先下载影片</string>
+    <string name="album_recorder_wi_fi_disconnected" formatted="false">记录器 Wi-Fi 已中断</string>
+    <string name="album_recorder_rejected_playback" formatted="false">记录器拒绝回放</string>
+    <string name="album_video_transfer_interrupted" formatted="false">录像档传输中断</string>
+    <string name="album_reading_file" formatted="false">正在读取此文件...</string>
+    <string name="album_loading_s" formatted="false">读取中: %1$s%%</string>
+    <string name="album_loading_075" formatted="false">正在读取...</string>
+    <string name="album_unable_to_load_s" formatted="false">载入失败：%1$s</string>
+    <string name="album_retry_077" formatted="false">重试</string>
+    <string name="album_playback_failed_s" formatted="false">回放失败：%1$s</string>
+    <string name="album_opening_local_video" formatted="false">正在开启本机影片…</string>
+    <string name="album_unable_to_decode_photo" formatted="false">无法解析照片文件</string>
+    <string name="album_unable_to_load_photo_s" formatted="false">照片载入失败：%1$s</string>
+    <string name="album_downloading" formatted="false">下载中...</string>
+    <string name="album_playback_closed_but_recording_resume_not" formatted="false">回放已关闭，但未确认恢复录像：%1$s</string>
+    <string name="album_recorder_disconnected_reconnect_and_retry" formatted="false">记录器连接已中断，请重新连接後再试</string>
+    <string name="album_downloading_s" formatted="false">下载中 %1$s%%</string>
+    <string name="album_waiting_to_download" formatted="false">等待下载...</string>
+    <string name="language_traditional_chinese" formatted="false">繁體中文</string>
+    <string name="language_simplified_chinese" formatted="false">简体中文</string>
+    <string name="device_formatting_keep_power_connected" formatted="false">格式化中，请勿断电…</string>
+    <string name="device_time_sync_s" formatted="false">校时状态：%1$s</string>
+    <string name="device_switching_recorder_s" formatted="false">连接目标切换中... (%1$s)</string>
+    <string name="device_target_s_tap_to_change_host" formatted="false">连接目标：%1$s (点击可切换 Host)</string>
+    <string name="device_connected_to_s_epoch_s" formatted="false">已切换连接目标至 %1$s (epoch: %2$s)</string>
+    <string name="device_unable_to_switch_s" formatted="false">切换失败: %1$s</string>
+    <string name="device_connect_to_the_recorder_first" formatted="false">请先连接记录器</string>
+    <string name="device_power_off_recorder_037" formatted="false">关闭记录器？</string>
+    <string name="device_recording_will_stop_and_wi_fi" formatted="false">记录器将停止录像并关闭，Wi-Fi 连接会中断。请确认记录器不是正在行车使用。</string>
+    <string name="device_power_off" formatted="false">确定关机</string>
+    <string name="device_power_off_command_accepted" formatted="false">关机命令已接受</string>
+    <string name="device_power_off_state_not_confirmed" formatted="false">关机状态未确认</string>
+    <string name="device_the_recorder_accepted_the_power_off" formatted="false">记录器已接受关机命令，Wi-Fi 将中断。</string>
+    <string name="device_the_command_may_have_been_sent" formatted="false">命令可能已送出，但未收到确认。请查看记录器指示灯；不要立即重复操作。\n%1$s</string>
+    <string name="device_ok" formatted="false">知道了</string>
+    <string name="device_format_recorder_sd_card_045" formatted="false">格式化记录器 SD 卡？</string>
+    <string name="device_all_videos_photos_and_protected_files" formatted="false">将永久删除目前记录器内所有影片、照片及紧急锁定，无法复原。请先备份重要文件。</string>
+    <string name="device_continue" formatted="false">继续确认</string>
+    <string name="device_final_confirmation_erase_recorder_card" formatted="false">最後确认：清空记录器存储卡</string>
+    <string name="device_target_s_nrecording_pauses_during_formatting" formatted="false">目标：%1$s\n格式化期间会暂停录像，请保持供电与 Wi-Fi 连接。确定已完成备份？</string>
+    <string name="device_format" formatted="false">确定格式化</string>
+    <string name="device_formatting_complete" formatted="false">格式化完成</string>
+    <string name="device_formatting_not_confirmed" formatted="false">格式化未确认完成</string>
+    <string name="device_the_card_was_read_back_and" formatted="false">已回读确认存储卡清空。</string>
+    <string name="device_check_the_recorder" formatted="false">请检查记录器状态</string>
+    <string name="device_collapse" formatted="false">点击收合 ▲</string>
+    <string name="device_advanced_diagnostics_change_host" formatted="false">进阶诊断：切换连接目标 Host</string>
+    <string name="device_advanced_connection_diagnostics_nnormally_add_or" formatted="false">【注意】此为进阶通讯诊断功能。\n一般新增或切换设备，请至首页以 Wi-Fi 自动辨识。\n手动指定 IP 将终止旧 Session，并重新对目标进行协定探测：</string>
+    <string name="device_switch" formatted="false">确认切换</string>
+    <string name="device_recorder_wi_fi_password_059" formatted="false">记录器 Wi-Fi 密码</string>
+    <string name="device_the_default_password_is_nafter_changing" formatted="false">预设密码为 12345678。\n如需修改，完成後请至系统 [Wi-Fi] 设置，重新输入新密码以连接。</string>
+    <string name="device_ok_061" formatted="false">确定</string>
+    <string name="device_time_sync_command_sent" formatted="false">已发送校时命令</string>
+    <string name="downloads_download_cancelled" formatted="false">已取消下载</string>
+    <string name="downloads_downloading_again" formatted="false">正在重新下载...</string>
+    <string name="downloads_s_active" formatted="false">%1$s 项进行中</string>
+    <string name="download_task_adapter_downloading_s_s_s" formatted="false">下载中 %1$s%% (%2$s / %3$s)</string>
+    <string name="download_task_adapter_downloading_s" formatted="false">下载中... (%1$s)</string>
+    <string name="download_task_adapter_downloaded_s" formatted="false">已下载完成 (%1$s)</string>
+    <string name="download_task_adapter_connection_timed_out" formatted="false">连接逾时</string>
+    <string name="download_task_adapter_download_failed_s" formatted="false">下载失败: %1$s</string>
+    <string name="download_task_adapter_download_again" formatted="false">重新下载</string>
+    <string name="download_task_adapter_waiting" formatted="false">等待</string>
+    <string name="home_connected_recorder_ready" formatted="false">● 已连接 · 通用记录器就绪</string>
+    <string name="home_offline_check_recorder_wi_fi" formatted="false">○ 未连接 · 请确认记录器 Wi-Fi</string>
+    <string name="home_battery_s" formatted="false">电量：%1$s/4</string>
+    <string name="home_s_s_bars" formatted="false">%1$s%2$s格</string>
+    <string name="home_battery_s_bars" formatted="false">电量%1$s格</string>
+    <string name="home_free_f_f_gb" formatted="false">可用 %.1f/%.0f GB</string>
+    <string name="home_battery_unknown" formatted="false">电量：未知</string>
+    <string name="home_sd_offline" formatted="false">SD：离线，待读取</string>
+    <string name="live_standard_map" formatted="false">一般地图</string>
+    <string name="live_map_loaded_phone_gps" formatted="false">地图已载入 · 定位来自手机</string>
+    <string name="live_map_unavailable_check_your_internet_connection" formatted="false">地图尚未载入，请检查网路与地图服务设置</string>
+    <string name="live_follow_my_location" formatted="false">回到目前位置并跟随</string>
+    <string name="live_recorder_offline_nphone_maps_are_still" formatted="false">记录器未连接\n手机地图仍可使用</string>
+    <string name="live_unable_to_read_recorder_status_reconnect" formatted="false">无法读取记录器状态，请重试连接</string>
+    <string name="live_recorder_is_not_in_rtsp_mode" formatted="false">设备回报非 RTSP 串流模式</string>
+    <string name="live_recording_did_not_stop_or_the" formatted="false">停止录像未执行或状态未变更</string>
+    <string name="live_recording_did_not_start" formatted="false">开始录像未执行</string>
+    <string name="live_photo_captured" formatted="false">拍照指令已完成，请到设备相册查看</string>
+    <string name="live_photo_in_progress">拍照中…</string>
+    <string name="live_photo_failed_s" formatted="false">拍照未完成：%1$s</string>
+    <string name="live_connect_to_recorder_wi_fi_first" formatted="false">尚未连接行车记录器专用 Wi-Fi</string>
+    <string name="live_recorder_offline_memory_card_details_unavailable" formatted="false">记录器未连接，尚无目前的存储卡资讯。</string>
+    <string name="live_total_f_gb_nused_f_gb" formatted="false">总容量：%.1f GB\n已用：%.1f GB\n可用：%.1f GB\n\n%s</string>
+    <string name="live_memory_card" formatted="false">存储卡资讯</string>
+    <string name="live_following_your_current_location" formatted="false">已回到目前位置并开启跟随</string>
+    <string name="live_phone_location_unavailable" formatted="false">尚未取得手机定位座标</string>
+    <string name="live_clear_this_route" formatted="false">清除本次轨迹？</string>
+    <string name="live_only_the_route_shown_on_this" formatted="false">只清除手机目前显示的骑乘轨迹，不影响记录器影片。</string>
+    <string name="live_clear" formatted="false">清除</string>
+    <string name="live_google_maps_is_not_installed_opening" formatted="false">未安装 Google Maps，直接开启 PiP 浮窗</string>
+    <string name="live_pip_is_not_supported_on_this" formatted="false">此 Android 版本不支援 PiP</string>
+    <string name="live_sd_f_f_gb_free" formatted="false">SD: 余 %.1f / 总 %.1f GB</string>
+    <string name="live_sd_ready_files_f_mb" formatted="false">SD 正常 · 文件 %.0fMB</string>
+    <string name="live_sd_ready_recording" formatted="false">SD 正常 · 录像中</string>
+    <string name="live_memory_card_error" formatted="false">存储卡异常</string>
+    <string name="live_no_memory_card_detected" formatted="false">未侦测到存储卡</string>
+    <string name="live_n" formatted="false">北</string>
+    <string name="live_ne" formatted="false">东北</string>
+    <string name="live_e" formatted="false">东</string>
+    <string name="live_se" formatted="false">东南</string>
+    <string name="live_s" formatted="false">南</string>
+    <string name="live_sw" formatted="false">西南</string>
+    <string name="live_w" formatted="false">西</string>
+    <string name="live_nw" formatted="false">西北</string>
+    <string name="live_source_s_gps_locked" formatted="false">资料来源：%1$s (定位正常)</string>
+    <string name="live_location_permission_required_tap_the_speed" formatted="false">未授权位置权限，点击上方 HUD 开启</string>
+    <string name="live_source_s_searching_for_satellites" formatted="false">资料来源：%1$s (卫星搜索中...)</string>
+    <string name="live_album_is_playing_a_video_live" formatted="false">相册正在回放影片，即时预览已暂停</string>
+    <string name="live_stopped" formatted="false">已停录</string>
+    <string name="live_unknown" formatted="false">状态未知</string>
+    <string name="live_phone_location" formatted="false">手机目前位置</string>
+    <string name="live_speed_s_km_h" formatted="false">速度: %1$s km/h</string>
+    <string name="live_location_disabled" formatted="false">尚未开启定位</string>
+    <string name="live_searching_for_gps" formatted="false">GPS 搜索中</string>
+    <string name="live_km_h_accuracy_unknown" formatted="false">-- km/h · 精度未知</string>
+    <string name="main_activity_my_recorders" formatted="false">我的记录器</string>
+    <string name="main_activity_close" formatted="false">关闭</string>
+    <string name="main_activity_no_recorder_yet_connect_to_recorder" formatted="false">尚未新增设备，连上记录器 Wi-Fi 即可开始。</string>
+    <string name="main_activity_unavailable" formatted="false">尚未取得</string>
+    <string name="main_activity_no_successful_connection_yet" formatted="false">尚无成功连接纪录</string>
+    <string name="main_activity_firmware_s_nlast_connected_s" formatted="false">固件版本：%1$s\n最近连接：%2$s</string>
+    <string name="main_activity_selected" formatted="false">目前选取</string>
+    <string name="main_activity_select_recorder" formatted="false">选取设备</string>
+    <string name="main_activity_remove" formatted="false">移除</string>
+    <string name="main_activity_remove_local_record_for_s" formatted="false">移除 %1$s 的本机记录</string>
+    <string name="main_activity_remove_this_recorder" formatted="false">移除此设备？</string>
+    <string name="main_activity_only_the_local_device_record_will" formatted="false">只移除本机设备记录，不会删除影片或重设记录器。</string>
+    <string name="main_activity_add_recorder" formatted="false">＋ 新增记录器</string>
+    <string name="main_activity_recorder_wi_fi_verified_ngateway_s" formatted="false">已侦测并成功验证记录器 Wi-Fi！\n设备闸道位址：%1$s (%2$s)\n\n是否立即自动绑定并建立连接？</string>
+    <string name="main_activity_connect_now" formatted="false">立即自动连接</string>
+    <string name="main_activity_connecting_to_recorder_s" formatted="false">正在连接至记录器 (%1$s)...</string>
+    <string name="main_activity_identifying_recorder" formatted="false">正在辨识设备</string>
+    <string name="main_activity_connected_to_wi_fi_checking_the" formatted="false">已连接至 Wi-Fi，正在探测设备闸道 (%1$s) 之记录器通讯协定，请稍候片刻...</string>
+    <string name="main_activity_incompatible_recorder" formatted="false">非相容行车记录器</string>
+    <string name="main_activity_the_wi_fi_device_at_s" formatted="false">当前连接之 Wi-Fi (%1$s) 经安全协定探测非相容行车记录器（非 GPSOCK 协定）。\n请确认已连接至记录器 Wi-Fi AP（例如 B1-xxxxxx）。</string>
+    <string name="main_activity_wi_fi_settings" formatted="false">前往 Wi-Fi 设置</string>
+    <string name="main_activity_recorder_detection_incomplete" formatted="false">设备探测未完成</string>
+    <string name="main_activity_no_response" formatted="false">无回应</string>
+    <string name="main_activity_recorder_detection_at_s_timed_out" formatted="false">当前 Wi-Fi (%1$s) 探测记录器回应逾时或失败：%2$s\n若确认为记录器，请稍候重试或重新连接 Wi-Fi。</string>
+    <string name="main_activity_retry_detection" formatted="false">重试探测</string>
+    <string name="main_activity_identify_recorder" formatted="false">辨识行车记录器</string>
+    <string name="main_activity_gateway_s_nprotocol_handshake_incomplete_try" formatted="false">设备闸道：%1$s\n尚未完成通讯协定握手，是否立即尝试连接？</string>
+    <string name="main_activity_try_connecting" formatted="false">尝试连接</string>
+    <string name="main_activity_recorder_wi_fi_not_connected" formatted="false">未连接至记录器 Wi-Fi</string>
+    <string name="main_activity_no_ip_address_entry_is_needed" formatted="false">新增设备无需手动输入 IP。\n请先於手机「Wi-Fi 设置」中连接至记录器 Wi-Fi AP（例如 B1-xxxxxx），连接後 App 将自动辨识并完成新增。</string>
+    <string name="media_adapter_protected_event" formatted="false">紧急事件</string>
+    <string name="recorder_time_synced_automatically" formatted="false">连接自动校时成功</string>
+    <string name="recorder_automatic_time_sync_failed_s" formatted="false">自动校时失败: %1$s</string>
+    <string name="recorder_time_synced" formatted="false">手动校时成功</string>
+    <string name="recorder_time_sync_failed_s" formatted="false">手动校时失败: %1$s</string>
+    <string name="recorder_continuous_recording_no_loop" formatted="false">单次连续录像 (不循环)</string>
+    <string name="recorder_loop_recording_min" formatted="false">循环录像 (1分)</string>
+    <string name="recorder_loop_recording_min_007" formatted="false">循环录像 (2分)</string>
+    <string name="recorder_loop_recording_min_008" formatted="false">循环录像 (3分)</string>
+    <string name="recorder_loop_recording_min_009" formatted="false">循环录像 (5分)</string>
+    <string name="recorder_recording_mode_loop_setting_unconfirmed" formatted="false">录像模式 (循环设置待确认)</string>
+    <string name="recorder_memory_card_error_or_formatting_required" formatted="false">存储卡异常或需格式化 (代码 %1$s)</string>
+    <string name="recorder_memory_card_not_ready_or_missing" formatted="false">存储卡未就绪或无卡</string>
+    <string name="recorder_s_card_ready_listed_media_f" formatted="false">%s · 存储卡正常 · 已列举媒体大小: %.1f MB</string>
+    <string name="recorder_s_card_ready_loop_recording" formatted="false">%s · 存储卡正常 (循环录像中)</string>
+    <string name="recorder_s_f_gb_free_calculating_time" formatted="false">%s · 可用空间 %.1f GB (时间估算中)</string>
+    <string name="recorder_s_overwrite_in_about_d_min" formatted="false">%s · 距循环覆盖约 %d 分钟 · 总保存约 %.1f 小时</string>
+    <string name="recorder_s_about_d_min_recording_time" formatted="false">%s · 剩余可录约 %d 分钟</string>
+    <string name="recorder_not_read_yet" formatted="false">未读取</string>
+    <string name="recorder_unable_to_switch" formatted="false">切换失败</string>
+    <string name="recorder_s_confirming" formatted="false">%1$s (确认中...)</string>
+    <string name="recorder_read_back_mismatch_s" formatted="false">回读值不符: %1$s</string>
+    <string name="recorder_s_sent_read_back_failed" formatted="false">%1$s (已送出，回读失败)</string>
+    <string name="recorder_setting_failed_s" formatted="false">设置失败: %1$s</string>
+    <string name="recorder_read_back_s" formatted="false">回读值: %1$s</string>
+    <string name="recorder_video_source_changed" formatted="false">影片来源已切换</string>
+    <string name="recorder_formatting_in_progress_do_not_repeat" formatted="false">格式化处理中，请勿重复操作</string>
+    <string name="recorder_recorder_changed_please_confirm_again" formatted="false">设备已切换，请重新确认</string>
+    <string name="recorder_reading" formatted="false">读取中...</string>
+    <string name="recorder_unable_to_read" formatted="false">读取失败</string>
+    <string name="recorder_unknown" formatted="false">未知</string>
+    <string name="recorder_unknown_not_read_yet" formatted="false">未知 (待读取)</string>
+    <string name="recorder_unable_to_read_recorder_videos" formatted="false">无法取得记录器影片清单</string>
+    <string name="recorder_video_source_changed_reopen_the_album" formatted="false">影片来源已切换，请重新开启相册</string>
+    <string name="recorder_unable_to_cache_preview" formatted="false">下载预览暂存失败</string>
+    <string name="recorder_unable_to_save_file" formatted="false">永久储存失败</string>
+    <string name="setting_fine" formatted="false">精细 (Fine)</string>
+    <string name="setting_normal" formatted="false">一般 (Normal)</string>
+    <string name="setting_economical" formatted="false">经济 (Economical)</string>
+    <string name="setting_minute" formatted="false">1 分钟</string>
+    <string name="setting_minutes" formatted="false">2 分钟</string>
+    <string name="setting_minutes_006" formatted="false">3 分钟</string>
+    <string name="setting_date_time" formatted="false">开启 (日期与时间)</string>
+    <string name="setting_date_only" formatted="false">仅日期 (Date)</string>
+    <string name="setting_unknown_s" formatted="false">未知 (%1$s)</string>
+    <string name="appearance_title" formatted="false">应用程式</string>
+    <string name="appearance_language" formatted="false">语言</string>
+    <string name="appearance_theme" formatted="false">外观主题</string>
+    <string name="appearance_system" formatted="false">跟随系统</string>
+    <string name="appearance_light" formatted="false">浅色</string>
+    <string name="appearance_dark" formatted="false">深色</string>
+    <string name="viewer_segments" formatted="false">显示或收起相邻片段</string>
+    <string name="rtc_not_synced" formatted="false">尚未校时</string>
+    <string name="gps_phone_source" formatted="false">手机 GPS</string>
+    <string name="gps_network_source" formatted="false">手机网路定位</string>
+    <string name="setting_off">关闭</string>
+    <string name="action_open">打开</string>
+    <string name="rtc_failed">校时未成功</string>
+    <string name="player_render_failed">视频渲染失败：%1$s</string>
+    <string name="player_unavailable">此设备无法加载 FFmpeg 播放引擎</string>
+    <string name="player_wifi_failed">无法绑定记录器 Wi-Fi</string>
+    <string name="player_open_failed_code">FFmpeg 打开失败：%1$s</string>
+    <string name="player_stalled">视频画面已中断，请重新播放</string>
+    <string name="player_open_failed">视频打开失败</string>
+</resources>

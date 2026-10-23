@@ -19,7 +19,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:scaleType="centerCrop"
-            android:contentDescription="片段縮圖" />
+            android:contentDescription="@string/item_viewer_strip_segment_thumbnail" />
 
         <TextView
             android:id="@+id/tv_strip_time"

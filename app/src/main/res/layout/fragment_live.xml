@@ -6,16 +6,23 @@
     android:layout_height="match_parent"
     android:background="@color/bg_dark">
 
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/map_split_guideline"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        app:layout_constraintGuide_percent="0.5" />
+
     <!-- Video Preview Container (Adaptive Fit in all available space, LIVE-01 / LIVE-04) -->
     <FrameLayout
         android:id="@+id/preview_container"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:background="@color/black"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintDimensionRatio="H,16:10"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/layout_live_mode_toggle"
+        app:layout_constraintBottom_toTopOf="@id/status_strip">
 
         <android.opengl.GLSurfaceView
             android:id="@+id/gl_player_view"
@@ -48,9 +55,9 @@
                 android:layout_height="wrap_content"
                 android:paddingHorizontal="24dp"
                 android:gravity="center"
-                android:text="即時串流連線中 / 暫無影像"
-                android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
+                android:text="@string/live_connecting_to_stream_no_video_yet"
+                android:textSize="14sp"
+        android:textColor="@color/white"/>
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_retry_stream"
@@ -89,7 +96,7 @@
                     android:layout_height="wrap_content"
                     android:fontFamily="monospace"
                     android:text="00"
-                    android:textColor="@color/text_primary"
+                    android:textColor="@color/white"
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
@@ -98,7 +105,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="4dp"
                     android:text="@string/hud_speed_unit"
-                    android:textColor="@color/text_secondary"
+                    android:textColor="@color/white"
                     android:textSize="12sp" />
             </LinearLayout>
 
@@ -125,15 +132,15 @@
                     android:layout_width="8dp"
                     android:layout_height="8dp"
                     android:src="@drawable/ic_recording_dot"
-                    android:contentDescription="HUD錄影指示" />
+                    android:contentDescription="@string/live_recording_indicator" />
 
                 <TextView
                     android:id="@+id/tv_hud_record_text"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="4dp"
-                    android:text="未錄影"
-                    android:textColor="@color/text_primary"
+                    android:text="@string/live_not_recording"
+                    android:textColor="@color/white"
                     android:textSize="@dimen/text_size_caption" />
 
                 <ImageView
@@ -157,7 +164,7 @@
             android:contentDescription="@string/action_enter_fullscreen"
             android:padding="12dp"
             android:src="@drawable/ic_live_fullscreen"
-            app:tint="@color/text_primary" />
+            app:tint="@color/white" />
     </FrameLayout>
 
     <!-- Compact Dashcam Device Status Strip (Directly below preview, 32dp) -->
@@ -171,7 +178,7 @@
         android:paddingHorizontal="16dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/preview_container">
+        app:layout_constraintBottom_toTopOf="@id/layout_normal_controls">
 
         <ImageView
             android:id="@+id/iv_record_dot"
@@ -188,7 +195,7 @@
             android:layout_weight="1"
             android:singleLine="true"
             android:text="@string/recording_stopped"
-            android:textColor="@color/text_primary"
+            android:textColor="@color/text_secondary"
             android:textSize="12sp" />
 
         <LinearLayout
@@ -232,13 +239,13 @@
     <LinearLayout
         android:id="@+id/layout_live_mode_toggle"
         android:layout_width="0dp"
-        android:layout_height="44dp"
         android:layout_marginHorizontal="12dp"
-        android:layout_marginTop="6dp"
         android:gravity="center"
-        app:layout_constraintTop_toBottomOf="@id/status_strip"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="0dp"
+        app:layout_constraintTop_toTopOf="parent">
 
         <com.google.android.material.button.MaterialButtonToggleGroup
             android:id="@+id/toggle_live_mode"
@@ -256,13 +263,18 @@
                 android:layout_weight="1"
                 android:minWidth="0dp"
                 android:layout_height="wrap_content"
-                android:minHeight="44dp"
                 android:paddingHorizontal="4dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
-                android:text="直播"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
+                android:text="@string/live_video"
+                android:textSize="12sp"
+                android:backgroundTint="@color/transparent"
+                app:strokeWidth="1dp"
+                android:textColor="@color/text_secondary"
+                android:minHeight="48dp"
+                android:textAllCaps="false"
+                android:stateListAnimator="@null"
+                android:elevation="0dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_mode_split"
@@ -271,13 +283,18 @@
                 android:layout_weight="1"
                 android:minWidth="0dp"
                 android:layout_height="wrap_content"
-                android:minHeight="44dp"
                 android:paddingHorizontal="4dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
-                android:text="分割"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
+                android:text="@string/live_split"
+                android:textSize="12sp"
+                android:backgroundTint="@color/transparent"
+                app:strokeWidth="1dp"
+                android:textColor="@color/text_secondary"
+                android:minHeight="48dp"
+                android:textAllCaps="false"
+                android:stateListAnimator="@null"
+                android:elevation="0dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_mode_map"
@@ -286,13 +303,18 @@
                 android:layout_weight="1"
                 android:minWidth="0dp"
                 android:layout_height="wrap_content"
-                android:minHeight="44dp"
                 android:paddingHorizontal="4dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
-                android:text="地圖"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
+                android:text="@string/live_map"
+                android:textSize="12sp"
+                android:backgroundTint="@color/transparent"
+                app:strokeWidth="1dp"
+                android:textColor="@color/text_secondary"
+                android:minHeight="48dp"
+                android:textAllCaps="false"
+                android:stateListAnimator="@null"
+                android:elevation="0dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_mode_ride"
@@ -301,13 +323,18 @@
                 android:layout_weight="1"
                 android:minWidth="0dp"
                 android:layout_height="wrap_content"
-                android:minHeight="44dp"
                 android:paddingHorizontal="4dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
-                android:text="騎乘"
-                android:textColor="@color/text_primary"
-                android:textSize="12sp" />
+                android:text="@string/live_ride"
+                android:textSize="12sp"
+                android:backgroundTint="@color/transparent"
+                app:strokeWidth="1dp"
+                android:textColor="@color/text_secondary"
+                android:minHeight="48dp"
+                android:textAllCaps="false"
+                android:stateListAnimator="@null"
+                android:elevation="0dp" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
     </LinearLayout>
 
@@ -317,69 +344,84 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        app:layout_constraintTop_toBottomOf="@id/layout_live_mode_toggle"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent">
 
         <!-- Compact Single-Row Action Buttons (52dp, LIVE-03) -->
         <LinearLayout
             android:id="@+id/action_buttons_container"
             android:layout_width="match_parent"
-            android:layout_height="52dp"
             android:layout_marginHorizontal="12dp"
-            android:layout_marginTop="6dp"
             android:gravity="center_vertical"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+            android:layout_height="48dp"
+            android:layout_marginTop="0dp">
 
             <!-- 1. Ensure Recording Toggle Button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_toggle_recording"
-                style="@style/Widget.MaterialComponents.Button"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
                 android:layout_weight="1.2"
                 android:layout_marginEnd="6dp"
-                android:backgroundTint="@color/accent_teal"
-                android:minHeight="48dp"
-                android:text="@string/btn_start_recording"
-                android:textColor="@color/bg_dark"
+                android:text="@string/btn_start_recording_compact"
                 android:textSize="13sp"
                 android:textStyle="bold"
-                app:cornerRadius="@dimen/radius_button" />
+                app:cornerRadius="@dimen/radius_button"
+                android:backgroundTint="@color/transparent"
+                app:strokeWidth="0dp"
+                android:textColor="@color/text_secondary"
+                android:minHeight="48dp"
+                android:textAllCaps="false"
+                android:stateListAnimator="@null"
+                android:elevation="0dp"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:paddingHorizontal="8dp"
+                android:contentDescription="@string/btn_start_recording" />
 
             <!-- 2. Snapshot Photo Button -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_snapshot"
-                style="@style/Widget.MaterialComponents.Button"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
                 android:layout_weight="1"
                 android:layout_marginHorizontal="4dp"
-                android:backgroundTint="@color/surface_elevated"
-                android:minHeight="48dp"
                 android:text="@string/btn_take_photo"
-                android:textColor="@color/text_primary"
                 android:textSize="13sp"
-                app:cornerRadius="@dimen/radius_button" />
+                app:cornerRadius="@dimen/radius_button"
+                android:backgroundTint="@color/transparent"
+                app:strokeWidth="0dp"
+                android:textColor="@color/text_secondary"
+                android:minHeight="48dp"
+                android:textAllCaps="false"
+                android:stateListAnimator="@null"
+                android:elevation="0dp"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:paddingHorizontal="8dp" />
 
             <!-- 3. More Actions Button (Opens PopupMenu: PiP, Fullscreen, etc.) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_more_options"
-                style="@style/Widget.MaterialComponents.Button"
                 android:layout_width="0dp"
                 android:layout_height="48dp"
                 android:layout_weight="0.8"
                 android:layout_marginStart="6dp"
-                android:backgroundTint="@color/surface_dark"
-                android:minHeight="48dp"
                 android:maxLines="1"
-                android:paddingHorizontal="8dp"
-                android:text="@string/btn_more_options"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp"
                 app:cornerRadius="@dimen/radius_button"
                 app:strokeColor="@color/border_subtle"
-                app:strokeWidth="1dp" />
+                android:backgroundTint="@color/transparent"
+                app:strokeWidth="0dp"
+                android:textColor="@color/text_secondary"
+                android:minHeight="48dp"
+                android:text="⋯"
+                android:textSize="24sp"
+                android:contentDescription="@string/btn_more_options"
+                android:textAllCaps="false"
+                android:stateListAnimator="@null"
+                android:elevation="0dp"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:paddingHorizontal="8dp" />
         </LinearLayout>
 
         <LinearLayout
@@ -388,7 +430,8 @@
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="12dp"
             android:layout_marginTop="12dp"
-            android:orientation="horizontal">
+            android:orientation="horizontal"
+        android:visibility="gone">
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_live_expand"
@@ -448,7 +491,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|center_horizontal"
                 android:layout_marginBottom="4dp"
-                android:text="資料來源：手機 GPS 定位"
+                android:text="@string/live_source_phone_gps"
                 android:textColor="@color/text_secondary"
                 android:textSize="@dimen/text_size_caption" />
         </FrameLayout>
@@ -475,7 +518,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="目前海拔"
+                    android:text="@string/live_altitude"
                     android:textColor="@color/text_secondary"
                     android:textSize="@dimen/text_size_caption" />
 
@@ -504,7 +547,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="累積爬升"
+                    android:text="@string/live_ascent"
                     android:textColor="@color/text_secondary"
                     android:textSize="@dimen/text_size_caption" />
 
@@ -533,7 +576,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="方位航向"
+                    android:text="@string/live_heading"
                     android:textColor="@color/text_secondary"
                     android:textSize="@dimen/text_size_caption" />
 
@@ -562,7 +605,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="總 G 值（含重力）"
+                    android:text="@string/live_total_g_with_gravity"
                     android:textColor="@color/text_secondary"
                     android:textSize="@dimen/text_size_caption" />
 
@@ -586,9 +629,9 @@
         android:layout_height="0dp"
         android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/layout_live_mode_toggle"
-        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/status_strip">
 
         <com.google.android.gms.maps.MapView
             android:id="@+id/map_view"
@@ -597,8 +640,9 @@
 
         <com.google.android.material.button.MaterialButton android:id="@+id/btn_map_type"
             style="@style/Widget.MaterialComponents.Button" android:layout_width="wrap_content" android:layout_height="48dp"
-            android:layout_gravity="top|end" android:layout_margin="10dp" android:text="衛星地圖"
-            android:backgroundTint="@color/surface_dark" android:textColor="@color/text_primary" app:cornerRadius="24dp" />
+            android:layout_gravity="top|end" android:layout_margin="10dp" android:text="@string/live_satellite"
+            android:backgroundTint="@color/surface_dark" android:textColor="@color/text_primary" app:cornerRadius="24dp"
+                android:visibility="gone" />
 
         <!-- Floating map header badge: Phone GPS status & Latency disclaimer -->
         <LinearLayout
@@ -616,7 +660,7 @@
                 android:id="@+id/tv_map_gps_info"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="手機定位 (與影像非毫秒級對齊)"
+                android:text="@string/live_phone_gps_not_frame_synced_with"
                 android:textColor="@color/accent_teal"
                 android:textSize="@dimen/text_size_caption"
                 android:textStyle="bold" />
@@ -625,7 +669,7 @@
                 android:id="@+id/tv_map_speed_info"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="速度: -- km/h · 精度: -- m"
+                android:text="@string/live_speed_km_h_accuracy_m"
                 android:textColor="@color/text_secondary"
                 android:textSize="@dimen/text_size_caption" />
         </LinearLayout>
@@ -636,7 +680,8 @@
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|end"
             android:layout_margin="12dp"
-            android:orientation="vertical"
+            android:layout_marginBottom="36dp"
+            android:orientation="horizontal"
             android:gravity="end">
 
             <!-- Floating Record Action Button on Map -->
@@ -645,11 +690,12 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="8dp"
-                android:contentDescription="@string/btn_start_recording"
+                android:contentDescription="@string/btn_start_recording_compact"
                 app:backgroundTint="@color/accent_teal"
                 app:fabSize="mini"
                 app:srcCompat="@drawable/ic_recording_dot"
-                app:tint="@color/bg_dark" />
+                app:tint="@color/bg_dark"
+                android:visibility="gone" />
 
             <!-- Floating Snapshot Action Button on Map -->
             <com.google.android.material.floatingactionbutton.FloatingActionButton
@@ -661,7 +707,8 @@
                 app:backgroundTint="@color/surface_elevated"
                 app:fabSize="mini"
                 app:srcCompat="@drawable/ic_camera_white"
-                app:tint="@color/text_primary" />
+                app:tint="@color/text_primary"
+                android:visibility="gone" />
 
             <!-- Floating Clear Trajectory Button -->
             <com.google.android.material.button.MaterialButton
@@ -672,21 +719,23 @@
                 android:layout_marginBottom="8dp"
                 android:backgroundTint="@color/surface_dark"
                 android:paddingHorizontal="10dp"
-                android:text="重設軌跡"
+                android:text="@string/live_reset_route"
                 android:textColor="@color/text_secondary"
                 android:textSize="@dimen/text_size_caption"
                 app:cornerRadius="18dp"
                 app:strokeColor="@color/border_subtle"
-                app:strokeWidth="1dp" />
+                app:strokeWidth="1dp"
+                android:visibility="gone" />
 
             <!-- Floating Follow / Center Location Button -->
             <com.google.android.material.floatingactionbutton.FloatingActionButton
                 android:id="@+id/fab_map_center"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:contentDescription="回到目前位置"
+                android:contentDescription="@string/live_my_location"
                 app:backgroundTint="@color/surface_elevated"
-                app:fabSize="normal"
+                app:fabSize="mini"
+                app:ensureMinTouchTargetSize="true"
                 app:srcCompat="@drawable/ic_my_location"
                 app:tint="@color/accent_teal" />
         </LinearLayout>
@@ -697,10 +746,10 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|center_horizontal"
-            android:background="#C0101418"
+            android:background="@color/surface_dark"
             android:gravity="center"
             android:paddingVertical="3dp"
-            android:text="記錄器走 Wi-Fi · 地圖走行動網路 · 離線不影響錄影"
+            android:text="@string/live_recorder_uses_wi_fi_maps_need"
             android:textColor="@color/text_secondary"
             android:textSize="@dimen/text_size_caption" />
     </FrameLayout>

@@ -56,9 +56,9 @@ class DownloadTaskAdapter(
                     val readStr = formatFileSize(task.bytesRead)
                     binding.tvTaskDetails.text = if (task.totalBytes > 0) {
                         val progress = ((task.bytesRead * 100) / task.totalBytes).toInt().coerceIn(0, 100)
-                        "下載中 $progress% ($readStr / $totalSizeStr)"
+                        itemView.context.getString(R.string.download_task_adapter_downloading_s_s_s, progress, readStr, totalSizeStr)
                     } else {
-                        "下載中... ($readStr)"
+                        itemView.context.getString(R.string.download_task_adapter_downloading_s, readStr)
                     }
                     binding.tvTaskDetails.setTextColor(ContextCompat.getColor(context, R.color.accent_teal))
 
@@ -71,39 +71,39 @@ class DownloadTaskAdapter(
                         binding.pbTaskProgress.isIndeterminate = true
                     }
 
-                    binding.btnTaskAction.text = "取消"
+                    binding.btnTaskAction.text = itemView.context.getString(R.string.album_cancel)
                     binding.btnTaskAction.setTextColor(ContextCompat.getColor(context, R.color.error_red))
                 }
                 DownloadStatus.COMPLETED -> {
-                    binding.tvTaskDetails.text = "已下載完成 ($totalSizeStr)"
+                    binding.tvTaskDetails.text = itemView.context.getString(R.string.download_task_adapter_downloaded_s, totalSizeStr)
                     binding.tvTaskDetails.setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
                     binding.pbTaskProgress.visibility = View.GONE
 
-                    binding.btnTaskAction.text = "開啟"
+                    binding.btnTaskAction.text = itemView.context.getString(R.string.action_open)
                     binding.btnTaskAction.setTextColor(ContextCompat.getColor(context, R.color.accent_teal))
                 }
                 DownloadStatus.FAILED -> {
-                    binding.tvTaskDetails.text = "下載失敗: ${task.errorMessage ?: "連線逾時"}"
+                    binding.tvTaskDetails.text = itemView.context.getString(R.string.download_task_adapter_download_failed_s, task.errorMessage ?: itemView.context.getString(R.string.download_task_adapter_connection_timed_out))
                     binding.tvTaskDetails.setTextColor(ContextCompat.getColor(context, R.color.error_red))
                     binding.pbTaskProgress.visibility = View.GONE
 
-                    binding.btnTaskAction.text = "重試"
+                    binding.btnTaskAction.text = itemView.context.getString(R.string.album_retry_077)
                     binding.btnTaskAction.setTextColor(ContextCompat.getColor(context, R.color.warning_yellow))
                 }
                 DownloadStatus.CANCELLED -> {
-                    binding.tvTaskDetails.text = "已取消下載"
+                    binding.tvTaskDetails.text = itemView.context.getString(R.string.downloads_download_cancelled)
                     binding.tvTaskDetails.setTextColor(ContextCompat.getColor(context, R.color.text_disabled))
                     binding.pbTaskProgress.visibility = View.GONE
 
-                    binding.btnTaskAction.text = "重新下載"
+                    binding.btnTaskAction.text = itemView.context.getString(R.string.download_task_adapter_download_again)
                     binding.btnTaskAction.setTextColor(ContextCompat.getColor(context, R.color.accent_teal))
                 }
                 DownloadStatus.PENDING -> {
-                    binding.tvTaskDetails.text = "等待下載..."
+                    binding.tvTaskDetails.text = itemView.context.getString(R.string.album_waiting_to_download)
                     binding.tvTaskDetails.setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
                     binding.pbTaskProgress.visibility = View.GONE
 
-                    binding.btnTaskAction.text = "等待"
+                    binding.btnTaskAction.text = itemView.context.getString(R.string.download_task_adapter_waiting)
                     binding.btnTaskAction.setTextColor(ContextCompat.getColor(context, R.color.text_disabled))
                 }
             }
