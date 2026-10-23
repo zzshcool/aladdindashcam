@@ -10,17 +10,25 @@
         android:layout_width="wrap_content" android:layout_height="wrap_content"
         android:orientation="vertical" app:layout_constraintGuide_percent="0.5" />
 
-    <LinearLayout android:id="@+id/layout_live_mode_toggle" android:layout_width="0dp" android:layout_height="44dp"
+    <LinearLayout android:id="@+id/layout_live_mode_toggle" android:layout_width="0dp" android:layout_height="wrap_content"
+        android:minHeight="44dp"
         android:gravity="center" app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toStartOf="@id/side_controls_container">
         <com.google.android.material.button.MaterialButtonToggleGroup android:id="@+id/toggle_live_mode"
-            android:layout_width="wrap_content" android:layout_height="40dp" app:singleSelection="true" app:selectionRequired="true" app:checkedButton="@id/btn_mode_normal">
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:minHeight="40dp" app:singleSelection="true" app:selectionRequired="true" app:checkedButton="@id/btn_mode_normal">
             <com.google.android.material.button.MaterialButton android:id="@+id/btn_mode_normal" style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content" android:layout_height="match_parent" android:text="直播" android:textColor="@color/text_primary" />
+                android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="40dp"
+                android:paddingHorizontal="8dp" android:insetTop="0dp" android:insetBottom="0dp"
+                android:text="直播" android:textColor="@color/text_primary" />
             <com.google.android.material.button.MaterialButton android:id="@+id/btn_mode_split" style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content" android:layout_height="match_parent" android:text="分割" android:textColor="@color/text_primary" />
+                android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="40dp"
+                android:paddingHorizontal="8dp" android:insetTop="0dp" android:insetBottom="0dp"
+                android:text="分割" android:textColor="@color/text_primary" />
             <com.google.android.material.button.MaterialButton android:id="@+id/btn_mode_map" style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="wrap_content" android:layout_height="match_parent" android:text="地圖" android:textColor="@color/text_primary" />
+                android:layout_width="wrap_content" android:layout_height="wrap_content" android:minHeight="40dp"
+                android:paddingHorizontal="8dp" android:insetTop="0dp" android:insetBottom="0dp"
+                android:text="地圖" android:textColor="@color/text_primary" />
         </com.google.android.material.button.MaterialButtonToggleGroup>
     </LinearLayout>
 

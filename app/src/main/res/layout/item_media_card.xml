@@ -82,7 +82,8 @@
                 android:id="@+id/tv_record_time"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:singleLine="true"
+                android:maxLines="1"
+                android:ellipsize="end"
                 android:text="14:32:05"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
@@ -94,6 +95,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
+                android:maxLines="1"
+                android:ellipsize="middle"
                 android:text="REC_20261021_143205_0001.MP4"
                 android:textColor="@color/text_secondary"
                 android:textSize="11sp" />

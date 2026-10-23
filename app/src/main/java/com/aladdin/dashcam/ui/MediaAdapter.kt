@@ -121,16 +121,19 @@ class MediaAdapter(
             val context = parent.context
             val dm = context.resources.displayMetrics
             val textView = TextView(context).apply {
-                layoutParams = ViewGroup.LayoutParams(
+                layoutParams = RecyclerView.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-                minimumHeight = (32 * dm.density).toInt()
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding((12 * dm.density).toInt(), (8 * dm.density).toInt(), (12 * dm.density).toInt(), 0)
+                ).apply {
+                    topMargin = (6 * dm.density).toInt()
+                    bottomMargin = (4 * dm.density).toInt()
+                }
+                gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                setPadding((12 * dm.density).toInt(), (4 * dm.density).toInt(), (12 * dm.density).toInt(), (4 * dm.density).toInt())
                 setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                 setTypeface(null, Typeface.BOLD)
+                includeFontPadding = false
             }
             HeaderViewHolder(textView)
         } else {

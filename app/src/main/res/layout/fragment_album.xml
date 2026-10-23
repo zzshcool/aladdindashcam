@@ -40,7 +40,7 @@
                     android:layout_height="wrap_content"
                     android:minHeight="48dp"
                     android:insetTop="0dp" android:insetBottom="0dp"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="6dp"
                     android:text="@string/album_source_device"
                     android:textColor="@color/text_primary"
                     android:textSize="13sp" />
@@ -53,7 +53,7 @@
                     android:layout_height="wrap_content"
                     android:minHeight="48dp"
                     android:insetTop="0dp" android:insetBottom="0dp"
-                    android:paddingHorizontal="12dp"
+                    android:paddingHorizontal="6dp"
                     android:text="@string/album_source_local"
                     android:textColor="@color/text_primary"
                     android:textSize="13sp" />
@@ -215,7 +215,7 @@
                     android:layout_height="wrap_content"
                     android:minHeight="48dp"
                     android:insetTop="0dp" android:insetBottom="0dp"
-                    android:paddingHorizontal="8dp"
+                    android:paddingHorizontal="6dp"
                     android:text="網格"
                     android:textColor="@color/text_primary"
                     android:textSize="12sp" />
@@ -228,7 +228,7 @@
                     android:layout_height="wrap_content"
                     android:minHeight="48dp"
                     android:insetTop="0dp" android:insetBottom="0dp"
-                    android:paddingHorizontal="8dp"
+                    android:paddingHorizontal="6dp"
                     android:text="時間軸"
                     android:textColor="@color/text_primary"
                     android:textSize="12sp" />
