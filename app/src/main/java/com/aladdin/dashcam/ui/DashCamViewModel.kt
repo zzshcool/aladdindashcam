@@ -814,6 +814,9 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     private val _isFormattingStorage = MutableStateFlow(false)
     val isFormattingStorage: StateFlow<Boolean> = _isFormattingStorage.asStateFlow()
 
+    suspend fun powerOffRecorder(expectedEpoch: Long): Result<Unit> =
+        client.powerOff(expectedEpoch)
+
     suspend fun formatRecorderStorage(expectedEpoch: Long): Result<Unit> = withContext(kotlinx.coroutines.NonCancellable) {
         if (!formatStorageMutex.tryLock()) return@withContext Result.failure(IllegalStateException("格式化處理中，請勿重複操作"))
         _isFormattingStorage.value = true
@@ -1598,7 +1601,8 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
             return@withContext null
         }
 
-        if (!isCurrentMediaSource(item) || deviceStatus.value.mode != DeviceMode.PLAYBACK) {
+        if (!isCurrentMediaSource(item) || deviceStatus.value.mode != DeviceMode.PLAYBACK ||
+            currentStreamOwner.value == MediaStreamOwner.ALBUM_PLAYBACK) {
             return@withContext null
         }
         val image = client.getThumbnail(item.deviceIndex, expectedEpoch = item.sourceEpoch).getOrNull()

@@ -77,6 +77,7 @@ object GPSocketProtocol {
     const val CMD_SET_MODE: Byte = 0x00
     const val CMD_GET_STATUS: Byte = 0x01
     const val CMD_GET_PARAM_FILE: Byte = 0x02
+    const val CMD_POWER_OFF: Byte = 0x03
     const val CMD_RESTART_STREAM: Byte = 0x04
     const val CMD_RECORD_TOGGLE: Byte = 0x00
     const val CMD_RECORD_AUDIO: Byte = 0x01
@@ -131,6 +132,9 @@ object GPSocketProtocol {
 
     fun buildGetStatusPacket(): ByteArray =
         buildPacket(TYPE_CMD, MODE_DEVICE, CMD_GET_STATUS)
+
+    fun buildPowerOffPacket(): ByteArray =
+        buildPacket(TYPE_CMD, MODE_DEVICE, CMD_POWER_OFF)
 
     fun buildRecordTogglePacket(): ByteArray =
         buildPacket(TYPE_CMD, MODE_RECORD, CMD_RECORD_TOGGLE)

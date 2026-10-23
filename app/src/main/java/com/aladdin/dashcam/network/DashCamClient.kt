@@ -120,6 +120,7 @@ class DashCamClient(
     fun bindNetwork(network: Network?) {
         synchronized(commandLock) {
             if (this.boundNetwork != network) {
+                if (network != null) isPoweredOffByUser.set(false)
                 val newEpoch = epochCounter.incrementAndGet()
                 targetEpoch = newEpoch
                 Log.i(TAG, "Network changed from ${this.boundNetwork} to $network, epoch: $newEpoch, invalidating existing session")
@@ -178,6 +179,7 @@ class DashCamClient(
     }
 
     private val isPollingPaused = AtomicBoolean(false)
+    private val isPoweredOffByUser = AtomicBoolean(false)
 
     fun pausePolling() {
         isPollingPaused.set(true)
@@ -195,7 +197,7 @@ class DashCamClient(
         pollingJob = scope.launch(Dispatchers.IO) {
             var consecutiveFailures = 0
             while (isActive) {
-                if (isPollingPaused.get()) {
+                if (isPollingPaused.get() || isPoweredOffByUser.get()) {
                     delay(1000)
                     continue
                 }
@@ -252,6 +254,7 @@ class DashCamClient(
 
     private fun ensureConnected() {
         synchronized(commandLock) {
+            check(!isPoweredOffByUser.get()) { "記錄器已接收關機請求；請待 Wi-Fi 重新連線" }
             val currentTargetNetwork = boundNetwork ?: run {
                 Log.w(TAG, "Cannot connect: waiting for dedicated Wi-Fi network (boundNetwork is null)")
                 _connectionStatus.value = ConnectionStatus.DISCONNECTED
@@ -513,6 +516,34 @@ class DashCamClient(
             } catch (e: Exception) {
                 Log.e(TAG, "Error restarting streaming", e)
                 disconnectInternal()
+                Result.failure(e)
+            }
+        }
+    }
+
+    suspend fun powerOff(expectedEpoch: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        synchronized(commandLock) {
+            if (expectedEpoch != targetEpoch) {
+                return@withContext Result.failure(IllegalStateException("設備已切換，請重新確認"))
+            }
+            var attempted = false
+            try {
+                ensureConnected()
+                check(expectedEpoch == targetEpoch) { "設備已切換，請重新確認" }
+                isPoweredOffByUser.set(true)
+                attempted = true
+                val response = sendAndReceive(GPSocketProtocol.MODE_DEVICE, GPSocketProtocol.CMD_POWER_OFF,
+                    GPSocketProtocol.buildPowerOffPacket())
+                if (response is GPSocketResponse.Ack) {
+                    disconnectInternal()
+                    Result.success(Unit)
+                } else {
+                    isPoweredOffByUser.set(false)
+                    Result.failure(IllegalStateException("記錄器未確認關機：$response"))
+                }
+            } catch (e: Exception) {
+                if (!attempted) isPoweredOffByUser.set(false)
+                if (attempted) disconnectInternal()
                 Result.failure(e)
             }
         }

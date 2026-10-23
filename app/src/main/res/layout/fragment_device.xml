@@ -644,6 +644,15 @@
                 android:textColor="@color/text_primary" />
 
             <Button
+                android:id="@+id/btn_power_off"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="8dp"
+                android:backgroundTint="@color/surface_elevated"
+                android:text="關閉記錄器"
+                android:textColor="@color/text_primary" />
+
+            <Button
                 android:id="@+id/btn_factory_reset"
                 android:layout_width="match_parent"
                 android:layout_height="48dp"

@@ -21,6 +21,7 @@ class DeviceFragment : Fragment() {
 
     private val viewModel: DashCamViewModel by activityViewModels()
     private var formatting = false
+    private var poweringOff = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -130,6 +131,33 @@ class DeviceFragment : Fragment() {
     }
 
     private fun setupListeners() {
+        binding.btnPowerOff.setOnClickListener {
+            if (poweringOff) return@setOnClickListener
+            if (viewModel.connectionStatus.value != ConnectionStatus.CONNECTED) {
+                Toast.makeText(requireContext(), "請先連線記錄器", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val epoch = viewModel.targetIdentity.value.epoch
+            AlertDialog.Builder(requireContext())
+                .setTitle("關閉記錄器？")
+                .setMessage("記錄器將停止錄影並關閉，Wi-Fi 連線會中斷。請確認記錄器不是正在行車使用。")
+                .setNegativeButton("取消", null)
+                .setPositiveButton("確定關機") { _, _ ->
+                    poweringOff = true
+                    binding.btnPowerOff.isEnabled = false
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        val result = viewModel.powerOffRecorder(epoch)
+                        if (_binding == null) return@launch
+                        poweringOff = false
+                        binding.btnPowerOff.isEnabled = true
+                        AlertDialog.Builder(requireContext())
+                            .setTitle(if (result.isSuccess) "關機命令已接受" else "關機狀態未確認")
+                            .setMessage(if (result.isSuccess) "記錄器已接受關機命令，Wi-Fi 將中斷。" else
+                                "命令可能已送出，但未收到確認。請查看記錄器指示燈；不要立即重複操作。\n${result.exceptionOrNull()?.message.orEmpty()}")
+                            .setPositiveButton("知道了", null).show()
+                    }
+                }.show()
+        }
         binding.btnFormatSd.setOnClickListener {
             if (formatting) return@setOnClickListener
             if (viewModel.connectionStatus.value != ConnectionStatus.CONNECTED) {
