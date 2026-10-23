@@ -14,16 +14,13 @@ import android.widget.Toast
 import android.widget.LinearLayout
 import androidx.activity.OnBackPressedCallback
 import androidx.core.content.ContextCompat
+import androidx.core.view.doOnLayout
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewModelScope
-import androidx.media3.common.MediaItem as ExoMediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
 import androidx.recyclerview.widget.GridLayoutManager
 import com.aladdin.dashcam.R
 import com.aladdin.dashcam.databinding.FragmentAlbumBinding
@@ -72,8 +69,10 @@ class AlbumFragment : Fragment() {
     private var selectedTimelineDateStr: String? = null
 
     // Media viewer & player state
-    private var exoPlayer: ExoPlayer? = null
-    private var jpegPlayback: com.aladdin.dashcam.network.GeneralplusPlaybackStream? = null
+    private var nativePlayer: com.aladdin.dashcam.media.NativeFfmpegPlayer? = null
+    private var remotePlayback = false
+    private var videoDurationMs = 0L
+    private var seekingVideo = false
     private var currentViewingItem: MediaItem? = null
     private var previewJob: Job? = null
     private var playbackCommandJob: Job? = null
@@ -118,6 +117,7 @@ class AlbumFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner, backPressedCallback)
+        initVideoPlayer()
         setupRecyclerView()
         setupListeners()
         updateResponsiveControls(resources.configuration)
@@ -157,6 +157,21 @@ class AlbumFragment : Fragment() {
         )
         binding.layoutViewerStripContainer.visibility = if (viewingVideo && config.orientation != Configuration.ORIENTATION_LANDSCAPE) View.VISIBLE else View.GONE
         binding.viewerTopBar.visibility = View.VISIBLE
+        binding.layoutViewerControls.visibility = if (viewingVideo) View.VISIBLE else View.GONE
+        (binding.layoutViewerControls.layoutParams as android.widget.FrameLayout.LayoutParams).bottomMargin =
+            if (binding.layoutViewerStripContainer.visibility == View.VISIBLE) (112 * resources.displayMetrics.density).toInt() else 0
+        binding.layoutMediaViewer.doOnLayout {
+            if (_binding != null && currentViewingItem?.isVideo == true) {
+                val stripHeight = if (binding.layoutViewerStripContainer.visibility == View.VISIBLE) binding.layoutViewerStripContainer.height else 0
+                val controls = binding.layoutViewerControls.layoutParams as android.widget.FrameLayout.LayoutParams
+                controls.bottomMargin = stripHeight
+                binding.layoutViewerControls.layoutParams = controls
+                val video = binding.glVideoView.layoutParams as android.widget.FrameLayout.LayoutParams
+                video.topMargin = if (binding.viewerTopBar.visibility == View.VISIBLE) binding.viewerTopBar.height else 0
+                video.bottomMargin = stripHeight + binding.layoutViewerControls.height
+                binding.glVideoView.layoutParams = video
+            }
+        }
     }
 
     override fun onHiddenChanged(hidden: Boolean) {
@@ -323,14 +338,95 @@ class AlbumFragment : Fragment() {
         }
     }
 
-    private fun setupListeners() {
-        binding.playerView.setControllerVisibilityListener(
-            androidx.media3.ui.PlayerView.ControllerVisibilityListener { visibility ->
-                if (_binding != null && resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-                    binding.viewerTopBar.visibility = visibility
+    private fun initVideoPlayer() {
+        nativePlayer = com.aladdin.dashcam.media.NativeFfmpegPlayer(
+            binding.glVideoView,
+            onFirstFrameRendered = {
+                if (_binding != null && currentViewingItem?.isVideo == true) {
+                    binding.viewerLoadingLayout.visibility = View.GONE
+                    binding.btnVideoPlayPause.isEnabled = true
+                    binding.btnVideoPlayPause.text = "暫停"
+                    android.util.Log.i("AlbumFragment", "FFmpeg file frame index=${currentViewingItem?.deviceIndex}, elapsedMs=${android.os.SystemClock.elapsedRealtime() - previewStartedAt}")
+                }
+            },
+            onError = { error -> if (_binding != null) showPlaybackError(previewRequestId, error) },
+            onProgress = { position, duration ->
+                if (_binding != null && currentViewingItem?.isVideo == true) {
+                    videoDurationMs = duration
+                    val positionText = formatVideoTime(position)
+                    binding.tvVideoPosition.text = if (remotePlayback) {
+                        "$positionText · 裝置回放（精確跳轉需先下載）"
+                    } else {
+                        "$positionText / ${if (duration > 0L) formatVideoTime(duration) else "時長未知"}"
+                    }
+                    binding.seekVideo.isEnabled = !remotePlayback && duration > 0L
+                    if (!seekingVideo && duration > 0L) {
+                        binding.seekVideo.progress = (position * 1000L / duration).toInt().coerceIn(0, 1000)
+                    }
+                }
+            },
+            onEnded = {
+                if (_binding != null) {
+                    binding.btnVideoPlayPause.text = "重播"
+                    binding.btnVideoPlayPause.isEnabled = true
                 }
             }
         )
+        binding.glVideoView.setOnClickListener {
+            if (resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                binding.viewerTopBar.visibility = if (binding.viewerTopBar.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            }
+        }
+        binding.btnVideoPlayPause.setOnClickListener {
+            val item = currentViewingItem ?: return@setOnClickListener
+            val native = nativePlayer ?: return@setOnClickListener
+            if (!native.hasSource) {
+                openViewer(item)
+                return@setOnClickListener
+            }
+            val token = previewRequestId
+            val pause = native.isPlaying
+            if (!pause && remotePlayback && native.needsRestart) {
+                Toast.makeText(context, "設備已結束暫停的串流，將從片頭重新播放", Toast.LENGTH_LONG).show()
+                openViewer(item)
+                return@setOnClickListener
+            }
+            binding.btnVideoPlayPause.isEnabled = false
+            viewLifecycleOwner.lifecycleScope.launch {
+                try {
+                    if (remotePlayback) viewModel.toggleRemotePlaybackPause(item).getOrThrow()
+                    if (previewRequestId != token) return@launch
+                    native.setPaused(pause, controlSource = !remotePlayback)
+                    binding.btnVideoPlayPause.text = if (pause) "播放" else "暫停"
+                } catch (error: Exception) {
+                    if (previewRequestId == token) showPlaybackError(token, error.message ?: "暫停狀態未確認，請重新開啟影片")
+                } finally {
+                    if (_binding != null && previewRequestId == token) binding.btnVideoPlayPause.isEnabled = true
+                }
+            }
+        }
+        binding.seekVideo.setOnSeekBarChangeListener(object : android.widget.SeekBar.OnSeekBarChangeListener {
+            override fun onStartTrackingTouch(seekBar: android.widget.SeekBar?) { seekingVideo = true }
+            override fun onProgressChanged(seekBar: android.widget.SeekBar?, progress: Int, fromUser: Boolean) {}
+            override fun onStopTrackingTouch(seekBar: android.widget.SeekBar?) {
+                seekingVideo = false
+                if (remotePlayback || videoDurationMs <= 0L) return
+                val token = previewRequestId
+                val targetMs = (seekBar?.progress ?: 0) * videoDurationMs / 1000L
+                viewLifecycleOwner.lifecycleScope.launch {
+                    if (nativePlayer?.seekTo(targetMs) != true && _binding != null && token == previewRequestId) {
+                        Toast.makeText(context, "無法跳轉此影片", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        })
+    }
+
+    private fun formatVideoTime(positionMs: Long): String {
+        val seconds = positionMs.coerceAtLeast(0L) / 1000L
+        return String.format(Locale.getDefault(), "%02d:%02d", seconds / 60L, seconds % 60L)
+    }
+    private fun setupListeners() {
         binding.toggleAlbumSource.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
                 if (adapter.isSelectionMode) {
@@ -679,6 +775,12 @@ class AlbumFragment : Fragment() {
      */
     private fun openViewer(item: MediaItem, startOffsetMs: Long = 0L) {
         playbackCommandJob?.cancel()
+        if (remotePlayback) {
+            playbackStopJob = viewModel.viewModelScope.launch { viewModel.stopRemotePlayback() }
+        }
+        remotePlayback = false
+        videoDurationMs = 0L
+        seekingVideo = false
         previewStartedAt = android.os.SystemClock.elapsedRealtime()
         android.util.Log.i("AlbumFragment", "Open media index=${item.deviceIndex}, file=${item.fileName}")
         thumbnailJobs.values.forEach { it.cancel() }
@@ -706,7 +808,7 @@ class AlbumFragment : Fragment() {
         // Reset player & photo view
         releasePlayer()
         releasePreviewProtection()
-        binding.playerView.visibility = View.GONE
+        binding.glVideoView.visibility = View.GONE
         binding.ivPhotoViewer.visibility = View.GONE
         binding.ivPhotoViewer.setImageDrawable(null)
         binding.viewerLoadingLayout.visibility = View.GONE
@@ -744,61 +846,51 @@ class AlbumFragment : Fragment() {
         }
 
         if (isDeviceSource && item.isVideo) {
+            remotePlayback = true
             binding.viewerLoadingLayout.visibility = View.VISIBLE
             binding.tvViewerLoadingText.text = "正在開啟錄影檔（回放時暫停錄影）…"
-            binding.ivPhotoViewer.scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
+            binding.glVideoView.visibility = View.VISIBLE
+            binding.layoutViewerControls.visibility = View.VISIBLE
+            binding.seekVideo.isEnabled = false
+            binding.btnVideoPlayPause.isEnabled = false
+            if (startOffsetMs > 0L) Toast.makeText(context, "裝置回放從片頭開始；精確跳轉請先下載影片", Toast.LENGTH_LONG).show()
             previewJob = viewLifecycleOwner.lifecycleScope.launch {
-                viewModel.requestStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
-                kotlinx.coroutines.delay(200)
-                val network = viewModel.wifiNetwork.value
-                if (network == null) {
-                    showPlaybackError(currentToken, "記錄器 Wi-Fi 已中斷")
-                    return@launch
-                }
-                val stream = com.aladdin.dashcam.network.GeneralplusPlaybackStream(network, viewModel.deviceHost.value)
-                jpegPlayback = stream
-                val sent = kotlinx.coroutines.CompletableDeferred<Unit>()
-                playbackCommandJob = viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
-                    val result = viewModel.startRemotePlayback(item) { sent.complete(Unit) }
-                    result.exceptionOrNull()?.let { error ->
-                        sent.completeExceptionally(error)
-                        stream.close()
-                        withContext(Dispatchers.Main) { showPlaybackError(currentToken, error.message ?: "記錄器拒絕回放") }
-                    }
-                }
-                var firstFrame = true
                 try {
-                    stream.play(onSourceRequested = { sent.await() }, onAudioAvailable = { available ->
-                        withContext(Dispatchers.Main) {
-                            if (_binding != null && previewRequestId == currentToken && !available) binding.tvViewerTime.append(" · 此回放無音訊")
+                    viewModel.requestStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
+                    playbackStopJob?.join()
+                    val network = viewModel.wifiNetwork.value ?: error("記錄器 Wi-Fi 已中斷")
+                    val sent = kotlinx.coroutines.CompletableDeferred<Unit>()
+                    playbackCommandJob = viewLifecycleOwner.lifecycleScope.launch(Dispatchers.IO) {
+                        val result = runCatching {
+                            viewModel.restartStreaming().getOrThrow()
+                            viewModel.startRemotePlayback(item) { sent.complete(Unit) }.getOrThrow()
                         }
-                    }) { bytes ->
-                        val bitmap = withContext(Dispatchers.IO) {
-                            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                        } ?: return@play
-                        withContext(Dispatchers.Main) {
-                            if (_binding != null && previewRequestId == currentToken) {
-                                binding.ivPhotoViewer.visibility = View.VISIBLE
-                                binding.ivPhotoViewer.setImageBitmap(bitmap)
-                                if (firstFrame) {
-                                    firstFrame = false
-                                    binding.viewerLoadingLayout.visibility = View.GONE
-                                    android.util.Log.i("AlbumFragment", "JPEG file frame index=${item.deviceIndex}, elapsedMs=${android.os.SystemClock.elapsedRealtime() - previewStartedAt}")
+                        result.exceptionOrNull()?.let { error ->
+                            sent.completeExceptionally(error)
+                            withContext(Dispatchers.Main) {
+                                if (_binding != null && previewRequestId == currentToken) {
+                                    nativePlayer?.stop()
+                                    showPlaybackError(currentToken, error.message ?: "記錄器拒絕回放")
                                 }
-                            } else bitmap.recycle()
+                            }
                         }
                     }
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    if (_binding != null && previewRequestId == currentToken && binding.viewerErrorLayout.visibility != View.VISIBLE) {
-                        showPlaybackError(currentToken, e.message ?: "錄影檔傳輸中斷")
+                    kotlinx.coroutines.withTimeout(20_000L) { sent.await() }
+                    if (previewRequestId == currentToken) {
+                        nativePlayer?.start("rtsp://${viewModel.deviceHost.value}:8080/?action=stream",
+                            targetNetwork = network, knownDurationMs = item.durationSeconds.toLong() * 1000L)
                     }
-                } finally { stream.close() }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    if (_binding != null && previewRequestId == currentToken) {
+                        nativePlayer?.stop()
+                        showPlaybackError(currentToken, error.message ?: "錄影檔傳輸中斷")
+                    }
+                }
             }
             return
         }
-
         // Remote Photo fetch or fallback
         fetchPreviewFallback(item, currentToken, startOffsetMs)
     }
@@ -839,43 +931,44 @@ class AlbumFragment : Fragment() {
             binding.ivPhotoViewer.setImageDrawable(null)
             binding.ivPhotoViewer.visibility = View.GONE
         }
+        nativePlayer?.stop()
+        binding.glVideoView.visibility = View.GONE
+        binding.btnVideoPlayPause.text = "重試"
+        binding.btnVideoPlayPause.isEnabled = true
         binding.viewerErrorLayout.visibility = View.VISIBLE
         binding.tvViewerErrorMsg.text = "回放失敗：$message"
     }
 
     private fun displayMediaContent(item: MediaItem, file: File, startOffsetMs: Long = 0L) {
         if (item.isVideo) {
-            binding.playerView.visibility = View.VISIBLE
+            binding.glVideoView.visibility = View.VISIBLE
             binding.ivPhotoViewer.visibility = View.GONE
-            setupExoPlayer(file, startOffsetMs)
+            setupNativePlayer(file, startOffsetMs)
         } else {
-            binding.playerView.visibility = View.GONE
+            binding.glVideoView.visibility = View.GONE
             binding.ivPhotoViewer.visibility = View.VISIBLE
             binding.ivPhotoViewer.scaleType = android.widget.ImageView.ScaleType.MATRIX
             displayPhoto(file)
         }
     }
 
-    private fun setupExoPlayer(file: File, startOffsetMs: Long = 0L) {
-        releasePlayer()
-        val player = ExoPlayer.Builder(requireContext()).build()
-        binding.playerView.player = player
-        player.addListener(object : Player.Listener {
-            override fun onPlayerError(error: PlaybackException) {
-                binding.viewerErrorLayout.visibility = View.VISIBLE
-                binding.tvViewerErrorMsg.text = "影片播放失敗：${error.message ?: "無法解碼影片"}"
+    private fun setupNativePlayer(file: File, startOffsetMs: Long = 0L) {
+        val item = currentViewingItem ?: return
+        val token = previewRequestId
+        remotePlayback = false
+        binding.layoutViewerControls.visibility = View.VISIBLE
+        binding.viewerLoadingLayout.visibility = View.VISIBLE
+        binding.tvViewerLoadingText.text = "正在開啟本機影片…"
+        binding.btnVideoPlayPause.isEnabled = false
+        previewJob = viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.requestStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
+            playbackStopJob?.join()
+            if (token == previewRequestId) {
+                nativePlayer?.start(file.absolutePath, streaming = false, startPositionMs = startOffsetMs,
+                    knownDurationMs = item.durationSeconds.toLong() * 1000L)
             }
-        })
-        val mediaItem = ExoMediaItem.fromUri(Uri.fromFile(file))
-        player.setMediaItem(mediaItem)
-        if (startOffsetMs > 0L) {
-            player.seekTo(startOffsetMs)
         }
-        player.prepare()
-        player.playWhenReady = true
-        exoPlayer = player
     }
-
     private fun displayPhoto(file: File) {
         try {
             val bitmap = BitmapFactory.decodeFile(file.absolutePath)
@@ -1000,6 +1093,7 @@ class AlbumFragment : Fragment() {
         previewJob = null
         downloadJob = null
         releasePlayer()
+        remotePlayback = false
         releasePreviewProtection()
         currentViewingItem = null
         (activity as? MainActivity)?.setAlbumPreviewExpanded(false)
@@ -1012,16 +1106,13 @@ class AlbumFragment : Fragment() {
                 if (currentViewingItem == null) viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
                 if (result.isFailure && isAdded) Toast.makeText(context, "回放已關閉，但未確認恢復錄影：${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
             }
+        } else {
+            viewModel.releaseStreamOwner(DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK)
         }
     }
 
     private fun releasePlayer() {
-        jpegPlayback?.close()
-        jpegPlayback = null
-        exoPlayer?.stop()
-        exoPlayer?.release()
-        exoPlayer = null
-        binding.playerView.player = null
+        nativePlayer?.stop()
     }
 
     private fun releasePreviewProtection() {
@@ -1052,14 +1143,13 @@ class AlbumFragment : Fragment() {
                 }
                 launch {
                     viewModel.connectionStatus.collect { status ->
-                        if (currentViewingItem?.isVideo == true && jpegPlayback != null &&
+                        if (currentViewingItem?.isVideo == true && remotePlayback && nativePlayer != null &&
                             status != com.aladdin.dashcam.model.ConnectionStatus.CONNECTED) {
                             val disconnectedToken = ++previewRequestId
                             previewJob?.cancel()
                             previewJob = null
                             playbackCommandJob?.cancel()
-                            jpegPlayback?.close()
-                            jpegPlayback = null
+                            nativePlayer?.stop()
                             binding.ivPhotoViewer.setImageDrawable(null)
                             showPlaybackError(disconnectedToken, "記錄器連線已中斷，請重新連線後再試")
                         }
@@ -1171,7 +1261,8 @@ class AlbumFragment : Fragment() {
         downloadJob = null
         currentViewingItem = null
         (activity as? MainActivity)?.setAlbumPreviewExpanded(false)
-        releasePlayer()
+        nativePlayer?.release()
+        nativePlayer = null
         releasePreviewProtection()
         _binding = null
     }

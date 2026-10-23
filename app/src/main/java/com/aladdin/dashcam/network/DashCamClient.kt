@@ -1081,6 +1081,22 @@ class DashCamClient(
         }
     }
 
+    suspend fun togglePlaybackPause(deviceIndex: Int, expectedEpoch: Long): Result<Unit> = withContext(Dispatchers.IO) {
+        synchronized(commandLock) {
+            try {
+                check(expectedEpoch == targetEpoch && activePlaybackIndex == deviceIndex) { "播放來源已切換，請重新開啟影片" }
+                ensureConnected()
+                check(queryStatusInternal()?.mode == DeviceMode.PLAYBACK) { "設備已離開回放模式" }
+                val response = sendAndReceive(GPSocketProtocol.MODE_PLAYBACK, GPSocketProtocol.CMD_PLAYBACK_PAUSE,
+                    GPSocketProtocol.buildPlaybackPausePacket())
+                check(response is GPSocketResponse.Ack) { "暫停狀態未確認：$response" }
+                Result.success(Unit)
+            } catch (error: Exception) {
+                Result.failure(error)
+            }
+        }
+    }
+
     /**
      * Stops RTSP playback and restores live stream readiness via CMD_PLAYBACK_STOP
      */

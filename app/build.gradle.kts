@@ -104,11 +104,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
-    // Media3 / ExoPlayer for RTSP and MP4 playback
-    implementation("androidx.media3:media3-exoplayer:1.3.1")
-    implementation("androidx.media3:media3-exoplayer-rtsp:1.3.1")
-    implementation("androidx.media3:media3-ui:1.3.1")
-
     // Google Maps SDK for Android
     implementation("com.google.android.gms:play-services-maps:18.2.0")
 

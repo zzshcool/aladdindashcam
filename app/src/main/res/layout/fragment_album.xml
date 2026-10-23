@@ -458,14 +458,12 @@
         android:focusable="true"
         android:visibility="gone">
 
-        <!-- Video Player View (Media3 ExoPlayer) -->
-        <androidx.media3.ui.PlayerView
-            android:id="@+id/player_view"
+        <!-- FFmpeg video surface for device and local media -->
+        <android.opengl.GLSurfaceView
+            android:id="@+id/gl_video_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            app:resize_mode="fit"
-            app:show_buffering="when_playing"
-            app:use_controller="true" />
+            android:visibility="gone" />
 
         <!-- Photo View for Images (Pinch to zoom supported) -->
         <ImageView
@@ -502,6 +500,45 @@
                 android:clipToPadding="false"
                 android:orientation="horizontal"
                 android:paddingHorizontal="12dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/layout_viewer_controls"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:background="#D911161B"
+            android:orientation="vertical"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <TextView
+                android:id="@+id/tv_video_position"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_video_play_pause"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:text="暫停" />
+
+                <SeekBar
+                    android:id="@+id/seek_video"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:contentDescription="本機影片播放位置"
+                    android:max="1000" />
+            </LinearLayout>
         </LinearLayout>
 
         <!-- Viewer Top Bar (Back button, File title, Recording time, Independent Download button) -->

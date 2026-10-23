@@ -285,7 +285,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             combine(networkMonitor.wifiNetwork, networkMonitor.wifiLinkRevision) { network, _ -> network }.collect { network ->
                 probeJob?.cancel()
-                client.bindNetwork(network)
+                withContext(Dispatchers.IO) { client.bindNetwork(network) }
                 if (network != null) {
                     probeJob = launch(Dispatchers.IO) probe@{
                         delay(350)
@@ -828,6 +828,11 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         return res
     }
 
+    suspend fun toggleRemotePlaybackPause(item: MediaItem): Result<Unit> {
+        if (!isCurrentMediaSource(item)) return Result.failure(IllegalStateException("影片來源已切換"))
+        return client.togglePlaybackPause(item.deviceIndex, item.sourceEpoch)
+    }
+
     private val formatStorageMutex = Mutex()
     private val _isFormattingStorage = MutableStateFlow(false)
     val isFormattingStorage: StateFlow<Boolean> = _isFormattingStorage.asStateFlow()
@@ -858,7 +863,6 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         val res = client.stopPlayback(expectedEpoch = epoch)
         _isRemotePlaybackActive.value = false
         _currentPlaybackItem.value = null
-        client.restartStreaming()
         return res
     }
 
