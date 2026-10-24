@@ -36,6 +36,7 @@ class MainActivity : AppCompatActivity() {
 
     private var activeFragment: Fragment? = null
     private var albumPreviewExpanded = false
+    private var launchIntro: LaunchIntroView? = null
 
     fun setAlbumPreviewExpanded(enabled: Boolean) {
         albumPreviewExpanded = enabled
@@ -77,6 +78,24 @@ class MainActivity : AppCompatActivity() {
         setupBottomNav()
         observeConnectionStatus()
         setupBackPressedHandler()
+        if (savedInstanceState == null && LaunchIntroView.shouldShow(this)) {
+            val content = findViewById<android.widget.FrameLayout>(android.R.id.content)
+            val accessibility = binding.root.importantForAccessibility
+            binding.root.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+            val intro = LaunchIntroView(this) {
+                launchIntro?.let { content.removeView(it) }
+                launchIntro = null
+                binding.root.importantForAccessibility = accessibility
+            }
+            launchIntro = intro
+            content.addView(intro, android.widget.FrameLayout.LayoutParams(-1, -1))
+            ViewCompat.setOnApplyWindowInsetsListener(intro) { view, insets ->
+                val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
+                view.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+                insets
+            }
+            ViewCompat.requestApplyInsets(intro)
+        }
     }
 
     var isFullscreen: Boolean = false
@@ -92,7 +111,9 @@ class MainActivity : AppCompatActivity() {
     private fun setupBackPressedHandler() {
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (isFullscreen) {
+                if (launchIntro != null) {
+                    launchIntro?.finish()
+                } else if (isFullscreen) {
                     setFullscreen(false)
                     liveFragment?.updateFullscreenLayout(false)
                 } else if (activeFragment != homeFragment) {

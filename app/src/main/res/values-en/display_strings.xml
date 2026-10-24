@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="album_sort">Sort</string>
+    <string-array name="album_sort_options">
+        <item>Date: newest first</item>
+        <item>Date: oldest first</item>
+        <item>Size: largest first</item>
+        <item>Size: smallest first</item>
+    </string-array>
+    <string name="ride_gforce_short">G-force</string>
+    <string name="ride_distance_label">Distance</string>
+    <string name="ride_duration_label">Duration</string>
+    <string name="ride_speed_label">Top speed</string>
+    <string name="ride_coverage_label">GPS coverage</string>
+    <string name="ride_no_points_short">No location fixes</string>
+    <string name="ride_view_details">View ride details</string>
+    <string name="home_connect_short">Connect</string>
+    <string name="home_live_short">Live</string>
+    <string name="home_rides_desc">Routes and ride statistics</string>
+</resources>

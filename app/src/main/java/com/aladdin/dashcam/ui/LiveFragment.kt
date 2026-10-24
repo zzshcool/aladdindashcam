@@ -21,6 +21,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import com.aladdin.dashcam.R
 import com.aladdin.dashcam.databinding.FragmentLiveBinding
 import com.aladdin.dashcam.model.ConnectionStatus
+import com.aladdin.dashcam.model.DeviceMode
 import com.aladdin.dashcam.model.RecordingStatus
 import com.aladdin.dashcam.gps.GpsStatus
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -33,6 +34,8 @@ import com.google.android.gms.maps.model.Polyline
 import com.google.android.gms.maps.model.PolylineOptions
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -84,6 +87,7 @@ class LiveFragment : Fragment() {
         binding.previewContainer.visibility = if (mapMode) View.GONE else View.VISIBLE
         binding.mapContainer.visibility = if (mapMode || split) View.VISIBLE else View.GONE
         binding.layoutNormalControls.visibility = View.VISIBLE
+        binding.statusStrip.visibility = if (mapMode) View.GONE else View.VISIBLE
         binding.layoutRideMode.visibility = if (ride) View.VISIBLE else View.GONE
         val constraints = ConstraintSet().apply { clone(binding.root) }
         val parent = ConstraintSet.PARENT_ID
@@ -99,10 +103,12 @@ class LiveFragment : Fragment() {
         connect(R.id.layout_normal_controls, end, parent, end)
         constraints.clear(R.id.layout_normal_controls, top)
         constraints.clear(R.id.layout_normal_controls, bottom)
-        connect(R.id.layout_normal_controls, if (landscape) top else bottom, parent, if (landscape) top else bottom)
+        connect(R.id.layout_normal_controls, bottom, parent, bottom)
         constraints.clear(R.id.status_strip, top)
         constraints.clear(R.id.status_strip, bottom)
-        connect(R.id.status_strip, bottom, if (landscape) parent else R.id.layout_normal_controls, if (landscape) bottom else top)
+        connect(R.id.status_strip, bottom, R.id.preview_container, bottom)
+        connect(R.id.status_strip, start, R.id.preview_container, start)
+        connect(R.id.status_strip, end, R.id.preview_container, end)
         connect(R.id.preview_container, start, parent, start)
         connect(R.id.preview_container, end, if (landscape && (split || ride)) R.id.map_split_guideline else parent,
             if (landscape && (split || ride)) start else end)
@@ -110,17 +116,14 @@ class LiveFragment : Fragment() {
         constraints.clear(R.id.preview_container, bottom)
         constraints.constrainHeight(R.id.preview_container, ConstraintSet.MATCH_CONSTRAINT)
         constraints.setDimensionRatio(R.id.preview_container, if (!landscape && (split || ride)) "H,16:9" else null)
-        if (!landscape && (split || ride)) {
-            constraints.clear(R.id.status_strip, bottom)
-            connect(R.id.status_strip, top, R.id.preview_container, bottom)
-        } else {
-            connect(R.id.preview_container, bottom, R.id.status_strip, top)
+        if (landscape || !(split || ride)) {
+            connect(R.id.preview_container, bottom, R.id.layout_normal_controls, top)
         }
         for (id in intArrayOf(R.id.map_container, R.id.layout_ride_mode)) {
             connect(id, start, if (landscape && !mapMode) R.id.map_split_guideline else parent, start)
             connect(id, end, parent, end)
-            connect(id, top, if (landscape || mapMode) R.id.layout_live_mode_toggle else R.id.status_strip, bottom)
-            connect(id, bottom, if (landscape || mapMode) R.id.status_strip else R.id.layout_normal_controls, top)
+            connect(id, top, if (landscape || mapMode) R.id.layout_live_mode_toggle else R.id.preview_container, bottom)
+            connect(id, bottom, R.id.layout_normal_controls, top)
         }
         constraints.applyTo(binding.root)
         if (mapMode || split) {
@@ -253,6 +256,9 @@ class LiveFragment : Fragment() {
     }
     private fun setupMediaStream(network: android.net.Network?) {
         val native = nativePlayer ?: return
+        if (viewModel.deviceStatus.value.mode == DeviceMode.PLAYBACK ||
+            viewModel.currentStreamOwner.value == DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK ||
+            viewModel.currentStreamOwner.value == DashCamViewModel.MediaStreamOwner.DOWNLOAD) return
         if (network == null || viewModel.targetIdentity.value.state != com.aladdin.dashcam.network.TargetState.READY) {
             streamJob?.cancel()
             streamJob = null
@@ -367,6 +373,11 @@ class LiveFragment : Fragment() {
             showMoreMenu(view)
         }
 
+        val expandGesture = android.view.GestureDetector(requireContext(), object : android.view.GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(event: android.view.MotionEvent) = true
+            override fun onDoubleTap(event: android.view.MotionEvent): Boolean { toggleFullscreen(); return true }
+        })
+        binding.glPlayerView.setOnTouchListener { _, event -> expandGesture.onTouchEvent(event) }
         binding.btnFullscreen.setOnClickListener {
             toggleFullscreen()
         }
@@ -540,12 +551,12 @@ class LiveFragment : Fragment() {
     fun updateFullscreenLayout(isFullscreen: Boolean) {
         if (_binding == null) return
         val controlsVisibility = if (isFullscreen) View.GONE else View.VISIBLE
-        binding.statusStrip.visibility = controlsVisibility
+        binding.statusStrip.visibility = View.VISIBLE
         binding.layoutLiveModeToggle?.visibility = controlsVisibility
         binding.layoutNormalControls?.visibility = if (isFullscreen) View.GONE else View.VISIBLE
         binding.layoutRideMode?.visibility = if (isFullscreen) View.GONE else (if (binding.toggleLiveMode?.checkedButtonId == R.id.btn_mode_ride) View.VISIBLE else View.GONE)
         binding.btnFullscreen.visibility = View.VISIBLE
-        binding.hudPipStatusContainer.visibility = if (isFullscreen) View.VISIBLE else View.GONE
+        binding.hudPipStatusContainer.visibility = View.GONE
         updatePreviewGeometry(isFullscreen)
         if (isFullscreen && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
             setupMediaStream(viewModel.networkMonitor.wifiNetwork.value)
@@ -739,10 +750,12 @@ class LiveFragment : Fragment() {
                         viewModel.wifiNetwork,
                         viewModel.deviceHost,
                         viewModel.currentStreamOwner,
-                        viewModel.targetIdentity
-                    ) { net, host, owner, _ -> Triple(net, host, owner) }
-                        .collect { (network, _, owner) ->
-                            if (owner == DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK || owner == DashCamViewModel.MediaStreamOwner.DOWNLOAD) {
+                        viewModel.targetIdentity,
+                        viewModel.deviceStatus.map { it.mode }.distinctUntilChanged()
+                    ) { net, host, owner, _, mode -> Triple(net, host, owner) to mode }
+                        .collect { (stream, mode) ->
+                            val (network, _, owner) = stream
+                            if (owner == DashCamViewModel.MediaStreamOwner.ALBUM_PLAYBACK || owner == DashCamViewModel.MediaStreamOwner.DOWNLOAD || mode == DeviceMode.PLAYBACK) {
                                 // 相簿正在回放，停止 FFmpeg 預覽以釋放記錄器 8080 RTSP 端口
                                 streamJob?.cancel()
                                 streamJob = null
@@ -765,15 +778,17 @@ class LiveFragment : Fragment() {
     private fun updateRecordingTimerUi(timer: RecordingTimerDisplay) {
         if (_binding == null) return
         val connected = viewModel.connectionStatus.value == ConnectionStatus.CONNECTED
+        val mode = viewModel.deviceStatus.value.mode
+        val canTakePhoto = connected && !takingPhoto && (mode == DeviceMode.RECORD || mode == DeviceMode.CAPTURE)
         val seconds = timer.displaySeconds.coerceAtLeast(0L)
         val recordingText = getString(R.string.recording_elapsed, seconds / 3600, seconds / 60 % 60, seconds % 60)
         binding.btnToggleRecording.isEnabled = connected && !timer.isUnknown && !takingPhoto
-        binding.btnSnapshot.isEnabled = connected && !takingPhoto
+        binding.btnSnapshot.isEnabled = canTakePhoto
         binding.btnSnapshot.text = getString(if (takingPhoto) R.string.live_photo_in_progress else R.string.btn_take_photo)
         binding.btnToggleRecording.alpha = if (binding.btnToggleRecording.isEnabled) 1f else 0.35f
         binding.btnSnapshot.alpha = if (binding.btnSnapshot.isEnabled) 1f else 0.35f
         binding.fabMapRecord.isEnabled = connected && !timer.isUnknown && !takingPhoto
-        binding.fabMapSnapshot.isEnabled = connected && !takingPhoto
+        binding.fabMapSnapshot.isEnabled = canTakePhoto
         binding.fabMapRecord.alpha = if (binding.fabMapRecord.isEnabled) 1f else 0.35f
         binding.fabMapSnapshot.alpha = if (binding.fabMapSnapshot.isEnabled) 1f else 0.35f
         if (!connected) binding.tvSdStatus.text = getString(R.string.device_status_disconnected)

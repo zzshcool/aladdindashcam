@@ -43,6 +43,10 @@ class DeviceFragment : Fragment() {
     }
 
     private fun setupAppearance() {
+        binding.switchLaunchIntro.isChecked = LaunchIntroView.repeats(requireContext())
+        binding.switchLaunchIntro.setOnCheckedChangeListener { _, enabled ->
+            LaunchIntroView.setRepeats(requireContext(), enabled)
+        }
         val tags = arrayOf("", "zh-TW", "zh-CN", "en")
         val languages = arrayOf(getString(R.string.appearance_system), getString(R.string.language_traditional_chinese), getString(R.string.language_simplified_chinese), "English")
         val selectedLocale = AppCompatDelegate.getApplicationLocales().get(0)

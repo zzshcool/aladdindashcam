@@ -17,7 +17,7 @@
         <!-- 54dp Compact Header (D02 / D05 / D11) -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="@dimen/header_height_compact"
+            android:layout_height="48dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -28,8 +28,7 @@
                 android:layout_weight="1"
                 android:gravity="center_vertical"
                 android:text="@string/home_title_my_dashcam"
-                android:textSize="@dimen/text_size_h1"
-                android:textStyle="bold"
+                android:textSize="14sp"
                 android:textColor="@color/text_primary"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
@@ -99,7 +98,7 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:padding="@dimen/space_16"
+                android:padding="12dp"
                 android:orientation="vertical">
 
                 <!-- Header Row: Small Device Silhouette + Name/Status -->
@@ -112,8 +111,8 @@
                     <!-- Small Brand Silhouette Graphic (Review Section 4: Do not hide device illustration) -->
                     <ImageView
                         android:id="@+id/iv_card_device_icon"
-                        android:layout_width="48dp"
-                        android:layout_height="38dp"
+                        android:layout_width="32dp"
+                        android:layout_height="28dp"
                         android:src="@drawable/ic_recorder_hero"
                         android:contentDescription="@null" />
 
@@ -129,7 +128,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:text="@string/home_device_none"
-                            android:textSize="@dimen/text_size_h2"
+                            android:textSize="18sp"
                             android:maxLines="1"
                             android:ellipsize="end"
                             android:textStyle="bold"
@@ -140,10 +139,29 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
+                            android:maxLines="1"
+                            android:ellipsize="end"
                             android:text="@string/home_device_none_desc"
                             android:textSize="@dimen/text_size_sub"
                             android:textColor="@color/text_secondary" />
                     </LinearLayout>
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_home_connect"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="0dp"
+                    android:text="@string/home_action_add"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    app:cornerRadius="@dimen/radius_button"
+                    android:backgroundTint="@color/transparent"
+                    android:textColor="@color/accent_blue"
+                    app:strokeWidth="0dp"
+                    android:textAllCaps="false"
+                    android:stateListAnimator="@null"
+                    android:elevation="0dp"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:paddingHorizontal="8dp" />
                 </LinearLayout>
 
                 <!-- Telemetry Row: Battery & SD Status (Review Section 4 & D09) -->
@@ -151,16 +169,17 @@
                     android:id="@+id/layout_device_telemetry"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:background="@drawable/bg_status_badge"
-                    android:paddingHorizontal="@dimen/space_12"
+
+                    android:paddingHorizontal="0dp"
                     android:gravity="center_vertical"
-                    android:orientation="vertical"
-                    android:layout_marginTop="8dp"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="6dp"
                     android:paddingVertical="4dp">
 
                     <!-- Battery info with clean text & accessibility (D09) -->
                     <LinearLayout
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
                         android:layout_height="wrap_content"
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
@@ -182,15 +201,10 @@
                             tools:text="電量 4/4" />
                     </LinearLayout>
 
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:layout_marginVertical="8dp"
-                        android:background="@color/border_subtle" />
-
                     <!-- SD info with clean text & capacity (D09) -->
                     <LinearLayout
-                        android:layout_width="match_parent"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
                         android:layout_height="wrap_content"
                         android:gravity="center_vertical"
                         android:orientation="horizontal">
@@ -209,29 +223,13 @@
                             android:layout_marginStart="@dimen/space_4"
                             android:textSize="@dimen/text_size_sub"
                             android:textColor="@color/text_primary"
-                            android:maxLines="4"
+                            android:maxLines="2"
                             tools:text="SD：可錄 120 分" />
                     </LinearLayout>
                 </LinearLayout>
 
                 <!-- Primary Action CTA (Review Section 3: Solid Cool Blue Button) -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_home_connect"
-                    android:layout_width="match_parent"
-                    android:layout_height="@dimen/button_height_primary"
-                    android:layout_marginTop="@dimen/space_16"
-                    android:text="@string/home_action_add"
-                    android:textSize="@dimen/text_size_body"
-                    android:textStyle="bold"
-                    app:cornerRadius="@dimen/radius_button"
-                    android:backgroundTint="@color/transparent"
-                    android:textColor="@color/accent_blue"
-                    app:strokeWidth="0dp"
-                    android:textAllCaps="false"
-                    android:stateListAnimator="@null"
-                    android:elevation="0dp"
-                    style="@style/Widget.MaterialComponents.Button.TextButton"
-                    android:paddingHorizontal="8dp" />
+
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -379,10 +377,55 @@
             </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/btn_home_rides" style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="match_parent" android:layout_height="48dp"
-            android:text="@string/ride_title" android:textAllCaps="false" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_8"
+            android:orientation="horizontal">
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btn_home_rides"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:layout_marginEnd="@dimen/space_4"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardCornerRadius="@dimen/radius_card"
+                app:cardBackgroundColor="@color/surface_dark"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/border_subtle">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="@dimen/space_12"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/ride_title"
+                        android:textSize="@dimen/text_size_body"
+                        android:textStyle="bold"
+                        android:textColor="@color/text_primary" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="@string/home_rides_desc"
+                        android:textSize="@dimen/text_size_caption"
+                        android:textColor="@color/text_secondary" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:layout_marginStart="@dimen/space_4" />
+        </LinearLayout>
 
         <!-- Brand Footer -->
         <TextView

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.AladdinDashCam.Launcher" parent="Theme.AladdinDashCam">
-        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowBackground">@color/bg_dark</item>
     </style>
 
     <style name="Theme.AladdinDashCam" parent="Theme.MaterialComponents.DayNight.NoActionBar">

@@ -102,9 +102,9 @@ class HomeFragment : Fragment() {
 
                         // Main Action CTA
                         binding.btnHomeConnect.text = if (isConnected) {
-                            getString(R.string.home_action_open_live)
+                            getString(R.string.home_live_short)
                         } else {
-                            getString(R.string.home_action_connect)
+                            getString(R.string.home_connect_short)
                         }
                     } else {
                         // Empty device state: show guidance

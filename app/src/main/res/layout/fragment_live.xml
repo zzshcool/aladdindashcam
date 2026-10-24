@@ -172,10 +172,10 @@
         android:id="@+id/status_strip"
         android:layout_width="0dp"
         android:layout_height="32dp"
-        android:background="@color/surface_dark"
+        android:background="#B3101418"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="16dp"
+        android:paddingHorizontal="10dp"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintBottom_toTopOf="@id/layout_normal_controls">
@@ -195,7 +195,7 @@
             android:layout_weight="1"
             android:singleLine="true"
             android:text="@string/recording_stopped"
-            android:textColor="@color/text_secondary"
+            android:textColor="@color/white"
             android:textSize="12sp" />
 
         <LinearLayout
@@ -221,7 +221,7 @@
                 android:singleLine="true"
                 android:visibility="gone"
                 android:text=""
-                android:textColor="@color/text_secondary"
+                android:textColor="@color/white"
                 android:textSize="12sp" />
         </LinearLayout>
 
@@ -230,7 +230,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:singleLine="true"
-            android:textColor="@color/text_secondary"
+            android:textColor="@color/white"
             android:text="@string/sd_remaining_unknown"
             android:textSize="12sp" />
     </LinearLayout>
@@ -510,10 +510,10 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginEnd="4dp"
-                android:background="@drawable/bg_status_badge"
+
                 android:gravity="center"
                 android:orientation="vertical"
-                android:paddingVertical="8dp">
+                android:paddingVertical="4dp">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -529,7 +529,7 @@
                     android:layout_marginTop="2dp"
                     android:text="-- m"
                     android:textColor="@color/text_primary"
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
@@ -539,10 +539,10 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginHorizontal="4dp"
-                android:background="@drawable/bg_status_badge"
+
                 android:gravity="center"
                 android:orientation="vertical"
-                android:paddingVertical="8dp">
+                android:paddingVertical="4dp">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -558,7 +558,7 @@
                     android:layout_marginTop="2dp"
                     android:text="+0 m"
                     android:textColor="@color/accent_teal"
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
@@ -568,10 +568,10 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginHorizontal="4dp"
-                android:background="@drawable/bg_status_badge"
+
                 android:gravity="center"
                 android:orientation="vertical"
-                android:paddingVertical="8dp">
+                android:paddingVertical="4dp">
 
                 <TextView
                     android:layout_width="wrap_content"
@@ -587,7 +587,7 @@
                     android:layout_marginTop="2dp"
                     android:text="--°"
                     android:textColor="@color/text_primary"
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
             </LinearLayout>
 
@@ -597,15 +597,15 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:layout_marginStart="4dp"
-                android:background="@drawable/bg_status_badge"
+
                 android:gravity="center"
                 android:orientation="vertical"
-                android:paddingVertical="8dp">
+                android:paddingVertical="4dp">
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/live_total_g_with_gravity"
+                    android:text="@string/ride_gforce_short"
                     android:textColor="@color/text_secondary"
                     android:textSize="@dimen/text_size_caption" />
 
@@ -616,7 +616,7 @@
                     android:layout_marginTop="2dp"
                     android:text="-- G"
                     android:textColor="@color/warning_yellow"
-                    android:textSize="15sp"
+                    android:textSize="14sp"
                     android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>

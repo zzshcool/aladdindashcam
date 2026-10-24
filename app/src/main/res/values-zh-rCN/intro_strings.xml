@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="intro_brand">Aladdin DashCam</string>
+    <string name="intro_slogan">每段骑程，都值得留下</string>
+    <string name="intro_subtitle">每段旅程，安心记录 · 影像 · 轨迹 · 你的骑行故事</string>
+    <string name="intro_repeat">每次启动播放动画</string>
+    <string name="intro_skip">进入首页</string>
+    <string name="intro_setting_hint">关闭后仅在首次启动显示；不影响视频播放或记录仪连接。</string>
+</resources>

@@ -71,20 +71,64 @@ class RideHistoryActivity : AppCompatActivity() {
             .any { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
         if (granted) startRide() else locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
     }
+    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
+
+    private fun rideCard(ride: RideSummary, action: () -> Unit): View {
+        val context = this
+        val content = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+        }
+        fun label(value: String, size: Float, color: Int) = TextView(context).apply {
+            text = value; textSize = size
+            setTextColor(ContextCompat.getColor(context, color))
+        }
+        content.addView(label(DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(ride.started)), 14f, R.color.text_secondary))
+        content.addView(label(java.lang.String.format(java.util.Locale.getDefault(), "%.2f km", ride.distance / 1000), 30f, R.color.text_primary).apply {
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(0, dp(8), 0, dp(8))
+        })
+        val metrics = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        val minutes = ((ride.ended ?: ride.started) - ride.started).coerceAtLeast(0) / 60000
+        listOf(
+            getString(R.string.ride_duration_label) to java.lang.String.format(java.util.Locale.getDefault(), "%d:%02d", minutes / 60, minutes % 60),
+            getString(R.string.ride_speed_label) to "${ride.maxSpeed ?: "--"} km/h",
+            getString(R.string.ride_coverage_label) to "${ride.coveragePercent}%"
+        ).forEach { (title, value) ->
+            metrics.addView(LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(label(title, 12f, R.color.text_secondary))
+                addView(label(value, 16f, R.color.text_primary).apply { setPadding(0, dp(4), 0, 0) })
+            }, LinearLayout.LayoutParams(0, -2, 1f))
+        }
+        content.addView(metrics)
+        content.addView(label(if (ride.pointCount == 0) getString(R.string.ride_no_points_short) else getString(R.string.ride_view_details) + "  ›", 13f, R.color.accent_blue).apply {
+            setPadding(0, dp(12), 0, 0)
+        })
+        return com.google.android.material.card.MaterialCardView(context).apply {
+            radius = dp(16).toFloat(); cardElevation = 0f
+            setCardBackgroundColor(ContextCompat.getColor(context, R.color.surface_dark))
+            addView(content)
+            layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) }
+            isClickable = true; isFocusable = true
+            setOnClickListener { action() }
+        }
+    }
+
     private fun renderList() {
         contentJob?.cancel()
         clearMap()
         rows.removeAllViews()
         rows.addView(button("‹ ${getString(R.string.ride_title)}") { finish() })
         rows.addView(button(getString(if (repository.activeId.value == null) R.string.ride_start else R.string.ride_stop)) { toggleRide() })
-        rows.addView(TextView(this).apply { text = getString(R.string.ride_notification) })
+        rows.addView(TextView(this).apply { text = getString(R.string.ride_notification); textSize = 13f; setPadding(dp(8), dp(8), dp(8), dp(8)) })
         contentJob = lifecycleScope.launch {
             val rides = withContext(Dispatchers.IO) {
-                repository.summaries().map { it.id to DateFormat.getDateTimeInstance().format(Date(it.started)) + "\n" + summary(it) }
+                repository.summaries().sortedByDescending { it.started }
             }
             if (rides.isEmpty()) rows.addView(TextView(this@RideHistoryActivity).apply { text = getString(R.string.ride_empty) })
-            rides.forEach { (id, label) ->
-                rows.addView(button(label) { showRide(id) })
+            rides.forEach { ride ->
+                rows.addView(rideCard(ride) { showRide(ride.id) })
             }
         }
     }
@@ -103,7 +147,8 @@ class RideHistoryActivity : AppCompatActivity() {
             clearMap()
             rows.removeAllViews()
             rows.addView(button("‹ ${getString(R.string.ride_title)}") { renderList() })
-            rows.addView(TextView(this@RideHistoryActivity).apply { text = summary(ride); textSize = 17f })
+            rows.addView(rideCard(RideSummary.from(ride)) { })
+            rows.addView(TextView(this@RideHistoryActivity).apply { text = summary(ride); textSize = 14f; setPadding(dp(16), dp(16), dp(16), dp(16)) })
             rows.addView(button(getString(R.string.ride_export_gpx)) {
                 if (ride.points.isEmpty()) { Toast.makeText(this@RideHistoryActivity, R.string.ride_no_fixes, Toast.LENGTH_LONG).show(); return@button }
                 lifecycleScope.launch {

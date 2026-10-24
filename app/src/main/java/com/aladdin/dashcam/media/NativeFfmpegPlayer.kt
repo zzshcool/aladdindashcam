@@ -48,6 +48,7 @@ class NativeFfmpegPlayer(
     private var released = false
     private val firstFrameDrawn = AtomicBoolean(false)
     private var monitorJob: Job? = null
+    private var hardware: HardwarePlaybackEngine? = null
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var rendererReady = false
     private var network: Network? = null
@@ -57,8 +58,8 @@ class NativeFfmpegPlayer(
 
     val isPlaying: Boolean get() = active && !paused
     val hasSource: Boolean get() = active
-    val needsRestart: Boolean get() = owner !== this || !active ||
-        synchronized(nativeLock) { ffmpegWrapper.naStatus() == ffmpegWrapper.ePlayerStatus.E_PlayerStatus_Stoped.ordinal }
+    val needsRestart: Boolean get() = owner !== this || !active || (hardware == null &&
+        synchronized(nativeLock) { ffmpegWrapper.naStatus() == ffmpegWrapper.ePlayerStatus.E_PlayerStatus_Stoped.ordinal })
 
     private val viewHandler = object : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
@@ -111,7 +112,7 @@ class NativeFfmpegPlayer(
     }
 
     suspend fun start(source: String, streaming: Boolean = true, targetNetwork: Network? = null,
-                      startPositionMs: Long = 0L, knownDurationMs: Long = 0L) = withContext(Dispatchers.Main.immediate) {
+                      startPositionMs: Long = 0L, knownDurationMs: Long = 0L, preferHardware: Boolean = true): Unit = withContext(Dispatchers.Main.immediate) {
         if (released || !isSupported || !rendererReady) {
             onError?.invoke(glSurfaceView.context.getString(R.string.player_unavailable))
             return@withContext
@@ -124,6 +125,41 @@ class NativeFfmpegPlayer(
         paused = false
         firstFrameDrawn.set(false)
         try {
+            if (!streaming && preferHardware) {
+                var samples = 0
+                val candidate = HardwarePlaybackEngine(glSurfaceView,
+                    firstFrame = {
+                        if (isCurrent(token) && firstFrameDrawn.compareAndSet(false, true)) {
+                            Log.i(TAG, "First decoded frame drawn, hardware=true, generation=$token")
+                            onFirstFrameRendered?.invoke()
+                        }
+                    },
+                    progress = { position, duration, frames ->
+                        if (isCurrent(token)) {
+                            onProgress?.invoke(position, duration)
+                            if (++samples % 8 == 0) Log.d(TAG, "Progress generation=$token frames=$frames positionMs=$position hardware=true")
+                        }
+                    },
+                    ended = { if (isCurrent(token)) finishPlayback() },
+                    failed = { error ->
+                        if (isCurrent(token)) {
+                            val resumeAt = hardware?.positionMs ?: startPositionMs
+                            Log.w(TAG, "Hardware playback failed; falling back to FFmpeg software", error)
+                            scope.launch { start(source, false, targetNetwork, resumeAt, knownDurationMs, preferHardware = false) }
+                        }
+                    })
+                hardware = candidate
+                try {
+                    candidate.start(source, startPositionMs)
+                    if (isCurrent(token)) sourceReady = true
+                    return@withContext
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Throwable) {
+                    Log.w(TAG, "Hardware playback unavailable; falling back to FFmpeg software", error)
+                    candidate.close(); hardware = null
+                }
+            }
+            glSurfaceView.visibility = android.view.View.VISIBLE
             if (targetNetwork != null) {
                 previousNetwork = connectivity.boundNetworkForProcess
                 check(connectivity.bindProcessToNetwork(targetNetwork)) { glSurfaceView.context.getString(R.string.player_wifi_failed) }
@@ -193,6 +229,7 @@ class NativeFfmpegPlayer(
     }
 
     suspend fun seekTo(positionMs: Long): Boolean {
+        hardware?.let { return it.seek(positionMs) }
         val token = generation
         return withContext(Dispatchers.IO) {
             synchronized(nativeLock) {
@@ -203,6 +240,7 @@ class NativeFfmpegPlayer(
 
     fun setPaused(value: Boolean, controlSource: Boolean = true) {
         if (owner !== this || !active || paused == value) return
+        hardware?.let { it.pause(value); paused = value; return }
         if (controlSource) synchronized(nativeLock) {
             if (value) ffmpegWrapper.naPause() else ffmpegWrapper.naResume()
         }
@@ -213,6 +251,12 @@ class NativeFfmpegPlayer(
     suspend fun saveSnapshot(file: File): Result<File> = withContext(Dispatchers.IO) {
         val token = generation
         try {
+            hardware?.let { engine ->
+                val bitmap = withContext(Dispatchers.Main) { engine.texture.bitmap } ?: error("No hardware video frame")
+                try { file.outputStream().use { check(bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 95, it)) } }
+                finally { bitmap.recycle() }
+                return@withContext Result.success(file)
+            }
             synchronized(nativeLock) {
                 check(isCurrent(token) && sourceReady && firstFrameDrawn.get()) { "No decoded video frame" }
                 check(ffmpegWrapper.naSaveSnapshot(file.absolutePath) == 0) { "FFmpeg snapshot failed" }
@@ -250,7 +294,11 @@ class NativeFfmpegPlayer(
     }
 
     private fun finishPlayback() {
-        stop()
+        if (hardware != null) {
+            active = false
+            sourceReady = false
+            paused = false
+        } else stop()
         onEnded?.invoke()
     }
 
@@ -260,6 +308,8 @@ class NativeFfmpegPlayer(
         sourceReady = false
         monitorJob?.cancel()
         monitorJob = null
+        hardware?.close(); hardware = null
+        glSurfaceView.visibility = android.view.View.VISIBLE
         if (rendererReady) glSurfaceView.onPause()
         if (owner !== this) return
         try {

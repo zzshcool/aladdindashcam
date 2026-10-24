@@ -53,28 +53,27 @@ class DownloadRepository(context: Context, private val scope: CoroutineScope) {
         tasks.update { list -> list.filterNot { it.id == item.storageKey } + DownloadTask(item.storageKey, item, totalBytes = item.sizeBytes) }
         val job = scope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
             try {
-                queue.withLock {
-                  while (isActive) {
-                    var current: MediaItem? = null
-                    while (isActive && current == null) {
-                        current = resolve(item)
-                        if (current == null) delay(2500)
+                while (isActive) {
+                    if (resolve(item) == null) { delay(2500); continue }
+                    val finished = queue.withLock {
+                        val current = resolve(item) ?: return@withLock false
+                        ensureActive()
+                        activeKey = item.storageKey
+                        try {
+                            val result = transfer(current, generation)
+                            if (result.isFailure && retryWhen() && generations[item.storageKey] == generation) {
+                                tasks.update { list -> list.map { if (it.id == item.storageKey) it.copy(status = DownloadStatus.PENDING, bytesRead = 0L) else it } }
+                                false
+                            } else {
+                                if (result.isFailure && generations[item.storageKey] == generation) {
+                                    tasks.update { list -> list.map { if (it.id == item.storageKey) it.copy(status = DownloadStatus.FAILED, errorMessage = result.exceptionOrNull()?.message) else it } }
+                                }
+                                true
+                            }
+                        } finally { activeKey = null }
                     }
-                    ensureActive()
-                    activeKey = item.storageKey
-                    try {
-                        val result = transfer(requireNotNull(current), generation)
-                        if (result.isFailure && retryWhen() && generations[item.storageKey] == generation) {
-                            tasks.update { list -> list.map { if (it.id == item.storageKey) it.copy(status = DownloadStatus.PENDING, bytesRead = 0L) else it } }
-                            delay(2500)
-                            continue
-                        }
-                        if (result.isFailure && generations[item.storageKey] == generation) {
-                            tasks.update { list -> list.map { if (it.id == item.storageKey) it.copy(status = DownloadStatus.FAILED, errorMessage = result.exceptionOrNull()?.message) else it } }
-                        }
-                    } finally { activeKey = null }
-                    break
-                  }
+                    if (finished) break
+                    delay(2500)
                 }
             } catch (error: CancellationException) {
                 throw error

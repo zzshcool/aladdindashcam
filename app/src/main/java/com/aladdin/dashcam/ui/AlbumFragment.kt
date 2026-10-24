@@ -69,6 +69,7 @@ class AlbumFragment : Fragment() {
     }
     private var isTimelineMode = false
     private var currentFilter = FilterCategory.ALL
+    private var sortOrder = 0
     private var currentFilteredMediaList: List<MediaItem> = emptyList()
     private var selectedTimelineDateStr: String? = null
     private var timelineItems: List<MediaItem> = emptyList()
@@ -475,6 +476,23 @@ class AlbumFragment : Fragment() {
         return String.format(Locale.getDefault(), "%02d:%02d", seconds / 60L, seconds % 60L)
     }
     private fun setupListeners() {
+        sortOrder = requireContext().getSharedPreferences("album_display", 0).getInt("sort", 0).coerceIn(0, 3)
+        binding.btnAlbumSort.setOnClickListener { anchor ->
+            val labels = resources.getStringArray(R.array.album_sort_options)
+            android.widget.PopupMenu(requireContext(), anchor).apply {
+                labels.forEachIndexed { index, label -> menu.add(0, index, index, label).apply {
+                    isCheckable = true; isChecked = index == sortOrder
+                } }
+                menu.setGroupCheckable(0, true, true)
+                setOnMenuItemClickListener { item ->
+                    sortOrder = item.itemId
+                    requireContext().getSharedPreferences("album_display", 0).edit().putInt("sort", sortOrder).apply()
+                    binding.btnAlbumSort.contentDescription = labels[sortOrder]
+                    applyFilters(); true
+                }
+                show()
+            }
+        }
         binding.toggleAlbumSource.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) {
                 if (adapter.isSelectionMode) {
@@ -627,6 +645,7 @@ class AlbumFragment : Fragment() {
         binding.btnViewerDownload.setOnClickListener {
             val item = currentViewingItem ?: return@setOnClickListener
             if (item.isDownloaded) return@setOnClickListener
+            closeViewer()
             startPermanentDownload(item)
         }
     }
@@ -655,6 +674,7 @@ class AlbumFragment : Fragment() {
     }
 
     private fun updateViewModeLayout() {
+        binding.btnAlbumSort.visibility = if (isTimelineMode) View.GONE else View.VISIBLE
         if (isTimelineMode) {
             binding.rvAlbum.visibility = View.GONE
             binding.scrollFilterChips.visibility = View.GONE
@@ -821,15 +841,17 @@ class AlbumFragment : Fragment() {
 
         // Sort reliably by recording time descending; unknown times placed after known times
         val sortedList = filtered.sortedWith { a, b ->
-            if (a.timestampMillis > 0 && b.timestampMillis > 0) {
-                b.timestampMillis.compareTo(a.timestampMillis)
-            } else if (a.timestampMillis > 0) {
-                -1
-            } else if (b.timestampMillis > 0) {
-                1
-            } else {
-                b.deviceIndex.compareTo(a.deviceIndex)
+            val comparison = when (sortOrder) {
+                2 -> b.sizeBytes.compareTo(a.sizeBytes)
+                3 -> a.sizeBytes.compareTo(b.sizeBytes)
+                else -> when {
+                    a.timestampMillis <= 0 && b.timestampMillis > 0 -> 1
+                    b.timestampMillis <= 0 && a.timestampMillis > 0 -> -1
+                    sortOrder == 1 -> a.timestampMillis.compareTo(b.timestampMillis)
+                    else -> b.timestampMillis.compareTo(a.timestampMillis)
+                }
             }
+            if (comparison != 0) comparison else b.deviceIndex.compareTo(a.deviceIndex)
         }
         currentFilteredMediaList = sortedList
 
@@ -839,7 +861,7 @@ class AlbumFragment : Fragment() {
 
         for (item in sortedList) {
             val headerText = formatGroupHeader(item.timestampMillis)
-            if (headerText != lastHeader) {
+            if (sortOrder < 2 && headerText != lastHeader) {
                 itemsWithHeaders.add(AlbumListItem.Header(headerText))
                 lastHeader = headerText
             }

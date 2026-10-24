@@ -186,7 +186,7 @@ class MediaAdapter(
                 }
 
                 // Secondary: File name
-                binding.tvMediaTitle.text = media.fileName.replace("_", "_\u200B")
+                binding.tvMediaTitle.text = media.fileName.replace(Regex("^\\d{8,14}[_-]?"), "").ifBlank { media.fileName }.replace("_", "_\u200B")
 
                 // File size
                 val sizeMb = media.sizeBytes / (1024 * 1024)

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="intro_brand">Aladdin DashCam</string>
+    <string name="intro_slogan">Every ride deserves a story</string>
+    <string name="intro_subtitle">Safe recording every journey · Footage · Route · Story</string>
+    <string name="intro_repeat">Play animation on every launch</string>
+    <string name="intro_skip">Start riding</string>
+    <string name="intro_setting_hint">When off, show only on first launch. Video playback and recorder connections are unaffected.</string>
+</resources>

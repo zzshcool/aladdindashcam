@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="album_sort">排序</string>
+    <string-array name="album_sort_options">
+        <item>日期：近 → 远</item>
+        <item>日期：远 → 近</item>
+        <item>大小：大 → 小</item>
+        <item>大小：小 → 大</item>
+    </string-array>
+    <string name="ride_gforce_short">G 值</string>
+    <string name="ride_distance_label">总里程</string>
+    <string name="ride_duration_label">骑行时间</string>
+    <string name="ride_speed_label">最高速度</string>
+    <string name="ride_coverage_label">GPS 覆盖</string>
+    <string name="ride_no_points_short">暂无定位点</string>
+    <string name="ride_view_details">查看骑行详情</string>
+    <string name="home_connect_short">连接</string>
+    <string name="home_live_short">直播</string>
+    <string name="home_rides_desc">路线与骑行统计</string>
+</resources>

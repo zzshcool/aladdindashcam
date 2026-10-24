@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -191,11 +192,11 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
     val downloadWorkCount = downloadRepository.workCount.asStateFlow()
     private val downloadGenerations = downloadRepository.generations
 
-    private val _openMediaItemEvent = MutableSharedFlow<MediaItem>(replay = 0, extraBufferCapacity = 1)
-    val openMediaItemEvent: SharedFlow<MediaItem> = _openMediaItemEvent.asSharedFlow()
+    private val _openMediaItemEvent = Channel<MediaItem>(Channel.CONFLATED)
+    val openMediaItemEvent = _openMediaItemEvent.receiveAsFlow()
 
     fun requestOpenMedia(item: MediaItem) {
-        _openMediaItemEvent.tryEmit(item)
+        _openMediaItemEvent.trySend(item)
     }
 
     val wifiNetwork = networkMonitor.wifiNetwork
@@ -901,11 +902,15 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         return res
     }
 
-    suspend fun enterRemoteAlbumBrowsing(): Result<Unit> =
-        client.enterAlbumBrowsing(targetIdentity.value.epoch)
+    private val albumModeMutex = Mutex()
 
-    suspend fun exitRemoteAlbumBrowsing(): Result<Unit> =
+    suspend fun enterRemoteAlbumBrowsing(): Result<Unit> = albumModeMutex.withLock {
+        client.enterAlbumBrowsing(targetIdentity.value.epoch)
+    }
+
+    suspend fun exitRemoteAlbumBrowsing(): Result<Unit> = albumModeMutex.withLock {
         client.exitAlbumBrowsing(targetIdentity.value.epoch)
+    }
 
     suspend fun deleteRemoteMedia(item: MediaItem): Result<Unit> {
         if (!isCurrentMediaSource(item)) return Result.failure(IllegalStateException(getString(R.string.recorder_video_source_changed)))
@@ -1438,15 +1443,14 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                 saved.sourceDeviceId != currentMediaSourceId() ||
                 currentStreamOwner.value == MediaStreamOwner.ALBUM_PLAYBACK) null
             else saved.copy(sourceEpoch = targetIdentity.value.epoch)
-        }, retryWhen = { connectionStatus.value != ConnectionStatus.CONNECTED }, transfer = { current, generation ->
+        }, retryWhen = { connectionStatus.value != ConnectionStatus.CONNECTED }, transfer = { current, generation -> albumModeMutex.withLock {
             if (!requestStreamOwner(MediaStreamOwner.DOWNLOAD)) Result.failure(IllegalStateException("Recorder busy"))
             else {
-                val before = client.queryStatus()
-                var entered = false
+                var before: DashCamDeviceStatus? = null
                 try {
+                    before = client.queryStatus()
                     check(before != null && before.mode != DeviceMode.UNKNOWN) { "Recorder mode unknown" }
                     client.enterAlbumBrowsing(current.sourceEpoch).getOrThrow()
-                    entered = true
                     val verified = client.getFileList(current.sourceEpoch).getOrThrow().firstOrNull {
                         it.fileName == current.fileName && it.sizeBytes == current.sizeBytes
                     } ?: error("Recording is no longer present on this device")
@@ -1456,12 +1460,13 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
                     Result.failure(error)
                 } finally {
                     withContext(kotlinx.coroutines.NonCancellable) {
-                        if (entered && before?.mode != DeviceMode.PLAYBACK) client.exitAlbumBrowsing(current.sourceEpoch)
-                        releaseStreamOwner(MediaStreamOwner.DOWNLOAD)
+                        try {
+                            if (before != null && before.mode != DeviceMode.PLAYBACK) client.exitAlbumBrowsing(current.sourceEpoch)
+                        } finally { releaseStreamOwner(MediaStreamOwner.DOWNLOAD) }
                     }
                 }
             }
-        })
+        } })
         try {
             androidx.core.content.ContextCompat.startForegroundService(getApplication(),
                 android.content.Intent(getApplication(), com.aladdin.dashcam.media.DownloadService::class.java))
