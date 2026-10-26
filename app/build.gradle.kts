@@ -19,7 +19,7 @@ val mapsApiKey: String = System.getenv("MAPS_API_KEY")
 
 android {
     namespace = "com.aladdin.dashcam"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "26.1.10909125"
 
     externalNativeBuild {
@@ -29,7 +29,7 @@ android {
     defaultConfig {
         applicationId = "com.aladdin.dashcam"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 2
         versionName = "1.0.1"
 
@@ -62,7 +62,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             if (releaseSigning.storeFile != null) {
                 signingConfig = releaseSigning
             }

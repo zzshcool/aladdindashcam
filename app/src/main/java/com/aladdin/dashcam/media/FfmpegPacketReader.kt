@@ -63,11 +63,13 @@ internal class FfmpegPacketReader(source: String) : AutoCloseable {
     }
     fun read(): LongArray? { packet.clear(); return nativeRead(handle, packet)?.also { packet.limit(it[1].toInt()) } }
     fun seek(positionUs: Long) = nativeSeek(handle, positionUs)
-    override fun close() { if (handle != 0L) { nativeClose(handle); handle = 0 } }
+    fun interrupt() { if (handle != 0L) nativeInterrupt(handle) }
+    override fun close() { if (handle != 0L) { interrupt(); nativeClose(handle); handle = 0 } }
     private external fun nativeOpen(source: String): Long
     private external fun nativeInfo(handle: Long): LongArray
     private external fun nativeConfig(handle: Long): ByteArray
     private external fun nativeRead(handle: Long, buffer: ByteBuffer): LongArray?
     private external fun nativeSeek(handle: Long, positionUs: Long)
+    private external fun nativeInterrupt(handle: Long)
     private external fun nativeClose(handle: Long)
 }

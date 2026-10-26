@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="vehicle_select">選擇車牌</string>
+    <string name="vehicle_manage">管理車牌</string>
+    <string name="vehicle_add">新增車牌</string>
+    <string name="vehicle_rename">更正車牌</string>
+    <string name="vehicle_remove">移除車牌</string>
+    <string name="vehicle_plate">車牌號碼</string>
+    <string name="vehicle_none">尚無車牌</string>
+    <string name="vehicle_unassigned">未指定車牌</string>
+    <string name="vehicle_need_plate">請先新增或選擇車牌，再記錄該車保養。</string>
+    <string name="vehicle_legacy_hint">既有紀錄尚未指定車牌，可編輯紀錄並選擇所屬車牌。</string>
+    <string name="vehicle_has_records">此車仍有保養紀錄，請先移轉或刪除紀錄，才能移除車牌。</string>
+    <string name="vehicle_invalid">請輸入 1–20 字元的車牌號碼</string>
+    <string name="vehicle_duplicate">此車牌已存在</string>
+</resources>

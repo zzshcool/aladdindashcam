@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="vehicle_select">Select vehicle</string>
+    <string name="vehicle_manage">Manage plates</string>
+    <string name="vehicle_add">Add plate</string>
+    <string name="vehicle_rename">Rename plate</string>
+    <string name="vehicle_remove">Remove plate</string>
+    <string name="vehicle_plate">License plate</string>
+    <string name="vehicle_none">No vehicles</string>
+    <string name="vehicle_unassigned">Unassigned</string>
+    <string name="vehicle_need_plate">Add or select a plate before recording maintenance.</string>
+    <string name="vehicle_legacy_hint">These older records have no plate. Edit a record to assign it to a vehicle.</string>
+    <string name="vehicle_has_records">This vehicle has maintenance records. Move or delete them before removing its plate.</string>
+    <string name="vehicle_invalid">Enter a plate number of 1–20 characters</string>
+    <string name="vehicle_duplicate">This plate already exists</string>
+</resources>

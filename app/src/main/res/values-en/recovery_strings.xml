@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="recovery_wifi_settings">Connection settings</string>
+    <string name="recovery_live_failed">Live view was interrupted. Retry; if no video appears, close the original recorder app and check the connection.\n%1$s</string>
+    <string name="recovery_playback_offline">Recorder disconnected. Reconnect to its Wi-Fi, then return and retry. The video will restart from the beginning.</string>
+    <string name="recovery_playback_failed">Unable to play. Retry or choose another video from the album. Remote videos restart from the beginning when retried.\n%1$s</string>
+</resources>

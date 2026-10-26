@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="vehicle_select">选择车牌</string>
+    <string name="vehicle_manage">管理车牌</string>
+    <string name="vehicle_add">新增车牌</string>
+    <string name="vehicle_rename">更正车牌</string>
+    <string name="vehicle_remove">移除车牌</string>
+    <string name="vehicle_plate">车牌号码</string>
+    <string name="vehicle_none">暂无车牌</string>
+    <string name="vehicle_unassigned">未指定车牌</string>
+    <string name="vehicle_need_plate">请先新增或选择车牌，再记录该车保养。</string>
+    <string name="vehicle_legacy_hint">已有记录尚未指定车牌，可编辑记录并选择所属车牌。</string>
+    <string name="vehicle_has_records">此车仍有保养记录，请先转移或删除记录，才能移除车牌。</string>
+    <string name="vehicle_invalid">请输入 1–20 字符的车牌号码</string>
+    <string name="vehicle_duplicate">此车牌已存在</string>
+</resources>

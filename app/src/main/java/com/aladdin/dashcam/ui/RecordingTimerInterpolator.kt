@@ -23,7 +23,7 @@ data class RecordingTimerDisplay(
  *    在本機每秒穩定推算更新 UI，完全不增加控制埠輪詢負擔。
  * 3. 收到新狀態時進行智慧動態校正：
  *    - 正常 1~2 秒網路/輪詢延遲抖動：維持基準與嚴格單調遞增，不無理由倒退。
- *    - 設備超前：向前對齊基準。
+ *    - 設備超前超過 2 秒：向前對齊基準；秒數量化抖動不重設時鐘。
  *    - 重新開始錄影 (秒數歸零或大幅變小)：立即重置基準，以新片段開始計時。
  *    - 漂移過大 (> 5s)：平滑強制校正，防止長期時鐘漂移。
  * 4. 停止錄影、斷線、狀態過期 (> 10s)、切換設備時立即清除錨點或標記未知，不繼續假裝錄影正常。
@@ -175,8 +175,8 @@ class RecordingTimerInterpolator(
                 return
             }
 
-            // 判斷 2: 設備回報秒數超前本地推算 (本地跑慢或延遲收到)
-            if (reportedSeconds > currentProjectedSeconds) {
+            // Small lead is packet timing jitter; keep the existing one-second cadence.
+            if (reportedSeconds - currentProjectedSeconds > 2L) {
                 logger?.invoke("設備回報超前: reported=${reportedSeconds}s > 推算=${currentProjectedSeconds}s，向前對齊基準錨點")
                 virtualStartTimeMs = candidateStartTimeMs
                 lastReportedSeconds = reportedSeconds

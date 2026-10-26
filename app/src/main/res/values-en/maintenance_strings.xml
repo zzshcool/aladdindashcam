@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="maintenance_title">Vehicle maintenance</string>
+    <string name="maintenance_home_hint">Work · Date · Odometer · Cost</string>
+    <string name="maintenance_add">Add maintenance</string>
+    <string name="maintenance_edit">Edit</string>
+    <string name="maintenance_delete">Delete</string>
+    <string name="maintenance_save">Save</string>
+    <string name="maintenance_total">%1$d services · Total %2$s</string>
+    <string name="maintenance_empty">No maintenance records yet. Tap Add maintenance to begin.</string>
+    <string name="maintenance_date">Service date</string>
+    <string name="maintenance_mileage">Odometer (km)</string>
+    <string name="maintenance_cost">Cost (TWD)</string>
+    <string name="maintenance_description">Maintenance details</string>
+    <string name="maintenance_item_summary">%1$d km · %2$s</string>
+    <string name="maintenance_invalid_mileage">Enter a non-negative whole-number odometer reading</string>
+    <string name="maintenance_invalid_cost">Enter a non-negative amount with up to two decimal places</string>
+    <string name="maintenance_required">Enter maintenance details</string>
+    <string name="maintenance_load_failed">Existing records could not be read. No data was created or overwritten.</string>
+    <string name="maintenance_storage_failed">Save failed. Check available storage and try again.</string>
+    <string name="backup_title">Backup and import</string>
+    <string name="backup_description">Exports maintenance, completed or interrupted rides, language, theme, intro preference and saved destinations.\nExcludes videos, photos, recorder credentials and Google accounts. The file contains destinations and location records.\nImport adds new records and keeps local records with the same ID.</string>
+    <string name="backup_export">Export backup</string>
+    <string name="backup_import">Import backup</string>
+    <string name="backup_restore_settings">Restore preferences too (replaces current preferences)</string>
+    <string name="backup_preview">Created: %1$s\nVehicles: %4$d\nMaintenance: %2$d\nRides: %3$d\n\nExisting IDs are kept. You can choose not to restore preferences.</string>
+    <string name="backup_merge">Merge records</string>
+    <string name="backup_import_done">Added %4$d plates, %1$d services and %2$d rides; skipped %3$d existing records.</string>
+    <string name="backup_import_failed">Import interrupted. Some new records may have been added. Retry to finish; existing records were not overwritten.</string>
+    <string name="backup_export_done">Backup exported.</string>
+    <string name="backup_export_failed">Export failed. The destination file may be incomplete; export again.</string>
+    <string name="backup_working">Working…</string>
+    <string name="backup_invalid">Invalid, unsupported, oversized or damaged backup. Nothing imported.</string>
+    <string name="backup_ride_active">End the active ride before backing up or importing.</string>
+    <string name="backup_cancelled">Cancelled. Local records were not changed.</string>
+    <string name="maintenance_back">Back</string>
+    <string name="maintenance_vehicle">Selected vehicle</string>
+    <string name="maintenance_spent">Total maintenance spend</string>
+    <string name="maintenance_visits">Service visits</string>
+    <string name="maintenance_count">%1$d visits</string>
+    <string name="maintenance_last_mileage">Last service mileage</string>
+    <string name="maintenance_last_date">Last serviced: %1$s</string>
+    <string name="maintenance_history">Service history</string>
+    <string name="maintenance_empty_title">Every service tells a story</string>
+    <string name="maintenance_empty_body">Record the work, mileage and cost to build a maintenance history for this vehicle.</string>
+    <string name="maintenance_record_options">Service record options</string>
+</resources>

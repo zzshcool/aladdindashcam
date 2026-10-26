@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rain_title">Rain mode</string>
+    <string name="rain_description">A transparent guard blocks taps, drags and Back while the screen keeps updating. It remains above other apps until unlocked.\nHold the bottom-left badge for 3 seconds; movement or multiple fingers cancels unlocking. The notification can unlock immediately; turning the screen off also stops the guard.\nThe guard keeps the screen awake. Ride mode also stays awake.</string>
+    <string name="rain_overlay_permission">Allow display over other apps</string>
+    <string name="rain_notification_permission">Notification and emergency unlock settings</string>
+    <string name="rain_with_navigation">Use rain touch guard when navigating</string>
+    <string name="rain_start">Enable guard in 3 seconds</string>
+    <string name="rain_stop">Unlock touch guard</string>
+    <string name="rain_pinning_help">Apps cannot block every Home or Recents gesture. In Google Maps, open Recents and choose Pin; enable app pinning in system security first if needed. Availability varies by phone.\nPinning reduces accidental exits; the touch guard reduces interactions inside the map.</string>
+    <string name="rain_security_settings">Open system security settings</string>
+    <string name="rain_locked">Rain touch guard enabled</string>
+    <string name="rain_arming">Touch guard arming</string>
+    <string name="rain_notification">Hold the badge, or use this notification to unlock immediately.</string>
+    <string name="rain_hold_unlock">Rain lock\nHold 3 seconds to unlock</string>
+    <string name="rain_unlock_progress">Keep holding: %1$d%%</string>
+    <string name="rain_unlocked">Rain touch guard unlocked</string>
+    <string name="rain_permissions_required">Allow overlays and notifications before enabling the guard and its emergency unlock.</string>
+    <string name="rain_ready">Permissions ready. Touch guard is off.</string>
+    <string name="rain_start_failed">Could not enable touch guard. Check permissions and system restrictions.</string>
+    <string name="rain_setup_navigation">Set up rain mode permissions, then return to start navigation.</string>
+</resources>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="rain_title">雨天模式</string>
+    <string name="rain_description">开启透明触控锁后，画面持续更新，点击、拖动与返回操作会被拦截；切换 App 也会保留保护层。\n长按左下解锁区 3 秒；移动或多指会取消解锁。通知栏可立即解除，手动关屏也会解除。\n锁定期间保持亮屏；骑行模式本身也会持续亮屏。</string>
+    <string name="rain_overlay_permission">允许显示在其他 App 上层</string>
+    <string name="rain_notification_permission">通知与解除入口设置</string>
+    <string name="rain_with_navigation">导航时启用雨天触控锁</string>
+    <string name="rain_start">开启触控锁（3 秒后）</string>
+    <string name="rain_stop">解除触控锁</string>
+    <string name="rain_pinning_help">系统主页与最近使用手势无法全部由 App 封锁。请在 Google Maps 中打开最近使用的应用并选择「固定」；首次需在系统安全性开启。各手机入口可能不同。\n系统固定负责减少跳出，触控锁负责减少地图内误触。</string>
+    <string name="rain_security_settings">打开系统安全性设置</string>
+    <string name="rain_locked">雨天触控锁已启用</string>
+    <string name="rain_arming">即将锁定画面</string>
+    <string name="rain_notification">长按浮窗解锁，或点击此通知立即解除。</string>
+    <string name="rain_hold_unlock">雨天锁定\n长按 3 秒解锁</string>
+    <string name="rain_unlock_progress">持续按住解锁 %1$d%%</string>
+    <string name="rain_unlocked">已解除雨天触控锁</string>
+    <string name="rain_permissions_required">需允许浮窗与通知，才能启用及保留解除入口。</string>
+    <string name="rain_ready">权限就绪，尚未启用触控锁。</string>
+    <string name="rain_start_failed">无法启用雨天触控锁，请检查权限与系统限制。</string>
+    <string name="rain_setup_navigation">请先完成雨天模式授权，再返回开始导航。</string>
+</resources>

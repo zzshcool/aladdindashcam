@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="recovery_wifi_settings">連線設定</string>
+    <string name="recovery_live_failed">直播已中斷。請重試；若仍無畫面，請關閉原廠 App 並確認記錄器連線。\n%1$s</string>
+    <string name="recovery_playback_offline">記錄器連線已中斷。請重新連上記錄器 Wi-Fi，再返回重試；影片會從頭播放。</string>
+    <string name="recovery_playback_failed">無法播放。可重試或返回相簿選擇其他影片；遠端影片重試會從頭播放。\n%1$s</string>
+</resources>

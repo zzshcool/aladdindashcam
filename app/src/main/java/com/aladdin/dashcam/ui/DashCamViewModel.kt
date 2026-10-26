@@ -162,7 +162,7 @@ class DashCamViewModel(application: Application) : AndroidViewModel(application)
         _timerTickTrigger,
         flow {
             while (true) {
-                delay(1000L)
+                delay(100L)
                 emit(Unit)
             }
         }

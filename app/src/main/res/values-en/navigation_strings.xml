@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="navigation_title">Destination</string>
+    <string name="navigation_destination_hint">Enter a place or full address</string>
+    <string name="navigation_help">Starting requests system split screen with live video and Google Maps navigation, while recording your ride. Use the system divider to resize. Versions before Android 12L use live picture-in-picture instead.</string>
+    <string name="navigation_company">Work</string>
+    <string name="navigation_home">Home</string>
+    <string name="navigation_save_hint">Enter an address, then tap Save favourite</string>
+    <string name="navigation_saved">%1$s saved</string>
+    <string name="navigation_start">Navigate and record ride</string>
+    <string name="navigation_recording_failed">Could not start ride recording. Check location permission and try again.</string>
+    <string name="navigation_maps_missing">Please install Google Maps first</string>
+    <string name="navigation_finish">End ride and view statistics</string>
+    <string name="ride_stats_title">Ride statistics</string>
+    <string name="ride_average_speed">Average speed (located intervals)</string>
+    <string name="ride_maximum_speed">Maximum speed</string>
+    <string name="ride_speed_chart">Speed over time</string>
+    <string name="ride_total_duration">Ride duration</string>
+    <string name="ride_total_distance">Distance</string>
+    <string name="ride_chart_empty">Not enough location data for a speed chart</string>
+    <string name="ride_chart_axes">Horizontal: elapsed ride time (minutes) · Vertical: km/h</string>
+    <string name="ride_stats_coverage_hint">Missing speed intervals stay blank; averages include only valid located intervals.</string>
+    <string name="navigation_save">Save favourite</string>
+    <string name="navigation_finish_short">End ride</string>
+    <string name="navigation_pip_unavailable">Cannot open live picture-in-picture. Allow picture-in-picture for Aladdin DashCam in system settings, then try again.</string>
+    <string name="navigation_split_unavailable">Automatic split screen did not open. Pair Aladdin DashCam and Google Maps in split screen from Recents, or use picture-in-picture from the live More menu.</string>
+    <string name="arrival_auto_return">Return to the app to confirm ride completion on arrival</string>
+    <string name="arrival_rule">Confirm the destination first. After leaving its area, a reliable phone GPS fix within %1$d m and %2$d seconds at low speed triggers a return prompt. End the ride manually if GPS is unavailable. Change your destination through this app to keep arrival detection in sync.</string>
+    <string name="arrival_unavailable">Confirm the destination on the map</string>
+    <string name="arrival_unavailable_help">Destination coordinates or precise location permission are unavailable. Pick a point on the map with precise location enabled, or navigate and end the ride manually.</string>
+    <string name="arrival_navigation_only">Navigate without automatic return</string>
+    <string name="arrival_resolving">Looking up destination coordinates…</string>
+    <string name="arrival_destination_confirm">Confirm navigation destination</string>
+    <string name="arrival_title">Near your destination</string>
+    <string name="arrival_notification">Tap to return, confirm ride completion and view statistics</string>
+    <string name="arrival_confirm">Phone GPS indicates you are near %1$s and moving slowly. This is an app estimate, not a Google Maps arrival notification. End this ride and view statistics?</string>
+    <string name="arrival_continue">Continue riding</string>
+    <string name="arrival_choose_on_map">Pick on map</string>
+    <string name="arrival_map_hint">Long-press your destination on the map, then confirm the pin to navigate</string>
+    <string name="arrival_map_confirm">Use the map pin you selected for %1$s. Google Maps navigation and this app will use the same coordinates for the destination.</string>
+</resources>

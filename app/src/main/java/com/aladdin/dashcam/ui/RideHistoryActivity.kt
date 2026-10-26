@@ -27,6 +27,8 @@ class RideHistoryActivity : AppCompatActivity() {
     private lateinit var repository: RideRepository
     private var routeFragment: SupportMapFragment? = null
     private var contentJob: Job? = null
+    private var finishingRideId: String? = null
+    private var selectedRideId: String? = null
     private val notifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { launchRideService() }
     private val locationPermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         if (result[Manifest.permission.ACCESS_FINE_LOCATION] == true || result[Manifest.permission.ACCESS_COARSE_LOCATION] == true) startRide()
@@ -35,16 +37,34 @@ class RideHistoryActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         repository = RideRepository.get(this)
+        finishingRideId = savedInstanceState?.getString("finishing_ride")
+        selectedRideId = savedInstanceState?.getString("selected_ride")
         rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 24, 24, 24) }
         setContentView(ScrollView(this).apply { addView(rows) })
-        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(rows) { view, insets ->
-            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            view.setPadding(24 + bars.left, 24 + bars.top, 24 + bars.right, 24 + bars.bottom); insets
-        }
+        if (savedInstanceState == null && intent.getBooleanExtra("finish_ride", false)) finishRide()
+        AppAppearance.applyContentInsets(rows, 16, 12, 16, 16)
         lifecycleScope.launch {
             repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.STARTED) {
-                repository.activeId.collect { renderList() }
+                repository.activeId.collect { active ->
+                    val finished = finishingRideId
+                    if (active == null && finished != null) {
+                        finishingRideId = null
+                        showRide(finished)
+                    } else selectedRideId?.let { showRide(it) } ?: renderList()
+                }
             }
+        }
+        val arrivalId = intent.getStringExtra(RideRecordingService.ARRIVAL_RIDE_ID)
+        if (arrivalId != null) {
+            getSystemService(android.app.NotificationManager::class.java).cancel(RideRecordingService.ARRIVAL_NOTIFICATION)
+            if (repository.activeId.value == arrivalId) {
+                androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle(R.string.arrival_title)
+                    .setMessage(getString(R.string.arrival_confirm, intent.getStringExtra(RideRecordingService.DESTINATION_LABEL).orEmpty()))
+                    .setPositiveButton(R.string.navigation_finish) { _, _ -> finishRide() }
+                    .setNegativeButton(R.string.arrival_continue) { _, _ -> finish() }
+                    .setOnCancelListener { finish() }.show()
+            } else if (repository.activeId.value == null) finishingRideId = arrivalId
         }
     }
     private fun button(label: String, action: () -> Unit) = Button(this, null, android.R.attr.borderlessButtonStyle).apply {
@@ -66,10 +86,20 @@ class RideHistoryActivity : AppCompatActivity() {
         catch (e: Exception) { Toast.makeText(this, e.message, Toast.LENGTH_LONG).show() }
     }
     private fun toggleRide() {
-        if (repository.activeId.value != null) { startService(Intent(this, RideRecordingService::class.java).setAction("stop")); return }
+        if (repository.activeId.value != null) { finishRide(); return }
         val granted = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
             .any { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
         if (granted) startRide() else locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
+    }
+    private fun finishRide() {
+        finishingRideId = repository.activeId.value ?: return
+        intent.removeExtra(RideRecordingService.ARRIVAL_RIDE_ID)
+        stopService(Intent(this, RideRecordingService::class.java))
+    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("finishing_ride", finishingRideId)
+        outState.putString("selected_ride", selectedRideId)
+        super.onSaveInstanceState(outState)
     }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
@@ -116,6 +146,7 @@ class RideHistoryActivity : AppCompatActivity() {
     }
 
     private fun renderList() {
+        selectedRideId = null
         contentJob?.cancel()
         clearMap()
         rows.removeAllViews()
@@ -141,13 +172,19 @@ class RideHistoryActivity : AppCompatActivity() {
         if (ride.interrupted) " · ${getString(R.string.ride_interrupted)}" else ""
 
     private fun showRide(id: String) {
+        selectedRideId = id
         contentJob?.cancel()
         contentJob = lifecycleScope.launch {
             val ride = withContext(Dispatchers.IO) { repository.read(id) } ?: return@launch
             clearMap()
             rows.removeAllViews()
             rows.addView(button("‹ ${getString(R.string.ride_title)}") { renderList() })
-            rows.addView(rideCard(RideSummary.from(ride)) { })
+            rows.addView(TextView(this@RideHistoryActivity).apply {
+                text = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(ride.started))
+                textSize = 14f; setPadding(dp(16), dp(8), dp(16), dp(4))
+                setTextColor(ContextCompat.getColor(context, R.color.text_secondary))
+            })
+            addRideStatistics(ride)
             rows.addView(TextView(this@RideHistoryActivity).apply { text = summary(ride); textSize = 14f; setPadding(dp(16), dp(16), dp(16), dp(16)) })
             rows.addView(button(getString(R.string.ride_export_gpx)) {
                 if (ride.points.isEmpty()) { Toast.makeText(this@RideHistoryActivity, R.string.ride_no_fixes, Toast.LENGTH_LONG).show(); return@button }
@@ -178,6 +215,86 @@ class RideHistoryActivity : AppCompatActivity() {
                 container.post { if (!isFinishing) map.moveCamera(CameraUpdateFactory.newLatLngBounds(bounds.build(), container.width.coerceAtLeast(1), container.height.coerceAtLeast(1), 40)) }
             }
         }
+    }
+    private fun addRideStatistics(ride: Ride) {
+        val end = ride.ended ?: ride.points.lastOrNull()?.time ?: ride.started
+        val duration = (end - ride.started).coerceAtLeast(0L)
+        val average = ride.averageSpeedKmh?.let { "%.1f km/h".format(it) } ?: "--"
+        rows.addView(TextView(this).apply {
+            text = getString(R.string.ride_stats_title)
+            textSize = 22f; setTypeface(typeface, android.graphics.Typeface.BOLD)
+            setPadding(dp(16), dp(20), dp(16), dp(8))
+        })
+        val metrics = listOf(
+            getString(R.string.ride_total_duration) to "%02d:%02d:%02d".format(duration / 3600000, duration / 60000 % 60, duration / 1000 % 60),
+            getString(R.string.ride_total_distance) to "%.2f km".format(ride.distanceMeters / 1000),
+            getString(R.string.ride_average_speed) to average,
+            getString(R.string.ride_maximum_speed) to (ride.maxSpeed?.let { "$it km/h" } ?: "--")
+        )
+        metrics.chunked(2).forEach { pair ->
+            val row = LinearLayout(this)
+            pair.forEach { (label, value) ->
+                row.addView(LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL; setPadding(dp(16), dp(12), dp(8), dp(12))
+                    addView(TextView(this@RideHistoryActivity).apply { text = label; textSize = 12f })
+                    addView(TextView(this@RideHistoryActivity).apply {
+                        text = value; textSize = 21f; setTextColor(ContextCompat.getColor(context, R.color.accent_blue))
+                    })
+                }, LinearLayout.LayoutParams(0, -2, 1f))
+            }
+            rows.addView(row)
+        }
+        rows.addView(TextView(this).apply {
+            text = getString(R.string.ride_speed_chart); textSize = 16f
+            setPadding(dp(16), dp(16), dp(16), dp(8))
+        })
+        val speeds = ride.points.filter { it.speed != null }
+        if (speeds.size < 2) {
+            rows.addView(TextView(this).apply { setText(R.string.ride_chart_empty); setPadding(dp(16), dp(12), dp(16), dp(12)) })
+            return
+        }
+        val description = metrics.joinToString("; ") { "${it.first}: ${it.second}" }
+        rows.addView(object : View(this) {
+            private val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+            init { contentDescription = getString(R.string.ride_speed_chart) + ": " + description }
+            override fun onDraw(canvas: android.graphics.Canvas) {
+                super.onDraw(canvas)
+                val left = dp(42).toFloat(); val top = dp(20).toFloat()
+                val right = width - dp(16).toFloat(); val bottom = height - dp(30).toFloat()
+                val maxSpeed = maxOf(10, ((ride.maxSpeed ?: 0) / 10 + 1) * 10)
+                val first = ride.points.first()
+                val origin = first.elapsed - (first.time - ride.started).coerceAtLeast(0L)
+                val span = maxOf(duration, ride.points.last().elapsed - origin, 1L)
+                paint.textSize = dp(11).toFloat(); paint.strokeWidth = dp(1).toFloat()
+                for (step in 0..4) {
+                    val y = bottom - (bottom - top) * step / 4
+                    paint.color = ContextCompat.getColor(context, R.color.text_secondary); paint.alpha = 45
+                    canvas.drawLine(left, y, right, y, paint)
+                    paint.alpha = 255
+                    canvas.drawText((maxSpeed * step / 4).toString(), dp(4).toFloat(), y + dp(4), paint)
+                }
+                for (step in 0..2) {
+                    val x = left + (right - left) * step / 2
+                    canvas.drawText("%.1f".format(span * step / 2.0 / 60000), x - dp(8), bottom + dp(22), paint)
+                }
+                paint.color = ContextCompat.getColor(context, R.color.accent_blue)
+                paint.strokeWidth = dp(2).toFloat()
+                var previous: RidePoint? = null
+                ride.points.forEach { point ->
+                    val a = previous
+                    if (a != null && a.speed != null && point.speed != null && point.elapsed - a.elapsed in 1..Ride.MAX_GAP_MS) {
+                        fun x(p: RidePoint) = left + (right - left) * (p.elapsed - origin).toFloat() / span
+                        fun y(p: RidePoint) = bottom - (bottom - top) * (p.speed ?: 0).toFloat() / maxSpeed
+                        canvas.drawLine(x(a), y(a), x(point), y(point), paint)
+                    }
+                    previous = point
+                }
+            }
+        }, LinearLayout.LayoutParams(-1, dp(200)))
+        rows.addView(TextView(this).apply {
+            text = getString(R.string.ride_chart_axes) + "\n" + getString(R.string.ride_stats_coverage_hint)
+            textSize = 12f; setPadding(dp(16), dp(8), dp(16), dp(16))
+        })
     }
     private fun clearMap() {
         routeFragment?.let { supportFragmentManager.beginTransaction().remove(it).commitNow() }

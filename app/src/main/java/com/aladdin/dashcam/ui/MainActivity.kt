@@ -41,7 +41,7 @@ class MainActivity : AppCompatActivity() {
     fun setAlbumPreviewExpanded(enabled: Boolean) {
         albumPreviewExpanded = enabled
         updateTopBarVisibility()
-        binding.bottomNav.visibility = if (enabled || isFullscreen || isInPictureInPictureMode) View.GONE else View.VISIBLE
+        binding.bottomNav.visibility = if (enabled || activeFragment == liveFragment || isFullscreen || isInPictureInPictureMode) View.GONE else View.VISIBLE
     }
 
     private val permissionLauncher = registerForActivityResult(
@@ -57,9 +57,9 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_AladdinDashCam)
         super.onCreate(savedInstanceState)
-        viewModel.resumeDownloads()
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        binding.root.post { viewModel.resumeDownloads() }
         viewModel.refreshLocalizedText()
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
             val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout())
@@ -111,6 +111,7 @@ class MainActivity : AppCompatActivity() {
     private fun setupBackPressedHandler() {
         onBackPressedDispatcher.addCallback(this, object : androidx.activity.OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
+                if (com.aladdin.dashcam.rain.RainGuardService.state.value == com.aladdin.dashcam.rain.RainGuardService.State.LOCKED) return
                 if (launchIntro != null) {
                     launchIntro?.finish()
                 } else if (isFullscreen) {
@@ -237,10 +238,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateTopBarVisibility() {
-        val landscapeLive = activeFragment == liveFragment &&
-            resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+        val liveVisible = activeFragment == liveFragment
         binding.topBar.visibility = if (activeFragment == homeFragment || activeFragment == liveFragment || albumPreviewExpanded) View.GONE else View.VISIBLE
-        binding.bottomNav.visibility = if (landscapeLive || isFullscreen || isInPictureInPictureMode || albumPreviewExpanded) View.GONE else View.VISIBLE
+        binding.bottomNav.visibility = if (liveVisible || isFullscreen || isInPictureInPictureMode || albumPreviewExpanded) View.GONE else View.VISIBLE
     }
 
     private fun setupTopBarActions() {

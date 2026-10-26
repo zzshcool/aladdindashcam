@@ -111,7 +111,7 @@ class NativeFfmpegPlayer(
         }
     }
 
-    suspend fun start(source: String, streaming: Boolean = true, targetNetwork: Network? = null,
+    suspend fun start(source: String, streaming: Boolean = source.startsWith("rtsp://") || source.contains("://"), targetNetwork: Network? = null,
                       startPositionMs: Long = 0L, knownDurationMs: Long = 0L, preferHardware: Boolean = true): Unit = withContext(Dispatchers.Main.immediate) {
         if (released || !isSupported || !rendererReady) {
             onError?.invoke(glSurfaceView.context.getString(R.string.player_unavailable))
@@ -125,6 +125,11 @@ class NativeFfmpegPlayer(
         paused = false
         firstFrameDrawn.set(false)
         try {
+            if (targetNetwork != null) {
+                previousNetwork = connectivity.boundNetworkForProcess
+                check(connectivity.bindProcessToNetwork(targetNetwork)) { glSurfaceView.context.getString(R.string.player_wifi_failed) }
+                network = targetNetwork
+            }
             if (!streaming && preferHardware) {
                 var samples = 0
                 val candidate = HardwarePlaybackEngine(glSurfaceView,
@@ -145,26 +150,25 @@ class NativeFfmpegPlayer(
                         if (isCurrent(token)) {
                             val resumeAt = hardware?.positionMs ?: startPositionMs
                             Log.w(TAG, "Hardware playback failed; falling back to FFmpeg software", error)
-                            scope.launch { start(source, false, targetNetwork, resumeAt, knownDurationMs, preferHardware = false) }
+                            scope.launch {
+                                if (streaming) delay(350)
+                                start(source, streaming, targetNetwork, resumeAt, knownDurationMs, preferHardware = false)
+                            }
                         }
                     })
                 hardware = candidate
                 try {
-                    candidate.start(source, startPositionMs)
+                    candidate.start(source, streaming, startPositionMs, knownDurationMs)
                     if (isCurrent(token)) sourceReady = true
                     return@withContext
                 } catch (cancelled: CancellationException) { throw cancelled }
                 catch (error: Throwable) {
-                    Log.w(TAG, "Hardware playback unavailable; falling back to FFmpeg software", error)
+                    Log.w(TAG, "Hardware playback unavailable for $source; falling back to FFmpeg software", error)
                     candidate.close(); hardware = null
+                    if (streaming) delay(350)
                 }
             }
             glSurfaceView.visibility = android.view.View.VISIBLE
-            if (targetNetwork != null) {
-                previousNetwork = connectivity.boundNetworkForProcess
-                check(connectivity.bindProcessToNetwork(targetNetwork)) { glSurfaceView.context.getString(R.string.player_wifi_failed) }
-                network = targetNetwork
-            }
             ffmpegWrapper.getInstance().SetViewHandler(viewHandler)
             glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
             glSurfaceView.onResume()

@@ -639,7 +639,13 @@ class AlbumFragment : Fragment() {
         }
 
         binding.btnViewerRetry.setOnClickListener {
-            currentViewingItem?.let { openViewer(it) }
+            val item = currentViewingItem ?: return@setOnClickListener
+            val local = viewModel.getLocalMediaFile(item)?.isFile == true || viewModel.getPreviewCacheFile(item).let {
+                it.isFile && (item.sizeBytes <= 0L || it.length() == item.sizeBytes)
+            }
+            if (isDeviceSource && !local && viewModel.targetIdentity.value.state != com.aladdin.dashcam.network.TargetState.READY) {
+                startActivity(android.content.Intent(android.provider.Settings.ACTION_WIFI_SETTINGS))
+            } else openViewer(item)
         }
 
         binding.btnViewerDownload.setOnClickListener {
@@ -1066,8 +1072,11 @@ class AlbumFragment : Fragment() {
     }
 
     private fun showPlaybackError(token: Long, message: String) {
-        if (remotePlayback) viewModel.playbackSession.interrupted()
         if (_binding == null || previewRequestId != token) return
+        if (remotePlayback) {
+            viewModel.playbackSession.interrupted()
+            stopRemotePlaybackBeforeDecoderRelease()
+        }
         binding.viewerLoadingLayout.visibility = View.GONE
         if (isDeviceSource && currentViewingItem?.isVideo == true) {
             binding.ivPhotoViewer.setImageDrawable(null)
@@ -1078,7 +1087,11 @@ class AlbumFragment : Fragment() {
         binding.btnVideoPlayPause.text = getString(R.string.album_retry_077)
         binding.btnVideoPlayPause.isEnabled = true
         binding.viewerErrorLayout.visibility = View.VISIBLE
-        binding.tvViewerErrorMsg.text = getString(R.string.album_playback_failed_s, message)
+        val offline = remotePlayback && viewModel.targetIdentity.value.state != com.aladdin.dashcam.network.TargetState.READY
+        binding.btnViewerRetry.setText(if (offline) R.string.recovery_wifi_settings else R.string.album_retry_077)
+        binding.tvViewerErrorMsg.text = if (offline) getString(R.string.recovery_playback_offline)
+            else getString(R.string.recovery_playback_failed, message)
+        binding.tvViewerErrorMsg.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
     }
 
     private fun displayMediaContent(item: MediaItem, file: File, startOffsetMs: Long = 0L) {

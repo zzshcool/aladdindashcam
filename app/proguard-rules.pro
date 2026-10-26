@@ -4,6 +4,14 @@
     native <methods>;
 }
 
+# The OEM engine looks up Java classes, fields and callbacks by their original names.
+-keep class com.generalplus.ffmpegLib.** { *; }
+-keepclassmembers class com.aladdin.dashcam.media.VideoExporter$* {
+    boolean isCancelled();
+    void onProgress(long);
+    android.graphics.Bitmap renderOverlay(long, int, int);
+}
+
 # Preserve data models and serialization
 -keep class com.aladdin.dashcam.model.** { *; }
 -keep class com.aladdin.dashcam.driver.** { *; }

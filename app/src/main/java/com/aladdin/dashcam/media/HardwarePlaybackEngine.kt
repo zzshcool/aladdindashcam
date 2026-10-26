@@ -86,9 +86,17 @@ internal class HardwarePlaybackEngine(
         texture.setTransform(Matrix().apply { setScale(sx, sy, texture.width / 2f, texture.height / 2f) })
     }
 
-    suspend fun start(source: String, startMs: Long) {
+    @Volatile private var activeReader: FfmpegPacketReader? = null
+
+    suspend fun start(
+        source: String,
+        streaming: Boolean = false,
+        startMs: Long = 0L,
+        knownDurationMs: Long = 0L
+    ) {
         val surface = withTimeout(3000) { surfaceReady.await() }
         val initialized = CompletableDeferred<Unit>()
+        val isLive = streaming && knownDurationMs <= 0L
         worker = scope.launch {
             var completed = false
             var reader: FfmpegPacketReader? = null
@@ -96,7 +104,7 @@ internal class HardwarePlaybackEngine(
             var track: AudioTrack? = null
             val ownedTexture = texture.surfaceTexture
             try {
-                val input = FfmpegPacketReader(source).also { reader = it }
+                val input = FfmpegPacketReader(source).also { reader = it; activeReader = it }
                 check(android.os.Build.VERSION.SDK_INT >= 29) { "Verified hardware decoder selection requires Android 10" }
                 val format = input.videoFormat()
                 val name = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.firstOrNull {
@@ -116,10 +124,11 @@ internal class HardwarePlaybackEngine(
                     videoHeight = if (rotated) input.width else input.height
                     fit()
                 }
-                Log.i("HardwarePlayback", "FFmpeg demux -> $name hardware=true ${input.width}x${input.height} audio=${input.sampleRate}/${input.channels}")
+                val effectiveDurationMs = if (knownDurationMs > 0L) knownDurationMs else input.durationUs / 1000L
+                Log.i("HardwarePlayback", "FFmpeg demux -> $name hardware=true ${input.width}x${input.height} streaming=$streaming isLive=$isLive audio=${input.sampleRate}/${input.channels}")
                 initialized.complete(Unit)
                 var targetUs = startMs.coerceAtLeast(0) * 1000
-                if (targetUs > 0) input.seek(targetUs)
+                if (!isLive && targetUs > 0) input.seek(targetUs)
                 var baseNs = SystemClock.elapsedRealtimeNanos() - targetUs * 1000
                 var audioStartUs = -1L
                 var audioWrittenFrames = 0L
@@ -167,7 +176,7 @@ internal class HardwarePlaybackEngine(
                 }
                 while (isActive && !closed) {
                     val seek = pendingSeek.getAndSet(-1)
-                    if (seek >= 0) {
+                    if (seek >= 0 && !isLive) {
                         targetUs = seek
                         seekPreview = paused
                         renderedPtsUs = -1
@@ -198,22 +207,38 @@ internal class HardwarePlaybackEngine(
                     if (outputIndex >= 0) {
                         val pts = outputInfo.presentationTimeUs
                         val isEnd = outputInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0
-                        if (pts < targetUs || (isEnd && outputInfo.size == 0)) {
-                            decoder.releaseOutputBuffer(outputIndex, false); outputIndex = -1; outputEnded = isEnd
+                        if (isLive) {
+                            decoder.releaseOutputBuffer(outputIndex, true)
+                            outputIndex = -1
                             activity = true
+                            var burstCount = 0
+                            while (isActive && !closed && burstCount < 3) {
+                                val extra = decoder.dequeueOutputBuffer(outputInfo, 0)
+                                if (extra >= 0) {
+                                    decoder.releaseOutputBuffer(extra, true)
+                                    burstCount++
+                                } else break
+                            }
                         } else {
-                            val delta = pts - clockUs()
-                            if (delta <= 20_000 || seekPreview) {
-                                decoder.releaseOutputBuffer(outputIndex, System.nanoTime() + delta.coerceAtLeast(0) * 1000)
-                                outputIndex = -1; outputEnded = isEnd; activity = true
-                                seekPreview = false
+                            if (pts < targetUs || (isEnd && outputInfo.size == 0)) {
+                                decoder.releaseOutputBuffer(outputIndex, false); outputIndex = -1; outputEnded = isEnd
+                                activity = true
+                            } else {
+                                val delta = pts - clockUs()
+                                if (delta <= 20_000 || seekPreview) {
+                                    decoder.releaseOutputBuffer(outputIndex, System.nanoTime() + delta.coerceAtLeast(0) * 1000)
+                                    outputIndex = -1; outputEnded = isEnd; activity = true
+                                    seekPreview = false
+                                }
                             }
                         }
                     }
                     if (pending == null && !eof) {
                         pending = input.read()
-                        if (pending == null) eof = true
-                        else activity = true
+                        if (pending == null) {
+                            if (isLive) throw java.io.IOException("Live stream connection closed")
+                            eof = true
+                        } else activity = true
                     }
                     val packet = pending
                     if (packet != null) {
@@ -226,7 +251,7 @@ internal class HardwarePlaybackEngine(
                                 decoder.queueInputBuffer(index, 0, packet[1].toInt(), packet[2].coerceAtLeast(0), 0)
                                 pending = null; activity = true
                             }
-                        } else {
+                        } else if (!isLive) {
                             val bytesPerFrame = input.channels * 2
                             if (input.packet.position() == 0 && packet[2] < targetUs) {
                                 val skip = ((targetUs - packet[2]) * input.sampleRate / 1_000_000 * bytesPerFrame).coerceAtMost(packet[1]).toInt()
@@ -248,6 +273,8 @@ internal class HardwarePlaybackEngine(
                                 }
                             }
                             if (!input.packet.hasRemaining()) pending = null
+                        } else {
+                            pending = null
                         }
                     }
                     if (eof && !inputEnded) {
@@ -258,23 +285,31 @@ internal class HardwarePlaybackEngine(
                         }
                     }
                     val now = SystemClock.elapsedRealtime()
-                    val position = clockUs().coerceAtLeast(targetUs)
-                    positionMs = position / 1000
-                    if (now - lastReport >= 250) {
-                        lastReport = now
-                        main.post { if (!closed) progress(positionMs, input.durationUs / 1000, frames) }
+                    if (isLive) {
+                        positionMs = 0L
+                        if (now - lastReport >= 250) {
+                            lastReport = now
+                            main.post { if (!closed) progress(positionMs, 0L, frames) }
+                        }
+                    } else {
+                        val position = clockUs().coerceAtLeast(targetUs)
+                        positionMs = position / 1000
+                        if (now - lastReport >= 250) {
+                            lastReport = now
+                            main.post { if (!closed) progress(positionMs, effectiveDurationMs, frames) }
+                        }
                     }
                     if (now >= nextClockReport) {
                         nextClockReport = now + 2000
-                        Log.d("HardwarePlayback", "Clock audioUs=$position videoUs=$renderedPtsUs deltaUs=${if (renderedPtsUs >= 0) renderedPtsUs - position else 0}")
+                        Log.d("HardwarePlayback", "Clock videoUs=$renderedPtsUs frames=$frames isLive=$isLive")
                     }
-                    if (outputEnded && (track == null || position >= audioLastUs)) {
+                    if (!isLive && outputEnded && (track == null || positionMs * 1000 >= audioLastUs)) {
                         completed = true
-                        positionMs = input.durationUs / 1000
+                        positionMs = effectiveDurationMs
                         main.post {
                             if (!closed) {
                                 texture.keepScreenOn = false
-                                progress(positionMs, input.durationUs / 1000, frames)
+                                progress(positionMs, effectiveDurationMs, frames)
                                 ended()
                             }
                         }; break
@@ -289,6 +324,8 @@ internal class HardwarePlaybackEngine(
                 if (!initialized.isCompleted) initialized.completeExceptionally(error)
                 else main.post { if (!closed) failed(error) }
             } finally {
+                activeReader = null
+                reader?.interrupt()
                 runCatching { track?.pause() }; runCatching { track?.flush() }; runCatching { track?.release() }
                 runCatching { codec?.stop() }; runCatching { codec?.release() }; reader?.close()
                 surface.release()
@@ -313,6 +350,7 @@ internal class HardwarePlaybackEngine(
     fun close() {
         if (closed) return
         closed = true; texture.keepScreenOn = false
+        activeReader?.interrupt()
         if (parent.viewTreeObserver.isAlive) parent.viewTreeObserver.removeOnGlobalLayoutListener(layoutObserver)
         scope.cancel()
         if (worker == null || worker?.isCompleted == true) {

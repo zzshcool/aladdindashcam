@@ -28,12 +28,14 @@ class LaunchIntroView(context: Context, private val completed: () -> Unit) : Fra
         private const val REPEAT = "repeat"
         private const val SEEN = "seen"
         private const val DURATION_MS = 2800L
-        private const val HOLD_MS = 1200L
+        private const val HOLD_MS = 400L
         private const val FRAME_INTERVAL_MS = 62L
 
         fun repeats(context: Context): Boolean = preferences(context).getBoolean(REPEAT, true)
         fun setRepeats(context: Context, enabled: Boolean) { preferences(context).edit().putBoolean(REPEAT, enabled).apply() }
-        fun shouldShow(context: Context): Boolean = repeats(context) || !preferences(context).getBoolean(SEEN, false)
+        fun shouldShow(context: Context): Boolean = android.animation.ValueAnimator.areAnimatorsEnabled() &&
+            context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)?.isTouchExplorationEnabled != true &&
+            (repeats(context) || !preferences(context).getBoolean(SEEN, false))
         private fun preferences(context: Context) = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
     }
 
@@ -58,7 +60,7 @@ class LaunchIntroView(context: Context, private val completed: () -> Unit) : Fra
             if (p < 1f) {
                 Choreographer.getInstance().postFrameCallbackDelayed(this, FRAME_INTERVAL_MS)
             } else {
-                // Keep the final glorious smoke + rider scene for 1200ms before smooth transition
+                // Hold the rider after the lamp and smoke have cleared.
                 Choreographer.getInstance().postFrameCallbackDelayed(this, DURATION_MS + HOLD_MS - elapsed)
             }
         }
@@ -302,9 +304,13 @@ class LaunchIntroView(context: Context, private val completed: () -> Unit) : Fra
             canvas.translate((width - unit * 64) / 2, (height - unit * 70) / 2)
             canvas.scale(unit, unit)
 
+            val exitProgress = ((phase - 0.72f) / 0.22f).coerceIn(0f, 1f)
+            val effectsOpacity = 1f - exitProgress * exitProgress * (3f - 2f * exitProgress)
+            var layerOpacity = effectsOpacity
+
             fun block(x: Float, y: Float, w: Float, h: Float, color: Int, alpha: Int = 255) {
                 paint.color = color
-                paint.alpha = alpha.coerceIn(0, 255)
+                paint.alpha = (alpha * layerOpacity).toInt().coerceIn(0, 255)
                 val left = round(x); val top = round(y)
                 canvas.drawRect(left, top, round(x + w).coerceAtLeast(left + 1f), round(y + h).coerceAtLeast(top + 1f), paint)
             }
@@ -450,7 +456,8 @@ class LaunchIntroView(context: Context, private val completed: () -> Unit) : Fra
 
             // --- LAYER 5: RIDER SUMMONING (AETHERIC SILHOUETTE -> SOLID WAVE) ---
             val riderLeft = 16f
-            val riderTop = 9f
+            val riderTop = 9f + round(10f * exitProgress)
+            layerOpacity = 1f
             if (phase >= 0.50f) {
                 val silhouetteAlpha = ((phase - 0.50f) / 0.12f).coerceIn(0f, 1f)
                 val solidWave = ((phase - 0.60f) / 0.26f).coerceIn(0f, 1f)
@@ -483,6 +490,7 @@ class LaunchIntroView(context: Context, private val completed: () -> Unit) : Fra
             }
 
             // --- LAYER 6: REFINED ALADDIN LAMP (CRAFTED PIXEL ART) ---
+            layerOpacity = effectsOpacity
             val lampPulse = if (phase in 0.10f..0.55f) ((sin(phase * 20.0).toFloat() + 1f) * 0.5f) else 0f
             val glowColor = if (lampPulse > 0.5f) goldHi else goldMid
 

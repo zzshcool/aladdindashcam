@@ -239,19 +239,26 @@
     <LinearLayout
         android:id="@+id/layout_live_mode_toggle"
         android:layout_width="0dp"
-        android:layout_marginHorizontal="12dp"
+        android:layout_marginHorizontal="4dp"
         android:gravity="center"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_height="48dp"
+        android:layout_height="wrap_content"
         android:layout_marginTop="0dp"
         app:layout_constraintTop_toTopOf="parent">
 
+        <ImageButton
+            android:id="@+id/btn_live_home" android:layout_width="48dp" android:layout_height="48dp"
+            android:padding="10dp" android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_live_back" android:contentDescription="@string/intro_skip"
+            app:tint="@color/text_secondary" />
+
         <com.google.android.material.button.MaterialButtonToggleGroup
             android:id="@+id/toggle_live_mode"
-            android:layout_width="match_parent"
+            android:layout_width="0dp"
+            android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:minHeight="44dp"
+            android:minHeight="48dp"
             app:checkedButton="@id/btn_mode_normal"
             app:selectionRequired="true"
             app:singleSelection="true">
@@ -267,9 +274,9 @@
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:text="@string/live_video"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:backgroundTint="@color/transparent"
-                app:strokeWidth="1dp"
+                app:strokeWidth="0dp"
                 android:textColor="@color/text_secondary"
                 android:minHeight="48dp"
                 android:textAllCaps="false"
@@ -287,9 +294,9 @@
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:text="@string/live_split"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:backgroundTint="@color/transparent"
-                app:strokeWidth="1dp"
+                app:strokeWidth="0dp"
                 android:textColor="@color/text_secondary"
                 android:minHeight="48dp"
                 android:textAllCaps="false"
@@ -307,9 +314,9 @@
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:text="@string/live_map"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:backgroundTint="@color/transparent"
-                app:strokeWidth="1dp"
+                app:strokeWidth="0dp"
                 android:textColor="@color/text_secondary"
                 android:minHeight="48dp"
                 android:textAllCaps="false"
@@ -327,9 +334,9 @@
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:text="@string/live_ride"
-                android:textSize="12sp"
+                android:textSize="11sp"
                 android:backgroundTint="@color/transparent"
-                app:strokeWidth="1dp"
+                app:strokeWidth="0dp"
                 android:textColor="@color/text_secondary"
                 android:minHeight="48dp"
                 android:textAllCaps="false"
@@ -338,90 +345,65 @@
         </com.google.android.material.button.MaterialButtonToggleGroup>
     </LinearLayout>
 
-    <!-- Normal Preview Controls Container -->
+    <!-- Floating actions retain 48dp touch areas while their icons occupy 20dp. -->
     <LinearLayout
         android:id="@+id/layout_normal_controls"
-        android:layout_width="0dp"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        android:elevation="8dp"
         android:orientation="vertical"
-        app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toBottomOf="parent">
 
-        <!-- Compact Single-Row Action Buttons (52dp, LIVE-03) -->
         <LinearLayout
             android:id="@+id/action_buttons_container"
-            android:layout_width="match_parent"
-            android:layout_marginHorizontal="12dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
+            android:layout_width="wrap_content"
             android:layout_height="48dp"
-            android:layout_marginTop="0dp">
-
-            <!-- 1. Ensure Recording Toggle Button -->
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_toggle_recording"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1.2"
-                android:layout_marginEnd="6dp"
-                android:text="@string/btn_start_recording_compact"
-                android:textSize="13sp"
-                android:textStyle="bold"
-                app:cornerRadius="@dimen/radius_button"
-                android:backgroundTint="@color/transparent"
-                app:strokeWidth="0dp"
-                android:textColor="@color/text_secondary"
-                android:minHeight="48dp"
-                android:textAllCaps="false"
-                android:stateListAnimator="@null"
-                android:elevation="0dp"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:paddingHorizontal="8dp"
-                android:contentDescription="@string/btn_start_recording" />
-
-            <!-- 2. Snapshot Photo Button -->
+                android:layout_width="48dp" android:layout_height="48dp"
+                android:minWidth="0dp" android:minHeight="0dp"
+                android:padding="0dp" android:gravity="center"
+                android:insetTop="6dp" android:insetBottom="6dp"
+                android:insetLeft="6dp" android:insetRight="6dp"
+                android:text="" android:contentDescription="@string/btn_start_recording"
+                android:backgroundTint="#C0101418"
+                android:stateListAnimator="@null" android:elevation="0dp"
+                app:icon="@drawable/ic_recording_dot" app:iconSize="20dp"
+                app:iconPadding="0dp" app:iconGravity="textStart"
+                app:iconTint="@color/white" app:cornerRadius="20dp" />
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_snapshot"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="1"
-                android:layout_marginHorizontal="4dp"
-                android:text="@string/btn_take_photo"
-                android:textSize="13sp"
-                app:cornerRadius="@dimen/radius_button"
-                android:backgroundTint="@color/transparent"
-                app:strokeWidth="0dp"
-                android:textColor="@color/text_secondary"
-                android:minHeight="48dp"
-                android:textAllCaps="false"
-                android:stateListAnimator="@null"
-                android:elevation="0dp"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:paddingHorizontal="8dp" />
-
-            <!-- 3. More Actions Button (Opens PopupMenu: PiP, Fullscreen, etc.) -->
+                android:layout_width="48dp" android:layout_height="48dp"
+                android:minWidth="0dp" android:minHeight="0dp"
+                android:padding="0dp" android:gravity="center"
+                android:insetTop="6dp" android:insetBottom="6dp"
+                android:insetLeft="6dp" android:insetRight="6dp"
+                android:text="" android:contentDescription="@string/btn_take_photo"
+                android:backgroundTint="#C0101418"
+                android:stateListAnimator="@null" android:elevation="0dp"
+                app:icon="@drawable/ic_camera_white" app:iconSize="20dp"
+                app:iconPadding="0dp" app:iconGravity="textStart"
+                app:iconTint="@color/white" app:cornerRadius="20dp" />
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_more_options"
-                android:layout_width="0dp"
-                android:layout_height="48dp"
-                android:layout_weight="0.8"
-                android:layout_marginStart="6dp"
-                android:maxLines="1"
-                app:cornerRadius="@dimen/radius_button"
-                app:strokeColor="@color/border_subtle"
-                android:backgroundTint="@color/transparent"
-                app:strokeWidth="0dp"
-                android:textColor="@color/text_secondary"
-                android:minHeight="48dp"
-                android:text="⋯"
-                android:textSize="24sp"
-                android:contentDescription="@string/btn_more_options"
-                android:textAllCaps="false"
-                android:stateListAnimator="@null"
-                android:elevation="0dp"
                 style="@style/Widget.MaterialComponents.Button.TextButton"
-                android:paddingHorizontal="8dp" />
+                android:layout_width="48dp" android:layout_height="48dp"
+                android:minWidth="0dp" android:minHeight="0dp"
+                android:padding="0dp" android:gravity="center"
+                android:insetTop="6dp" android:insetBottom="6dp"
+                android:insetLeft="6dp" android:insetRight="6dp"
+                android:text="" android:contentDescription="@string/btn_more_options"
+                android:backgroundTint="#C0101418"
+                android:stateListAnimator="@null" android:elevation="0dp"
+                app:icon="@drawable/ic_live_more" app:iconSize="20dp"
+                app:iconPadding="0dp" app:iconGravity="textStart"
+                app:iconTint="@color/white" app:cornerRadius="20dp" />
         </LinearLayout>
 
         <LinearLayout
@@ -464,8 +446,10 @@
     <!-- Full GPS Ride Mode HUD (Speedometer Gauge + Altitude + Bearing + G-Force) -->
     <LinearLayout
         android:id="@+id/layout_ride_mode"
+        android:keepScreenOn="true"
         android:layout_width="0dp"
         android:layout_height="0dp"
+        android:paddingBottom="64dp"
         android:orientation="vertical"
         android:background="@color/bg_dark"
         android:visibility="gone"
@@ -644,16 +628,30 @@
             android:backgroundTint="@color/surface_dark" android:textColor="@color/text_primary" app:cornerRadius="24dp"
                 android:visibility="gone" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_map_destination"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="48dp" android:layout_height="48dp"
+            android:layout_gravity="top|end" android:layout_margin="4dp"
+            android:padding="0dp" android:minWidth="0dp" android:minHeight="0dp"
+            android:insetTop="6dp" android:insetBottom="6dp"
+            android:insetLeft="6dp" android:insetRight="6dp"
+            android:text="" android:contentDescription="@string/navigation_title"
+            android:backgroundTint="#C0101418" android:stateListAnimator="@null"
+            app:icon="@drawable/ic_live_navigation" app:iconSize="20dp"
+            app:iconPadding="0dp" app:iconGravity="textStart"
+            app:iconTint="@color/white" app:cornerRadius="20dp" />
+
         <!-- Floating map header badge: Phone GPS status & Latency disclaimer -->
         <LinearLayout
             android:id="@+id/map_disclaimer_badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="top|start"
-            android:layout_margin="10dp"
+            android:layout_margin="6dp"
             android:background="@drawable/bg_status_badge"
             android:orientation="vertical"
-            android:paddingHorizontal="10dp"
+            android:paddingHorizontal="8dp"
             android:paddingVertical="4dp">
 
             <TextView
@@ -662,7 +660,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/live_phone_gps_not_frame_synced_with"
                 android:textColor="@color/accent_teal"
-                android:textSize="@dimen/text_size_caption"
+                android:textSize="10sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -671,7 +669,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/live_speed_km_h_accuracy_m"
                 android:textColor="@color/text_secondary"
-                android:textSize="@dimen/text_size_caption" />
+                android:textSize="10sp" />
         </LinearLayout>
 
         <!-- Floating map controls: Re-center & Clear Trajectory & Quick Actions -->
@@ -679,8 +677,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|end"
-            android:layout_margin="12dp"
-            android:layout_marginBottom="36dp"
+            android:layout_marginEnd="12dp"
+            android:layout_marginBottom="64dp"
             android:orientation="horizontal"
             android:gravity="end">
 
@@ -743,15 +741,19 @@
         <!-- Dual-Network Notice Banner -->
         <TextView
             android:id="@+id/tv_map_notice"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
+            android:maxWidth="160dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginBottom="8dp"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom|center_horizontal"
+            android:layout_gravity="bottom|start"
             android:background="@color/surface_dark"
             android:gravity="center"
             android:paddingVertical="3dp"
             android:text="@string/live_recorder_uses_wi_fi_maps_need"
             android:textColor="@color/text_secondary"
-            android:textSize="@dimen/text_size_caption" />
+            android:textSize="10sp"
+            android:visibility="gone" />
     </FrameLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

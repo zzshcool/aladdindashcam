@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="recovery_wifi_settings">连接设置</string>
+    <string name="recovery_live_failed">直播已中断。请重试；若仍无画面，请关闭原厂 App 并确认记录仪连接。\n%1$s</string>
+    <string name="recovery_playback_offline">记录仪连接已中断。请重新连接记录仪 Wi-Fi，再返回重试；视频将从头播放。</string>
+    <string name="recovery_playback_failed">无法播放。可重试或返回相册选择其他视频；远程视频重试会从头播放。\n%1$s</string>
+</resources>

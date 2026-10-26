@@ -37,6 +37,19 @@ data class Ride(val id: String, val started: Long, val ended: Long?, val points:
         return total
     }
     val maxSpeed: Int? get() = points.mapNotNull { it.speed }.maxOrNull()
+    /** Time-weighted km/h over consecutive located intervals; GPS gaps stay unknown. */
+    val averageSpeedKmh: Double? get() {
+        var observedMs = 0L
+        var speedIntegral = 0.0
+        points.zipWithNext().forEach { (a, b) ->
+            val interval = b.elapsed - a.elapsed
+            if (interval in 1..MAX_GAP_MS && a.speed != null && b.speed != null) {
+                observedMs += interval
+                speedIntegral += (a.speed + b.speed) / 2.0 * interval
+            }
+        }
+        return if (observedMs > 0) speedIntegral / observedMs else null
+    }
     val ascentMeters: Double? get() {
         if (points.none { it.altitude != null }) return null
         var base: Double? = null

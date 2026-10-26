@@ -303,7 +303,7 @@
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/btn_home_local_album"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:layout_marginEnd="@dimen/space_4"
                 android:clickable="true"
@@ -340,7 +340,7 @@
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/btn_home_downloads"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:layout_marginStart="@dimen/space_4"
                 android:clickable="true"
@@ -370,8 +370,6 @@
                         android:text="@string/downloads_guide"
                         android:textSize="@dimen/text_size_caption"
                         android:layout_marginTop="2dp"
-                        android:maxLines="1"
-                        android:ellipsize="end"
                         android:textColor="@color/text_secondary" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
@@ -386,7 +384,7 @@
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/btn_home_rides"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
                 android:layout_marginEnd="@dimen/space_4"
                 android:clickable="true"
@@ -420,12 +418,57 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <Space
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/btn_home_maintenance"
                 android:layout_width="0dp"
-                android:layout_height="0dp"
+                android:layout_height="match_parent"
                 android:layout_weight="1"
-                android:layout_marginStart="@dimen/space_4" />
+                android:layout_marginStart="@dimen/space_4"
+                android:clickable="true"
+                android:focusable="true"
+                app:cardCornerRadius="@dimen/radius_card"
+                app:cardBackgroundColor="@color/surface_dark"
+                app:strokeWidth="1dp"
+                app:strokeColor="@color/border_subtle">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:padding="@dimen/space_12" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="@string/maintenance_title" android:textSize="@dimen/text_size_body"
+                        android:textStyle="bold" android:textColor="@color/text_primary" />
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp" android:text="@string/maintenance_home_hint"
+                        android:textSize="@dimen/text_size_caption" android:textColor="@color/text_secondary" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
         </LinearLayout>
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_12"
+            app:cardCornerRadius="@dimen/radius_card" app:cardElevation="0dp"
+            app:cardBackgroundColor="@color/surface_dark"
+            app:strokeWidth="1dp" app:strokeColor="@color/border_subtle">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:gravity="center_vertical" android:orientation="horizontal">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_home_rain" style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="0dp" android:layout_weight="1" android:layout_height="52dp"
+                    android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp"
+                    android:paddingHorizontal="8dp" android:text="@string/rain_title"
+                    android:textSize="12sp" android:textAllCaps="false" android:textColor="@color/text_secondary"
+                    app:icon="@drawable/ic_live_rain" app:iconSize="18dp" app:iconPadding="6dp"
+                    app:iconGravity="textStart" app:iconTint="@color/text_secondary" />
+                <View android:layout_width="1dp" android:layout_height="20dp" android:background="@color/border_subtle" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btn_home_backup" style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="0dp" android:layout_weight="1" android:layout_height="52dp"
+                    android:minWidth="0dp" android:insetTop="0dp" android:insetBottom="0dp"
+                    android:paddingHorizontal="8dp" android:text="@string/backup_title"
+                    android:textSize="12sp" android:textAllCaps="false" android:textColor="@color/text_secondary"
+                    app:icon="@drawable/ic_tab_downloads" app:iconSize="18dp" app:iconPadding="6dp"
+                    app:iconGravity="textStart" app:iconTint="@color/text_secondary" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <!-- Brand Footer -->
         <TextView

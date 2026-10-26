@@ -39,4 +39,16 @@ object AppAppearance {
         context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).edit().putInt(THEME, mode).apply()
         AppCompatDelegate.setDefaultNightMode(mode)
     }
+
+    fun applyContentInsets(view: android.view.View, leftDp: Int, topDp: Int, rightDp: Int, bottomDp: Int) {
+        val density = view.resources.displayMetrics.density
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(view) { content, insets ->
+            val safe = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars() or
+                androidx.core.view.WindowInsetsCompat.Type.displayCutout() or androidx.core.view.WindowInsetsCompat.Type.ime())
+            content.setPadding((leftDp * density).toInt() + safe.left, (topDp * density).toInt() + safe.top,
+                (rightDp * density).toInt() + safe.right, (bottomDp * density).toInt() + safe.bottom)
+            insets
+        }
+        androidx.core.view.ViewCompat.requestApplyInsets(view)
+    }
 }

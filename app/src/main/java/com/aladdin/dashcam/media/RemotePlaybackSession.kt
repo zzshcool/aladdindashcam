@@ -25,7 +25,7 @@ class RemotePlaybackSession(
     private val _state = MutableStateFlow(State.IDLE)
     val state = _state.asStateFlow()
 
-    suspend fun open(item: MediaItem, decoder: NativeFfmpegPlayer) = mutex.withLock {
+    suspend fun open(item: MediaItem, decoder: NativeFfmpegPlayer, preferHardware: Boolean = false) = mutex.withLock {
         closeInternal().getOrThrow()
         val wifi = network() ?: error("Recorder Wi-Fi disconnected")
         val length = duration(item)
@@ -42,7 +42,7 @@ class RemotePlaybackSession(
                     result.getOrThrow()
                 }
                 withTimeout(20_000) { sent.await() }
-                decoder.start(source(), targetNetwork = wifi, knownDurationMs = length)
+                decoder.start(source(), streaming = true, targetNetwork = wifi, knownDurationMs = length, preferHardware = preferHardware)
                 command.await()
             }
         } catch (error: Throwable) {

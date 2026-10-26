@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="navigation_title">目的地導航</string>
+    <string name="navigation_destination_hint">輸入公司、地點或完整地址</string>
+    <string name="navigation_help">開始後會要求系統分割畫面，同時顯示直播與 Google Maps 導航，並記錄騎乘。分隔線可由系統調整；Android 12L 以前改用直播子母畫面。</string>
+    <string name="navigation_company">公司</string>
+    <string name="navigation_home">住家</string>
+    <string name="navigation_save_hint">先輸入地址，再按「儲存常用地點」</string>
+    <string name="navigation_saved">已儲存%1$s</string>
+    <string name="navigation_start">開始騎乘導航</string>
+    <string name="navigation_recording_failed">無法開始騎乘紀錄，請檢查定位權限後再試</string>
+    <string name="navigation_maps_missing">請先安裝 Google Maps</string>
+    <string name="navigation_finish">結束騎乘並查看統計</string>
+    <string name="ride_stats_title">本趟統計</string>
+    <string name="ride_average_speed">平均時速（有定位時段）</string>
+    <string name="ride_maximum_speed">最高時速</string>
+    <string name="ride_speed_chart">速度變化</string>
+    <string name="ride_total_duration">騎乘時間</string>
+    <string name="ride_total_distance">距離</string>
+    <string name="ride_chart_empty">尚無足夠定位資料，無法繪製速度圖</string>
+    <string name="ride_chart_axes">橫軸：騎乘經過時間（分鐘） · 縱軸：km/h</string>
+    <string name="ride_stats_coverage_hint">沒有速度資料的時段保留空白；平均值僅計入有效定位區間。</string>
+    <string name="navigation_save">儲存常用地點</string>
+    <string name="navigation_finish_short">結束騎乘</string>
+    <string name="navigation_pip_unavailable">無法開啟直播子母畫面。請在系統的子母畫面權限允許 Aladdin DashCam，再試一次。</string>
+    <string name="navigation_split_unavailable">手機未自動開啟分割畫面。請從最近使用的 App 手動將 Aladdin DashCam 與 Google Maps 設為分割畫面，或使用直播「更多」的子母畫面。</string>
+    <string name="arrival_auto_return">到站後回 App 確認結束騎乘</string>
+    <string name="arrival_rule">啟用時先確認目的地。離開目的地範圍後，手機 GPS 判斷進入 %1$d 公尺內並低速停留 %2$d 秒，便回 App 確認；定位不佳時請手動結束。更改目的地請回 App 設定。</string>
+    <string name="arrival_unavailable">請在地圖確認目的地</string>
+    <string name="arrival_unavailable_help">系統未能提供可用座標，或缺少精確定位權限。可在地圖選點（需精確定位），或僅開啟導航後手動結束騎乘。</string>
+    <string name="arrival_navigation_only">僅開啟導航</string>
+    <string name="arrival_resolving">正在查詢目的地座標…</string>
+    <string name="arrival_destination_confirm">確認導航目的地</string>
+    <string name="arrival_title">已接近目的地</string>
+    <string name="arrival_notification">點按返回 App，確認結束騎乘並查看統計</string>
+    <string name="arrival_confirm">手機 GPS 判斷已接近「%1$s」並低速停留。這是 App 的估計，並非 Google Maps 的到站通知。要結束本趟騎乘並查看統計嗎？</string>
+    <string name="arrival_continue">繼續騎乘</string>
+    <string name="arrival_choose_on_map">地圖選點</string>
+    <string name="arrival_map_hint">長按地圖上的目的地位置，確認圖釘後開始導航</string>
+    <string name="arrival_map_confirm">使用你在地圖選定的圖釘位置作為「%1$s」目的地。Google Maps 導航與 App 的到站判斷都會使用這個位置。</string>
+</resources>

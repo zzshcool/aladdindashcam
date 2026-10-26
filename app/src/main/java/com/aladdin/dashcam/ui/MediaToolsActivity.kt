@@ -54,10 +54,7 @@ class MediaToolsActivity : AppCompatActivity() {
         positionMs = savedInstanceState?.getLong("position") ?: intent.getLongExtra("position", 0L)
         rows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(24, 16, 24, 24) }
         setContentView(ScrollView(this).apply { addView(rows) })
-        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(rows) { view, insets ->
-            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-            view.setPadding(24 + bars.left, 16 + bars.top, 24 + bars.right, 24 + bars.bottom); insets
-        }
+        AppAppearance.applyContentInsets(rows, 16, 12, 16, 16)
         rows.addView(button("‹ ${getString(R.string.video_tools)}") { finish() })
         rows.addView(label(source.name))
         val gl = GLSurfaceView(this)

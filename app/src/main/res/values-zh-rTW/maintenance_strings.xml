@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="maintenance_title">車況與保養</string>
+    <string name="maintenance_home_hint">內容 · 日期 · 里程 · 費用</string>
+    <string name="maintenance_add">新增保養</string>
+    <string name="maintenance_edit">編輯</string>
+    <string name="maintenance_delete">刪除</string>
+    <string name="maintenance_save">儲存</string>
+    <string name="maintenance_total">共 %1$d 次保養 · 累計 %2$s</string>
+    <string name="maintenance_empty">還沒有保養紀錄，按「新增保養」開始記錄。</string>
+    <string name="maintenance_date">保養日期</string>
+    <string name="maintenance_mileage">里程數（km）</string>
+    <string name="maintenance_cost">本次費用（TWD）</string>
+    <string name="maintenance_description">保養內容</string>
+    <string name="maintenance_item_summary">%1$d km · %2$s</string>
+    <string name="maintenance_invalid_mileage">請輸入有效的非負整數里程</string>
+    <string name="maintenance_invalid_cost">請輸入非負金額，最多兩位小數</string>
+    <string name="maintenance_required">請輸入保養內容</string>
+    <string name="maintenance_load_failed">無法讀取既有紀錄，未建立或覆蓋資料。</string>
+    <string name="maintenance_storage_failed">儲存失敗，請確認儲存空間後重試。</string>
+    <string name="backup_title">備份與匯入</string>
+    <string name="backup_description">匯出保養履歷、已結束或中斷的騎乘紀錄，以及語言、主題、啟動動畫與常用目的地。\n不含影片、照片、記錄器帳密或 Google 帳號。檔案內含目的地與定位紀錄。\n匯入會合併新紀錄；同 ID 的本機資料保留。</string>
+    <string name="backup_export">匯出備份檔</string>
+    <string name="backup_import">匯入備份檔</string>
+    <string name="backup_restore_settings">同時還原偏好設定（會取代目前設定）</string>
+    <string name="backup_preview">備份日期：%1$s\n車牌：%4$d 個\n保養紀錄：%2$d 筆\n騎乘紀錄：%3$d 筆\n\n相同 ID 保留本機資料，不覆寫；可取消還原偏好設定。</string>
+    <string name="backup_merge">確認合併</string>
+    <string name="backup_import_done">已加入 %4$d 個車牌、%1$d 筆保養、%2$d 筆騎乘；略過 %3$d 筆既有紀錄。</string>
+    <string name="backup_import_failed">匯入中斷，部分新紀錄可能已加入；可重試，既有紀錄未覆寫。</string>
+    <string name="backup_export_done">備份檔已匯出。</string>
+    <string name="backup_export_failed">匯出失敗，檔案可能不完整，請重新匯出。</string>
+    <string name="backup_working">處理中…</string>
+    <string name="backup_invalid">備份檔無效、不支援此版本、超過大小上限或檔案已損壞；未匯入。</string>
+    <string name="backup_ride_active">請先結束目前騎乘，再進行備份或匯入。</string>
+    <string name="backup_cancelled">已取消，本機資料未變更。</string>
+    <string name="maintenance_back">返回</string>
+    <string name="maintenance_vehicle">目前車輛</string>
+    <string name="maintenance_spent">累計保養費用</string>
+    <string name="maintenance_visits">保養次數</string>
+    <string name="maintenance_count">%1$d 次</string>
+    <string name="maintenance_last_mileage">最近保養里程</string>
+    <string name="maintenance_last_date">最近保養：%1$s</string>
+    <string name="maintenance_history">保養履歷</string>
+    <string name="maintenance_empty_title">讓每次保養都有跡可循</string>
+    <string name="maintenance_empty_body">記下保養內容、里程與花費，逐步建立這台車的保養履歷。</string>
+    <string name="maintenance_record_options">保養紀錄選項</string>
+</resources>

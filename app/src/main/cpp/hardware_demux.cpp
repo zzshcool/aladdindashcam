@@ -1,9 +1,15 @@
 #include <jni.h>
 #include <algorithm>
+#include <atomic>
 #include <cstring>
 #include <memory>
 #include <stdexcept>
+#include <chrono>
+#include <thread>
 #include <vector>
+#include <android/log.h>
+#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "HardwareDemux", __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "HardwareDemux", __VA_ARGS__)
 extern "C" {
 #include "libavformat/avformat.h"
 #include "libavcodec/avcodec.h"
@@ -12,11 +18,13 @@ extern "C" {
 #include "libswresample/swresample.h"
 }
 namespace {
-void check(int result) {
+void checkStep(const char* step, int result) {
     if (result >= 0) return;
     char text[AV_ERROR_MAX_STRING_SIZE]; av_strerror(result, text, sizeof(text));
-    throw std::runtime_error(text);
+    LOGE("%s failed: %d (%s)", step, result, text);
+    throw std::runtime_error(std::string(step) + " failed: " + text);
 }
+void check(int result) { checkStep("Operation", result); }
 struct Reader {
     AVFormatContext* input = nullptr;
     AVCodecContext* audio = nullptr;
@@ -26,6 +34,7 @@ struct Reader {
     int videoIndex = -1, audioIndex = -1, nalLength = 0;
     bool eof = false;
     int64_t origin = 0;
+    std::atomic<bool> interrupted{false};
     ~Reader() {
         swr_free(&convert); avcodec_free_context(&audio);
         av_frame_free(&frame); av_packet_free(&packet); avformat_close_input(&input);
@@ -34,6 +43,11 @@ struct Reader {
         return value == AV_NOPTS_VALUE ? 0 : av_rescale_q(value, input->streams[stream]->time_base, AV_TIME_BASE_Q) - origin;
     }
 };
+static int interruptCallback(void* opaque) {
+    auto* r = reinterpret_cast<Reader*>(opaque);
+    if (!r) return 0;
+    return r->interrupted.load(std::memory_order_relaxed) ? 1 : 0;
+}
 void failure(JNIEnv* env, const std::exception& error) { env->ThrowNew(env->FindClass("java/lang/IllegalStateException"), error.what()); }
 jlongArray info(JNIEnv* env, std::initializer_list<jlong> values) {
     auto result = env->NewLongArray(values.size()); env->SetLongArrayRegion(result, 0, values.size(), values.begin()); return result;
@@ -44,13 +58,49 @@ Java_com_aladdin_dashcam_media_FfmpegPacketReader_nativeOpen(JNIEnv* env, jobjec
     const char* name = env->GetStringUTFChars(path, nullptr);
     try {
         auto reader = std::make_unique<Reader>(); av_register_all();
-        const int result = avformat_open_input(&reader->input, name, nullptr, nullptr);
-        env->ReleaseStringUTFChars(path, name); name = nullptr; check(result);
-        check(avformat_find_stream_info(reader->input, nullptr));
+        reader->input = avformat_alloc_context();
+        if (!reader->input) throw std::bad_alloc();
+        reader->input->interrupt_callback.callback = interruptCallback;
+        reader->input->interrupt_callback.opaque = reader.get();
+        AVDictionary* opts = nullptr;
+        const bool isNetwork = std::strstr(name, "://") != nullptr;
+        if (isNetwork) {
+            av_dict_set(&opts, "stimeout", "5000000", 0);
+            av_dict_set(&opts, "buffer_size", "4194304", 0);
+            av_dict_set(&opts, "max_delay", "500000", 0);
+            av_dict_set(&opts, "probesize", "524288", 0);
+            av_dict_set(&opts, "analyzeduration", "1000000", 0);
+        }
+        int result = AVERROR_UNKNOWN;
+        const int maxAttempts = isNetwork ? 10 : 1;
+        for (int attempt = 0; attempt < maxAttempts && !reader->interrupted.load(std::memory_order_relaxed); ++attempt) {
+            AVDictionary* openOpts = nullptr;
+            if (opts) av_dict_copy(&openOpts, opts, 0);
+            result = avformat_open_input(&reader->input, name, nullptr, &openOpts);
+            av_dict_free(&openOpts);
+            LOGD("avformat_open_input attempt=%d result=%d", attempt, result);
+            if (result >= 0) break;
+            if (attempt + 1 < maxAttempts) {
+                avformat_close_input(&reader->input);
+                reader->input = avformat_alloc_context();
+                if (!reader->input) throw std::bad_alloc();
+                reader->input->interrupt_callback.callback = interruptCallback;
+                reader->input->interrupt_callback.opaque = reader.get();
+                std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            }
+        }
+        av_dict_free(&opts);
+        env->ReleaseStringUTFChars(path, name); name = nullptr; checkStep("avformat_open_input", result);
+        checkStep("avformat_find_stream_info", avformat_find_stream_info(reader->input, nullptr));
         reader->videoIndex = av_find_best_stream(reader->input, AVMEDIA_TYPE_VIDEO, -1, -1, nullptr, 0);
-        check(reader->videoIndex);
+        checkStep("av_find_best_stream_video", reader->videoIndex);
         auto video = reader->input->streams[reader->videoIndex]->codecpar;
-        if (video->codec_id != AV_CODEC_ID_H264 && video->codec_id != AV_CODEC_ID_HEVC) throw std::runtime_error("Hardware video format unsupported");
+        LOGD("Video stream info: codec_id=%d (%s) %dx%d", video->codec_id, avcodec_get_name(video->codec_id), video->width, video->height);
+        if (video->codec_id != AV_CODEC_ID_H264 && video->codec_id != AV_CODEC_ID_HEVC) {
+            char msg[128];
+            snprintf(msg, sizeof(msg), "Hardware video format unsupported: %s (id=%d)", avcodec_get_name(video->codec_id), video->codec_id);
+            throw std::runtime_error(msg);
+        }
         if (video->extradata_size > 0 && video->extradata[0] == 1) {
             if (video->codec_id == AV_CODEC_ID_H264 && video->extradata_size >= 7) reader->nalLength = (video->extradata[4] & 3) + 1;
             if (video->codec_id == AV_CODEC_ID_HEVC && video->extradata_size >= 23) reader->nalLength = (video->extradata[21] & 3) + 1;
@@ -135,8 +185,18 @@ Java_com_aladdin_dashcam_media_FfmpegPacketReader_nativeRead(JNIEnv* env, jobjec
                     std::memcpy(destination + written, packet->data + offset, length); written += length; offset += length;
                 }
             } else {
-                if (packet->size > capacity) throw std::runtime_error("Video packet too large");
-                std::memcpy(destination, packet->data, packet->size); written = packet->size;
+                bool hasStartCode = (packet->size >= 3 && packet->data[0] == 0 && packet->data[1] == 0 && packet->data[2] == 1) ||
+                                    (packet->size >= 4 && packet->data[0] == 0 && packet->data[1] == 0 && packet->data[2] == 0 && packet->data[3] == 1);
+                if (!hasStartCode) {
+                    if (written + 4LL + packet->size > capacity) throw std::runtime_error("Video packet too large");
+                    destination[written++] = 0; destination[written++] = 0; destination[written++] = 0; destination[written++] = 1;
+                    std::memcpy(destination + written, packet->data, packet->size);
+                    written += packet->size;
+                } else {
+                    if (packet->size > capacity) throw std::runtime_error("Video packet too large");
+                    std::memcpy(destination, packet->data, packet->size);
+                    written = packet->size;
+                }
             }
             return info(env, {0, written, r->time(packet->pts, r->videoIndex), packet->flags});
         }
@@ -152,4 +212,17 @@ Java_com_aladdin_dashcam_media_FfmpegPacketReader_nativeSeek(JNIEnv* env, jobjec
     } catch (const std::exception& error) { failure(env, error); }
 }
 extern "C" JNIEXPORT void JNICALL
-Java_com_aladdin_dashcam_media_FfmpegPacketReader_nativeClose(JNIEnv*, jobject, jlong handle) { delete reinterpret_cast<Reader*>(handle); }
+Java_com_aladdin_dashcam_media_FfmpegPacketReader_nativeInterrupt(JNIEnv*, jobject, jlong handle) {
+    if (handle) {
+        auto* r = reinterpret_cast<Reader*>(handle);
+        r->interrupted.store(true, std::memory_order_relaxed);
+    }
+}
+extern "C" JNIEXPORT void JNICALL
+Java_com_aladdin_dashcam_media_FfmpegPacketReader_nativeClose(JNIEnv*, jobject, jlong handle) {
+    if (handle) {
+        auto* r = reinterpret_cast<Reader*>(handle);
+        r->interrupted.store(true, std::memory_order_relaxed);
+        delete r;
+    }
+}

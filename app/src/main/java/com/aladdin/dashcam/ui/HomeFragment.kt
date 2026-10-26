@@ -47,6 +47,15 @@ class HomeFragment : Fragment() {
         binding.btnHomeRides.setOnClickListener {
             startActivity(android.content.Intent(requireContext(), RideHistoryActivity::class.java))
         }
+        binding.btnHomeMaintenance.setOnClickListener {
+            startActivity(android.content.Intent(requireContext(), MaintenanceActivity::class.java))
+        }
+        binding.btnHomeBackup.setOnClickListener {
+            startActivity(android.content.Intent(requireContext(), LocalBackupActivity::class.java))
+        }
+        binding.btnHomeRain.setOnClickListener {
+            startActivity(android.content.Intent(requireContext(), RainModeActivity::class.java))
+        }
         binding.btnHomeLocalAlbum.setOnClickListener {
             (activity as? MainActivity)?.openLocalAlbum()
         }
@@ -57,7 +66,7 @@ class HomeFragment : Fragment() {
             if (viewModel.connectionStatus.value == ConnectionStatus.CONNECTED) {
                 (activity as? MainActivity)?.openLive(R.id.btn_mode_normal)
             } else {
-                (activity as? MainActivity)?.promptAddDevice()
+                startActivity(android.content.Intent(android.provider.Settings.ACTION_WIFI_SETTINGS))
             }
         }
     }
@@ -104,7 +113,7 @@ class HomeFragment : Fragment() {
                         binding.btnHomeConnect.text = if (isConnected) {
                             getString(R.string.home_live_short)
                         } else {
-                            getString(R.string.home_connect_short)
+                            getString(R.string.recovery_wifi_settings)
                         }
                     } else {
                         // Empty device state: show guidance
