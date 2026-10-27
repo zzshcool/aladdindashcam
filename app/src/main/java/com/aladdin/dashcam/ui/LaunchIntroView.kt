@@ -28,14 +28,12 @@ class LaunchIntroView(context: Context, private val completed: () -> Unit) : Fra
         private const val REPEAT = "repeat"
         private const val SEEN = "seen"
         private const val DURATION_MS = 2800L
-        private const val HOLD_MS = 400L
+        private const val HOLD_MS = 1200L
         private const val FRAME_INTERVAL_MS = 62L
 
         fun repeats(context: Context): Boolean = preferences(context).getBoolean(REPEAT, true)
         fun setRepeats(context: Context, enabled: Boolean) { preferences(context).edit().putBoolean(REPEAT, enabled).apply() }
-        fun shouldShow(context: Context): Boolean = android.animation.ValueAnimator.areAnimatorsEnabled() &&
-            context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)?.isTouchExplorationEnabled != true &&
-            (repeats(context) || !preferences(context).getBoolean(SEEN, false))
+        fun shouldShow(context: Context): Boolean = repeats(context) || !preferences(context).getBoolean(SEEN, false)
         private fun preferences(context: Context) = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
     }
 
@@ -46,15 +44,19 @@ class LaunchIntroView(context: Context, private val completed: () -> Unit) : Fra
     private var finished = false
     private var startTime = 0L
     private var pausedAt = 0L
+    private val touchExploration = context.getSystemService(android.view.accessibility.AccessibilityManager::class.java)
+        ?.isTouchExplorationEnabled == true
+    private val reducedMotion = touchExploration
 
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             if (finished || !isAttachedToWindow || windowVisibility != VISIBLE) return
+            if (touchExploration) return
             val now = SystemClock.uptimeMillis()
             if (startTime == 0L) startTime = now
             val elapsed = now - startTime
             if (elapsed >= DURATION_MS + HOLD_MS) { finish(); return }
-            val p = (elapsed.toFloat() / DURATION_MS).coerceIn(0f, 1f)
+            val p = if (reducedMotion) 1f else (elapsed.toFloat() / DURATION_MS).coerceIn(0f, 1f)
             if (artwork.phase != p) artwork.phase = p
             brandPanel?.alpha = ((p - 0.26f) / 0.24f).coerceIn(0f, 1f)
             if (p < 1f) {
@@ -154,7 +156,8 @@ class LaunchIntroView(context: Context, private val completed: () -> Unit) : Fra
         super.onAttachedToWindow()
         startTime = SystemClock.uptimeMillis()
         pausedAt = 0L
-        artwork.phase = 0f
+        artwork.phase = if (reducedMotion) 1f else 0f
+        brandPanel?.alpha = if (reducedMotion) 1f else 0f
         if (windowVisibility == VISIBLE) Choreographer.getInstance().postFrameCallback(frameCallback)
         else pausedAt = startTime
     }
