@@ -23,6 +23,7 @@ class MediaToolsActivity : AppCompatActivity() {
     private var exportJob: Job? = null
     private var positionMs = 0L
     private var durationMs = 0L
+    private var pauseAt: Pair<Long, CompletableDeferred<Unit>>? = null
     private lateinit var source: File
     private lateinit var key: String
     private lateinit var rows: LinearLayout
@@ -45,6 +46,7 @@ class MediaToolsActivity : AppCompatActivity() {
 
     private val bookmarks by lazy { VideoBookmarks(this) }
     private val videoTimestamp get() = intent.getLongExtra("time", 0L)
+    private val reportDraft by lazy { ReportDraftEditor(this, source) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,7 +60,9 @@ class MediaToolsActivity : AppCompatActivity() {
         rows.addView(button("‹ ${getString(R.string.video_tools)}") { finish() })
         rows.addView(label(source.name))
         val gl = GLSurfaceView(this)
-        rows.addView(gl, LinearLayout.LayoutParams(-1, (220 * resources.displayMetrics.density).toInt()))
+        val videoContainer = FrameLayout(this)
+        videoContainer.addView(gl, FrameLayout.LayoutParams(-1, -1))
+        rows.addView(videoContainer, LinearLayout.LayoutParams(-1, (220 * resources.displayMetrics.density).toInt()))
         val transport = LinearLayout(this)
         transport.addView(button(getString(R.string.video_play_pause)) {
             player?.let { native ->
@@ -68,6 +72,16 @@ class MediaToolsActivity : AppCompatActivity() {
         })
         transport.addView(button(getString(R.string.bookmark_add)) { bookmarks.add(key, positionMs); showBookmarks() })
         rows.addView(transport)
+        rows.addView(button("擷取目前畫面為照片") { capturePhoto() })
+        val fineSeek = LinearLayout(this)
+        listOf(-100L, 100L).forEach { delta ->
+            fineSeek.addView(button(if (delta < 0) "前移 0.1 秒" else "後移 0.1 秒") {
+                if (durationMs > 0 && exportJob?.isActive != true) lifecycleScope.launch {
+                    seekPreview((positionMs + delta).coerceIn(0L, (durationMs - 1).coerceAtLeast(0)), pauseAfter = true)
+                }
+            })
+        }
+        rows.addView(fineSeek)
         rangeLabel = label(getString(R.string.video_loading)); rows.addView(rangeLabel)
         range = RangeSlider(this).apply { valueFrom = 0f; valueTo = 1f; values = listOf(0f, 1f); isEnabled = false }
         rows.addView(range)
@@ -123,8 +137,40 @@ class MediaToolsActivity : AppCompatActivity() {
         rows.addView(button(getString(R.string.bookmark_list)) { showBookmarks() })
         rows.addView(button(getString(R.string.event_export)) { exportEvent() })
 
+        // Keep the evidence workflow together; optional ride tools remain expandable.
+        rows.removeView(positionSeek)
+        rows.addView(positionSeek, rows.indexOfChild(transport))
+        val endpoints = LinearLayout(this)
+        endpoints.addView(button("設為開始") { markEndpoint(true) })
+        endpoints.addView(button("設為結束") { markEndpoint(false) })
+        rows.addView(endpoints, rows.indexOfChild(rangeLabel))
+        val advanced = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
+        val firstAdvanced = rows.indexOfChild(range) + 1
+        while (rows.getChildAt(firstAdvanced) != progress) {
+            val child = rows.getChildAt(firstAdvanced)
+            rows.removeView(child)
+            advanced.addView(child)
+        }
+        rows.addView(button("騎乘疊圖與進階選項 ▾") {
+            advanced.visibility = if (advanced.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        })
+        rows.addView(advanced)
+        export.text = "儲存選取片段"
+        rows.addView(button("填寫／繼續檢舉草稿") {
+            if (exportJob?.isActive == true) return@button
+            player?.setPaused(true)
+            reportDraft.open(if (selectedRide != null || videoTimestamp > 0) alignedVideoTime() + positionMs else 0L,
+                selectedRide?.id)
+        }, rows.indexOfChild(transport))
+
+        if (savedInstanceState?.getBoolean("reportOpen") == true) reportDraft.open(
+            if (videoTimestamp > 0) videoTimestamp + positionMs else 0L, savedInstanceState.getString("ride"))
+
         player = NativeFfmpegPlayer(gl, onProgress = { pos, duration ->
             positionMs = pos
+            pauseAt?.takeIf { pos in it.first..(it.first + 250) }?.let {
+                player?.setPaused(true); it.second.complete(Unit)
+            }
             if (!draggingPosition && duration > 0) positionSeek.progress = (pos * 1000 / duration).coerceIn(0, 1000).toInt()
             updateSynchronizedPreview()
             if (duration > 0 && durationMs == 0L) {
@@ -180,10 +226,16 @@ class MediaToolsActivity : AppCompatActivity() {
                 }.show()
             }.show()
     }
-    private suspend fun seekPreview(position: Long) {
+    private suspend fun seekPreview(position: Long, pauseAfter: Boolean = false) {
         val native = player ?: return
+        val reached = if (pauseAfter) CompletableDeferred<Unit>() else null
+        if (reached != null) pauseAt = position to reached
         if (!native.hasSource || !native.seekTo(position)) native.start(source.absolutePath, streaming = false, startPositionMs = position)
         else native.setPaused(false)
+        if (reached != null) {
+            try { withTimeoutOrNull(3000) { reached.await() } }
+            finally { native.setPaused(true); pauseAt = null }
+        }
     }
     private fun startExport() {
         if (exportJob?.isActive == true) return
@@ -208,7 +260,9 @@ class MediaToolsActivity : AppCompatActivity() {
                 }
                 val published = withContext(Dispatchers.IO) { runCatching { MediaFiles.publish(this@MediaToolsActivity, output, true) }.isSuccess }
                 progress.text = getString(if (published) R.string.video_export_done else R.string.video_export_app_only, output.name)
+                reportDraft.attach(output, start)
                 rows.addView(button(getString(R.string.video_share)) { MediaFiles.share(this@MediaToolsActivity, output, "video/mp4") })
+                showSaved(output, "video/mp4", published)
             } catch (cancelled: CancellationException) { progress.text = getString(R.string.export_cancelled); throw cancelled }
             catch (error: Throwable) { progress.text = getString(R.string.video_export_failed, error.message) }
             finally {
@@ -218,6 +272,53 @@ class MediaToolsActivity : AppCompatActivity() {
                 window.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
         }
+    }
+    private fun capturePhoto() {
+        if (exportJob?.isActive == true || pauseAt != null || durationMs <= 0) return
+        val native = player ?: return
+        native.setPaused(true)
+        exportJob = lifecycleScope.launch {
+            val output = File(MediaFiles.moviesDir(this@MediaToolsActivity),
+                "${source.nameWithoutExtension}_${positionMs}ms_${UUID.randomUUID().toString().take(8)}.jpg")
+            try {
+                native.saveSnapshot(output).getOrThrow()
+                val published = withContext(Dispatchers.IO) {
+                    if (android.os.Build.VERSION.SDK_INT < 29) false
+                    else runCatching { MediaFiles.publish(this@MediaToolsActivity, output, false) }.isSuccess
+                }
+                progress.text = if (published) "照片已存入相簿：${output.name}" else "照片已儲存在 App，可使用下方分享：${output.name}"
+                reportDraft.attach(output, positionMs)
+                rows.addView(button("分享照片：${output.name}") {
+                    MediaFiles.share(this@MediaToolsActivity, output, "image/jpeg")
+                })
+                showSaved(output, "image/jpeg", published)
+            } catch (cancelled: CancellationException) {
+                output.delete()
+                throw cancelled
+            } catch (error: Exception) {
+                output.delete()
+                progress.text = "照片擷取失敗：${error.message}"
+            }
+        }
+    }
+    private fun markEndpoint(start: Boolean) {
+        if (durationMs <= 0 || exportJob?.isActive == true) return
+        player?.setPaused(true)
+        val seconds = (positionMs / 1000f).coerceIn(0f, range.valueTo)
+        val values = range.values
+        if ((start && seconds >= values[1]) || (!start && seconds <= values[0])) {
+            Toast.makeText(this, "結束時間必須晚於開始時間", Toast.LENGTH_SHORT).show()
+            return
+        }
+        range.values = if (start) listOf(seconds, values[1]) else listOf(values[0], seconds)
+        rangeLabel.text = getString(R.string.video_range, range.values[0], range.values[1])
+    }
+    private fun showSaved(file: File, mime: String, published: Boolean) {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(if (mime.startsWith("image")) "照片已儲存" else "片段已儲存")
+            .setMessage(if (published) "已存入手機相簿，可在檢舉網站選取上傳。" else "已存入 App，可透過分享取出檔案。")
+            .setPositiveButton("分享") { _, _ -> MediaFiles.share(this, file, mime) }
+            .setNegativeButton("繼續擷取", null).show()
     }
     private fun alignedVideoTime(): Long {
         val ride = selectedRide ?: return videoTimestamp
@@ -286,6 +387,8 @@ class MediaToolsActivity : AppCompatActivity() {
             }.show()
     }
     override fun onSaveInstanceState(outState: Bundle) {
+        reportDraft.saveEditingState()
+        outState.putBoolean("reportOpen", reportDraft.isOpen)
         outState.putLong("position", positionMs); outState.putInt("routeContainer", mapContainer.id)
         outState.putString("ride", selectedRide?.id); outState.putString("alignment", offset.text.toString())
         super.onSaveInstanceState(outState)

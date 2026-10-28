@@ -1,0 +1,6 @@
+內政部國土測繪中心 2025 直轄市、縣（市）界線（1140318）。
+政府資料開放授權條款第1版：https://data.gov.tw/license
+原始資料：https://data.gov.tw/dataset/7442
+GeoJSON 轉換版本：https://geo.maderaojen.me/datasets/tw-counties/releases/v1/2026-08-07.1/data.geojson
+SHA-256：25a1ef2fcd0c09f5dabe070fbd64490e0084cba8795c2724a9be335e2d6a183e
+用途：離線縣市建議；非道路管轄或法律界址認定。

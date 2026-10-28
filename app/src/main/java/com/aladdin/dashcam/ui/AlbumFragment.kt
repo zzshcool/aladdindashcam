@@ -86,6 +86,8 @@ class AlbumFragment : Fragment() {
     private var playbackCommandJob: Job? = null
     private var previewRequestId = 0L
     private var downloadJob: Job? = null
+    private var reportJob: Job? = null
+    private var reportButton: android.widget.Button? = null
     private var listRefreshJob: Job? = null
     private var albumEnterJob: Deferred<Result<Unit>>? = null
     private var albumExitJob: Job? = null
@@ -191,6 +193,7 @@ class AlbumFragment : Fragment() {
         binding.btnViewerSegments.visibility = View.GONE
         binding.btnViewerSegments.isSelected = segmentsExpanded
         binding.viewerTopBar.visibility = View.VISIBLE
+        reportButton?.visibility = if (viewingVideo) View.VISIBLE else View.GONE
         binding.layoutViewerControls.visibility = if (viewingVideo) View.VISIBLE else View.GONE
         (binding.layoutViewerControls.layoutParams as android.widget.FrameLayout.LayoutParams).bottomMargin =
             if (binding.layoutViewerStripContainer.visibility == View.VISIBLE) (112 * resources.displayMetrics.density).toInt() else 0
@@ -581,6 +584,19 @@ class AlbumFragment : Fragment() {
         }
 
         // Viewer controls
+        reportButton = com.google.android.material.button.MaterialButton(requireContext()).apply {
+            text = "檢舉"
+            contentDescription = "擷取照片／製作檢舉資料"
+            isAllCaps = false
+            minWidth = 0
+            setPadding(12, 0, 12, 0)
+            setOnClickListener { currentViewingItem?.let { beginReport(it) } }
+        }.also { button ->
+            (binding.btnViewerMore.parent as ViewGroup).addView(button,
+                (binding.btnViewerMore.parent as ViewGroup).indexOfChild(binding.btnViewerMore),
+                ViewGroup.LayoutParams((64 * resources.displayMetrics.density).toInt(),
+                    (48 * resources.displayMetrics.density).toInt()))
+        }
         binding.btnViewerBack.setOnClickListener {
             closeViewer()
         }
@@ -589,12 +605,13 @@ class AlbumFragment : Fragment() {
             val menu = androidx.appcompat.widget.PopupMenu(requireContext(), anchor)
             if (item.isVideo) {
                 menu.menu.add(0, 1, 0, getString(R.string.bookmark_add))
-                menu.menu.add(0, 2, 1, getString(R.string.video_tools))
+                menu.menu.add(0, 2, 1, "擷取照片／檢舉片段")
                 menu.menu.add(0, 4, 3, getString(R.string.viewer_segments))
                 if (isDeviceSource) menu.menu.add(0, 5, 4, getString(R.string.event_download_neighbors))
             }
             menu.menu.add(0, 3, 2, getString(R.string.video_share))
             menu.setOnMenuItemClickListener { action ->
+                if (action.itemId == 2) { beginReport(item); return@setOnMenuItemClickListener true }
                 if (action.itemId == 5) {
                     val event = item.timestampMillis + videoPositionMs
                     closeViewer()
@@ -613,11 +630,7 @@ class AlbumFragment : Fragment() {
                 } else {
                     val file = viewModel.getLocalMediaFile(item)?.takeIf { it.isFile }
                     if (file == null) Toast.makeText(requireContext(), R.string.video_download_first, Toast.LENGTH_LONG).show()
-                    else if (action.itemId == 2) {
-                        startActivity(android.content.Intent(requireContext(), MediaToolsActivity::class.java)
-                            .putExtra("path", file.absolutePath).putExtra("key", item.sourceDeviceId + ":" + item.fileName)
-                            .putExtra("time", item.timestampMillis).putExtra("position", videoPositionMs))
-                    } else com.aladdin.dashcam.media.MediaFiles.share(requireContext(), file, if (item.isVideo) "video/*" else "image/jpeg")
+                    else com.aladdin.dashcam.media.MediaFiles.share(requireContext(), file, if (item.isVideo) "video/*" else "image/jpeg")
                 }
                 true
             }
@@ -1214,6 +1227,51 @@ class AlbumFragment : Fragment() {
         }
     }
 
+    private fun beginReport(item: MediaItem) {
+        if (!item.isVideo || reportJob?.isActive == true) return
+        val position = videoPositionMs
+        fun openTools(file: File) {
+            startActivity(android.content.Intent(requireContext(), MediaToolsActivity::class.java)
+                .putExtra("path", file.absolutePath).putExtra("key", item.sourceDeviceId + ":" + item.fileName)
+                .putExtra("time", item.timestampMillis).putExtra("position", position))
+        }
+        viewModel.getLocalMediaFile(item)?.let { openTools(it); return }
+        if (viewModel.connectionStatus.value != ConnectionStatus.CONNECTED) {
+            Toast.makeText(requireContext(), "請先連線記錄器，才能下載影片製作檢舉資料", Toast.LENGTH_LONG).show()
+            return
+        }
+        closeViewer()
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle("準備檢舉影片")
+            .setMessage("正在下載原始影片，完成後會自動開啟檢舉工具。")
+            .setNegativeButton("稍後處理") { _, _ -> reportJob?.cancel() }
+            .create()
+        dialog.setOnCancelListener { reportJob?.cancel() }
+        dialog.show()
+        reportJob = viewLifecycleOwner.lifecycleScope.launch {
+            var progress: Job? = null
+            try {
+                playbackStopJob?.join()
+                val download = viewModel.startPermanentDownload(item)
+                progress = launch {
+                    viewModel.downloadTasks.collect { tasks ->
+                        val task = tasks.find { it.id == item.storageKey } ?: return@collect
+                        val percent = if (task.totalBytes > 0) (task.bytesRead * 100 / task.totalBytes).coerceIn(0, 100) else 0
+                        dialog.setMessage(if (task.status == DownloadStatus.PENDING) "等待下載，請保持記錄器連線。\n完成後會自動開啟檢舉工具。"
+                            else "下載中 $percent%\n完成後會自動開啟檢舉工具。")
+                    }
+                }
+                download.join()
+                val file = viewModel.getLocalMediaFile(item)
+                if (file != null && lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) && !isHidden) openTools(file)
+                else if (file == null) Toast.makeText(context, "影片下載未完成，請在下載頁查看狀態後重試檢舉。", Toast.LENGTH_LONG).show()
+            } finally {
+                progress?.cancel()
+                dialog.dismiss()
+            }
+        }
+    }
+
     /**
      * Starts user-confirmed permanent download to local storage.
      * Delegates to DashCamViewModel's unified startPermanentDownload (F1 / Single Ownership).
@@ -1398,6 +1456,7 @@ class AlbumFragment : Fragment() {
 
     override fun onStop() {
         super.onStop()
+        reportJob?.cancel()
         if (_binding != null && currentViewingItem != null) closeViewer()
         if (_binding != null && isDeviceSource) {
             listRefreshJob?.cancel()
@@ -1427,5 +1486,6 @@ class AlbumFragment : Fragment() {
         nativePlayer = null
         releasePreviewProtection()
         _binding = null
+        reportButton = null
     }
 }

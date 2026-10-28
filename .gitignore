@@ -70,3 +70,4 @@ captures/
 **/test/
 docs/screenshots/
 scratch/
+app/src/androidTest/
